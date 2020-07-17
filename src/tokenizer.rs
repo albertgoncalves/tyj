@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::str::CharIndices;
 
 #[derive(Debug, PartialEq)]
-enum Token<'a> {
+pub(crate) enum Tkn<'a> {
     LBrace,
     RBrace,
     LParen,
@@ -13,10 +13,10 @@ enum Token<'a> {
     Dot,
     Equals,
     Var,
-    Null,
-    Undef,
     Ident(&'a str),
     BinOp(&'a str),
+    Null,
+    Undef,
     Num(&'a str),
     Str(&'a str),
     Bool(&'a str),
@@ -27,9 +27,9 @@ fn is_numeric(c: char) -> bool {
     (c == '.') || c.is_digit(10)
 }
 
-fn get_tokens(string: &str) -> Vec<Token> {
+fn get_tokens(string: &str) -> Vec<Tkn> {
     let mut chars: Peekable<CharIndices> = string.char_indices().peekable();
-    let mut tokens: Vec<Token> = Vec::with_capacity(string.len());
+    let mut tokens: Vec<Tkn> = Vec::with_capacity(string.len());
 
     macro_rules! eat_char {
         () => {
@@ -80,44 +80,44 @@ fn get_tokens(string: &str) -> Vec<Token> {
                     |c: char| c.is_alphabetic() || c.is_digit(10),
                     i,
                 );
-                let token: Token<'_> = match ident {
-                    "var" => Token::Var,
-                    "null" => Token::Null,
-                    "undefined" => Token::Undef,
-                    "true" | "false" => Token::Bool(ident),
-                    _ => Token::Ident(ident),
+                let token: Tkn<'_> = match ident {
+                    "var" => Tkn::Var,
+                    "null" => Tkn::Null,
+                    "undefined" => Tkn::Undef,
+                    "true" | "false" => Tkn::Bool(ident),
+                    _ => Tkn::Ident(ident),
                 };
                 tokens.push(token);
             }
             _ if is_numeric(c) => {
                 let num: &str = get_substring!(is_numeric, i);
                 if num == "." {
-                    tokens.push(Token::Dot);
+                    tokens.push(Tkn::Dot);
                 } else if (num.matches('.').count() < 2)
                     && (0 < num.matches(|c: char| c.is_digit(10)).count())
                 {
-                    tokens.push(Token::Num(num));
+                    tokens.push(Tkn::Num(num));
                 } else {
-                    tokens.push(Token::Illegal(num));
+                    tokens.push(Tkn::Illegal(num));
                 }
             }
-            '=' => tokens.push(Token::Equals),
-            ':' => tokens.push(Token::Colon),
-            ';' => tokens.push(Token::Semicolon),
-            ',' => tokens.push(Token::Comma),
-            '.' => tokens.push(Token::Dot),
-            '{' => tokens.push(Token::LBrace),
-            '}' => tokens.push(Token::RBrace),
-            '(' => tokens.push(Token::LParen),
-            ')' => tokens.push(Token::RParen),
-            '+' => tokens.push(Token::BinOp(&string[i..(i + 1)])),
+            '=' => tokens.push(Tkn::Equals),
+            ':' => tokens.push(Tkn::Colon),
+            ';' => tokens.push(Tkn::Semicolon),
+            ',' => tokens.push(Tkn::Comma),
+            '.' => tokens.push(Tkn::Dot),
+            '{' => tokens.push(Tkn::LBrace),
+            '}' => tokens.push(Tkn::RBrace),
+            '(' => tokens.push(Tkn::LParen),
+            ')' => tokens.push(Tkn::RParen),
+            '+' => tokens.push(Tkn::BinOp(&string[i..(i + 1)])),
             '"' => {
                 if let Some((i, _)) = chars.next() {
-                    tokens.push(Token::Str(get_str_literal!(i)));
+                    tokens.push(Tkn::Str(get_str_literal!(i)));
                     eat_char!();
                 }
             }
-            _ => tokens.push(Token::Illegal(&string[i..(i + 1)])),
+            _ => tokens.push(Tkn::Illegal(&string[i..(i + 1)])),
         }
     }
     tokens
@@ -125,7 +125,7 @@ fn get_tokens(string: &str) -> Vec<Token> {
 
 #[cfg(test)]
 mod tests {
-    use super::{get_tokens, Token};
+    use super::{get_tokens, Tkn};
 
     macro_rules! assert_token {
         ($a:expr, $b:expr $(,)?) => {
@@ -141,48 +141,42 @@ mod tests {
 
     #[test]
     fn null() {
-        assert_token!("null", Token::Null);
-        assert_tokens!("null;", vec![Token::Null, Token::Semicolon]);
+        assert_token!("null", Tkn::Null);
+        assert_tokens!("null;", vec![Tkn::Null, Tkn::Semicolon]);
     }
 
     #[test]
     fn undefined() {
-        assert_token!("undefined", Token::Undef);
-        assert_tokens!("undefined;", vec![Token::Undef, Token::Semicolon]);
+        assert_token!("undefined", Tkn::Undef);
+        assert_tokens!("undefined;", vec![Tkn::Undef, Tkn::Semicolon]);
     }
 
     #[test]
     fn number() {
-        assert_token!("1", Token::Num("1"));
-        assert_token!("10", Token::Num("10"));
-        assert_token!(".10", Token::Num(".10"));
-        assert_token!("1.0", Token::Num("1.0"));
-        assert_token!("1.0.", Token::Illegal("1.0."));
-        assert_tokens!("1;", vec![Token::Num("1"), Token::Semicolon]);
-        assert_tokens!("10;", vec![Token::Num("10"), Token::Semicolon]);
-        assert_tokens!(".10;", vec![Token::Num(".10"), Token::Semicolon]);
-        assert_tokens!("1.0;", vec![Token::Num("1.0"), Token::Semicolon]);
-        assert_tokens!(
-            "1.0.;",
-            vec![Token::Illegal("1.0."), Token::Semicolon],
-        );
+        assert_token!("1", Tkn::Num("1"));
+        assert_token!("10", Tkn::Num("10"));
+        assert_token!(".10", Tkn::Num(".10"));
+        assert_token!("1.0", Tkn::Num("1.0"));
+        assert_token!("1.0.", Tkn::Illegal("1.0."));
+        assert_tokens!("1;", vec![Tkn::Num("1"), Tkn::Semicolon]);
+        assert_tokens!("10;", vec![Tkn::Num("10"), Tkn::Semicolon]);
+        assert_tokens!(".10;", vec![Tkn::Num(".10"), Tkn::Semicolon]);
+        assert_tokens!("1.0;", vec![Tkn::Num("1.0"), Tkn::Semicolon]);
+        assert_tokens!("1.0.;", vec![Tkn::Illegal("1.0."), Tkn::Semicolon],);
     }
 
     #[test]
     fn string() {
-        assert_token!("\"blah\"", Token::Str("blah"));
-        assert_tokens!(
-            "\"blah\";",
-            vec![Token::Str("blah"), Token::Semicolon],
-        );
+        assert_token!("\"blah\"", Tkn::Str("blah"));
+        assert_tokens!("\"blah\";", vec![Tkn::Str("blah"), Tkn::Semicolon],);
     }
 
     #[test]
     fn bool() {
-        assert_token!("true", Token::Bool("true"));
-        assert_token!("false", Token::Bool("false"));
-        assert_tokens!("true;", vec![Token::Bool("true"), Token::Semicolon]);
-        assert_tokens!("false;", vec![Token::Bool("false"), Token::Semicolon]);
+        assert_token!("true", Tkn::Bool("true"));
+        assert_token!("false", Tkn::Bool("false"));
+        assert_tokens!("true;", vec![Tkn::Bool("true"), Tkn::Semicolon]);
+        assert_tokens!("false;", vec![Tkn::Bool("false"), Tkn::Semicolon]);
     }
 
     #[test]
@@ -190,16 +184,16 @@ mod tests {
         assert_tokens!(
             "{ a: null, bc: undefined };",
             vec![
-                Token::LBrace,
-                Token::Ident("a"),
-                Token::Colon,
-                Token::Null,
-                Token::Comma,
-                Token::Ident("bc"),
-                Token::Colon,
-                Token::Undef,
-                Token::RBrace,
-                Token::Semicolon
+                Tkn::LBrace,
+                Tkn::Ident("a"),
+                Tkn::Colon,
+                Tkn::Null,
+                Tkn::Comma,
+                Tkn::Ident("bc"),
+                Tkn::Colon,
+                Tkn::Undef,
+                Tkn::RBrace,
+                Tkn::Semicolon
             ],
         );
     }
@@ -209,11 +203,11 @@ mod tests {
         assert_tokens!(
             "var a = \"null\";",
             vec![
-                Token::Var,
-                Token::Ident("a"),
-                Token::Equals,
-                Token::Str("null"),
-                Token::Semicolon,
+                Tkn::Var,
+                Tkn::Ident("a"),
+                Tkn::Equals,
+                Tkn::Str("null"),
+                Tkn::Semicolon,
             ],
         )
     }
@@ -232,30 +226,30 @@ mod tests {
              false;\
              { a: 0.1 };",
             vec![
-                Token::Null,
-                Token::Semicolon,
-                Token::Undef,
-                Token::Semicolon,
-                Token::Num("1"),
-                Token::Semicolon,
-                Token::Num("10"),
-                Token::Semicolon,
-                Token::Num(".10"),
-                Token::Semicolon,
-                Token::Num("1.0"),
-                Token::Semicolon,
-                Token::Str("blah"),
-                Token::Semicolon,
-                Token::Bool("true"),
-                Token::Semicolon,
-                Token::Bool("false"),
-                Token::Semicolon,
-                Token::LBrace,
-                Token::Ident("a"),
-                Token::Colon,
-                Token::Num("0.1"),
-                Token::RBrace,
-                Token::Semicolon,
+                Tkn::Null,
+                Tkn::Semicolon,
+                Tkn::Undef,
+                Tkn::Semicolon,
+                Tkn::Num("1"),
+                Tkn::Semicolon,
+                Tkn::Num("10"),
+                Tkn::Semicolon,
+                Tkn::Num(".10"),
+                Tkn::Semicolon,
+                Tkn::Num("1.0"),
+                Tkn::Semicolon,
+                Tkn::Str("blah"),
+                Tkn::Semicolon,
+                Tkn::Bool("true"),
+                Tkn::Semicolon,
+                Tkn::Bool("false"),
+                Tkn::Semicolon,
+                Tkn::LBrace,
+                Tkn::Ident("a"),
+                Tkn::Colon,
+                Tkn::Num("0.1"),
+                Tkn::RBrace,
+                Tkn::Semicolon,
             ],
         )
     }
@@ -272,50 +266,50 @@ mod tests {
                 var f = d + e;\
             };",
             vec![
-                Token::Ident("window"),
-                Token::Dot,
-                Token::Ident("onload"),
-                Token::Equals,
-                Token::Ident("function"),
-                Token::LParen,
-                Token::RParen,
-                Token::LBrace,
-                Token::Var,
-                Token::Ident("a"),
-                Token::Equals,
-                Token::Num("0.1"),
-                Token::Semicolon,
-                Token::Var,
-                Token::Ident("b"),
-                Token::Equals,
-                Token::Num("10"),
-                Token::Semicolon,
-                Token::Var,
-                Token::Ident("c"),
-                Token::Equals,
-                Token::Ident("a"),
-                Token::BinOp("+"),
-                Token::Ident("b"),
-                Token::Semicolon,
-                Token::Var,
-                Token::Ident("d"),
-                Token::Equals,
-                Token::Str("foo"),
-                Token::Semicolon,
-                Token::Var,
-                Token::Ident("e"),
-                Token::Equals,
-                Token::Str("bar"),
-                Token::Semicolon,
-                Token::Var,
-                Token::Ident("f"),
-                Token::Equals,
-                Token::Ident("d"),
-                Token::BinOp("+"),
-                Token::Ident("e"),
-                Token::Semicolon,
-                Token::RBrace,
-                Token::Semicolon,
+                Tkn::Ident("window"),
+                Tkn::Dot,
+                Tkn::Ident("onload"),
+                Tkn::Equals,
+                Tkn::Ident("function"),
+                Tkn::LParen,
+                Tkn::RParen,
+                Tkn::LBrace,
+                Tkn::Var,
+                Tkn::Ident("a"),
+                Tkn::Equals,
+                Tkn::Num("0.1"),
+                Tkn::Semicolon,
+                Tkn::Var,
+                Tkn::Ident("b"),
+                Tkn::Equals,
+                Tkn::Num("10"),
+                Tkn::Semicolon,
+                Tkn::Var,
+                Tkn::Ident("c"),
+                Tkn::Equals,
+                Tkn::Ident("a"),
+                Tkn::BinOp("+"),
+                Tkn::Ident("b"),
+                Tkn::Semicolon,
+                Tkn::Var,
+                Tkn::Ident("d"),
+                Tkn::Equals,
+                Tkn::Str("foo"),
+                Tkn::Semicolon,
+                Tkn::Var,
+                Tkn::Ident("e"),
+                Tkn::Equals,
+                Tkn::Str("bar"),
+                Tkn::Semicolon,
+                Tkn::Var,
+                Tkn::Ident("f"),
+                Tkn::Equals,
+                Tkn::Ident("d"),
+                Tkn::BinOp("+"),
+                Tkn::Ident("e"),
+                Tkn::Semicolon,
+                Tkn::RBrace,
+                Tkn::Semicolon,
             ],
         );
     }
