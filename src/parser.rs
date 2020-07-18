@@ -21,6 +21,7 @@ enum Expr<'a> {
 #[derive(Debug, PartialEq)]
 enum Stmt<'a> {
     Var(&'a str, Expr<'a>),
+    Ret(Expr<'a>),
 }
 
 macro_rules! eat {
@@ -96,12 +97,28 @@ fn get_var<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Stmt<'a> {
     var
 }
 
+fn get_ret<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Stmt<'a> {
+    let expr: Expr = match tokens.peek() {
+        Some(Tkn::Semicolon) => {
+            eat!(tokens);
+            Expr::Undef
+        }
+        _ => {
+            let expr: Expr = get_expr(tokens);
+            eat_or_panic!(tokens, Tkn::Semicolon);
+            expr
+        }
+    };
+    Stmt::Ret(expr)
+}
+
 fn get_ast<'a>(tokens: &[Tkn<'a>]) -> Vec<Stmt<'a>> {
     let mut ast: Vec<Stmt> = Vec::new();
     let mut tokens: Peekable<Iter<'_, Tkn<'_>>> = tokens.iter().peekable();
     while let Some(t) = tokens.next() {
         match t {
             Tkn::Var => ast.push(get_var(&mut tokens)),
+            Tkn::Ret => ast.push(get_ret(&mut tokens)),
             _ => panic!(),
         }
     }
@@ -224,6 +241,21 @@ mod tests {
     }
 
     #[test]
+    fn var_empty_object() {
+        assert_ast!(
+            &[
+                Tkn::Var,
+                Tkn::Ident("x"),
+                Tkn::Equals,
+                Tkn::LBrace,
+                Tkn::RBrace,
+                Tkn::Semicolon,
+            ],
+            vec![Stmt::Var("x", Expr::Obj(Vec::new()))],
+        );
+    }
+
+    #[test]
     fn var_object_trailing_comma() {
         assert_ast!(
             &[
@@ -331,5 +363,47 @@ mod tests {
                 ),
             ],
         )
+    }
+
+    #[test]
+    fn return_nothing() {
+        assert_ast!(&[Tkn::Ret, Tkn::Semicolon], vec![Stmt::Ret(Expr::Undef)])
+    }
+
+    #[test]
+    fn return_object() {
+        assert_ast!(
+            &[
+                Tkn::Ret,
+                Tkn::LBrace,
+                Tkn::Ident("ab"),
+                Tkn::Colon,
+                Tkn::Null,
+                Tkn::Comma,
+                Tkn::Ident("cd"),
+                Tkn::Colon,
+                Tkn::Undef,
+                Tkn::RBrace,
+                Tkn::Semicolon,
+            ],
+            vec![Stmt::Ret(Expr::Obj(vec![
+                Prop {
+                    key: "ab",
+                    value: Expr::Null,
+                },
+                Prop {
+                    key: "cd",
+                    value: Expr::Undef,
+                },
+            ]))],
+        );
+    }
+
+    #[test]
+    fn return_empty_object() {
+        assert_ast!(
+            &[Tkn::Ret, Tkn::LBrace, Tkn::RBrace, Tkn::Semicolon],
+            vec![Stmt::Ret(Expr::Obj(Vec::new()))],
+        );
     }
 }
