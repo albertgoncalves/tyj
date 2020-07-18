@@ -13,6 +13,8 @@ pub(crate) enum Tkn<'a> {
     Dot,
     Equals,
     Var,
+    Fn,
+    Ret,
     Ident(&'a str),
     BinOp(&'a str),
     Null,
@@ -82,6 +84,8 @@ fn get_tokens(string: &str) -> Vec<Tkn> {
                 );
                 let token: Tkn<'_> = match ident {
                     "var" => Tkn::Var,
+                    "function" => Tkn::Fn,
+                    "return" => Tkn::Ret,
                     "null" => Tkn::Null,
                     "undefined" => Tkn::Undef,
                     "true" | "false" => Tkn::Bool(ident),
@@ -255,6 +259,26 @@ mod tests {
     }
 
     #[test]
+    fn tiny_function() {
+        assert_tokens!(
+            "function f() {
+                return 0;
+            }",
+            vec![
+                Tkn::Fn,
+                Tkn::Ident("f"),
+                Tkn::LParen,
+                Tkn::RParen,
+                Tkn::LBrace,
+                Tkn::Ret,
+                Tkn::Num("0"),
+                Tkn::Semicolon,
+                Tkn::RBrace,
+            ],
+        );
+    }
+
+    #[test]
     fn tiny_program() {
         assert_tokens!(
             "window.onload = function() {\
@@ -270,7 +294,7 @@ mod tests {
                 Tkn::Dot,
                 Tkn::Ident("onload"),
                 Tkn::Equals,
-                Tkn::Ident("function"),
+                Tkn::Fn,
                 Tkn::LParen,
                 Tkn::RParen,
                 Tkn::LBrace,
