@@ -89,7 +89,7 @@ fn get_infix_binding_power(op: &str) -> (u8, u8) {
     }
 }
 
-fn get_anon_fn<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Expr<'a> {
+fn get_args<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Vec<&'a str> {
     eat_or_panic!(tokens, Tkn::LParen);
     let mut args: Vec<&str> = Vec::new();
     while let Some(t) = tokens.next() {
@@ -106,8 +106,14 @@ fn get_anon_fn<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Expr<'a> {
             _ => panic!(),
         }
     }
-    let mut body: Vec<Stmt> = Vec::new();
+    args
+}
+
+fn get_body<'a, 'b>(
+    tokens: &mut Peekable<Iter<'b, Tkn<'a>>>,
+) -> Vec<Stmt<'a>> {
     eat_or_panic!(tokens, Tkn::LBrace);
+    let mut body: Vec<Stmt> = Vec::new();
     while let Some(t) = tokens.peek() {
         match t {
             Tkn::RBrace => {
@@ -117,6 +123,12 @@ fn get_anon_fn<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Expr<'a> {
             _ => body.push(get_stmt(tokens)),
         }
     }
+    body
+}
+
+fn get_fn<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Expr<'a> {
+    let args: Vec<&str> = get_args(tokens);
+    let body: Vec<Stmt> = get_body(tokens);
     Expr::Fn { args, body }
 }
 
@@ -129,7 +141,7 @@ fn get_expr<'a, 'b>(
         Some(Tkn::Str(x)) => Expr::Str(x),
         Some(Tkn::Bool(x)) => Expr::Bool(x),
         Some(Tkn::Ident(x)) => Expr::Ref(x),
-        Some(Tkn::Fn) => get_anon_fn(tokens),
+        Some(Tkn::Fn) => get_fn(tokens),
         Some(Tkn::Null) => Expr::Null,
         Some(Tkn::Undef) => Expr::Undef,
         Some(Tkn::LBrace) => {
@@ -181,43 +193,14 @@ fn get_expr<'a, 'b>(
     expr
 }
 
-fn get_fn<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Stmt<'a> {
-    let ident: &str = get_ident(tokens);
-    eat_or_panic!(tokens, Tkn::LParen);
-    let mut args: Vec<&str> = Vec::new();
-    while let Some(t) = tokens.next() {
-        match t {
-            Tkn::Ident(x) => {
-                args.push(x);
-                match tokens.next() {
-                    Some(Tkn::Comma) => (),
-                    Some(Tkn::RParen) => break,
-                    _ => panic!(),
-                }
-            }
-            Tkn::RParen => break,
-            _ => panic!(),
-        }
-    }
-    let mut body: Vec<Stmt> = Vec::new();
-    eat_or_panic!(tokens, Tkn::LBrace);
-    while let Some(t) = tokens.peek() {
-        match t {
-            Tkn::RBrace => {
-                eat!(tokens);
-                break;
-            }
-            _ => body.push(get_stmt(tokens)),
-        }
-    }
-    Stmt::Fn { ident, args, body }
-}
-
 fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Stmt<'a> {
     match tokens.peek() {
         Some(Tkn::Fn) => {
             eat!(tokens);
-            get_fn(tokens)
+            let ident: &str = get_ident(tokens);
+            let args: Vec<&str> = get_args(tokens);
+            let body: Vec<Stmt> = get_body(tokens);
+            Stmt::Fn { ident, args, body }
         }
         Some(Tkn::Var) => {
             eat!(tokens);
@@ -505,7 +488,7 @@ mod tests {
     }
 
     #[test]
-    fn multiple_vars() {
+    fn multiple_declares() {
         assert_ast!(
             &[
                 Tkn::Var,
@@ -773,7 +756,7 @@ mod tests {
     }
 
     #[test]
-    fn declare_anon_fn() {
+    fn declare_anonymous_function() {
         assert_ast!(
             &[
                 Tkn::Var,
@@ -859,7 +842,7 @@ mod tests {
                             right: Box::new(Expr::Ref("b")),
                         }),
                     ],
-                }
+                },
             }],
         )
     }

@@ -356,7 +356,7 @@ mod tests {
     }
 
     #[test]
-    fn declare_anon_fn() {
+    fn declare_anonymous_function() {
         assert_tokens!(
             "var f = function(x) {
                 return x + 0.1;
