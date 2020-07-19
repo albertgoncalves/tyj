@@ -33,7 +33,7 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
     let mut chars: Peekable<CharIndices> = string.char_indices().peekable();
     let mut tokens: Vec<Tkn> = Vec::with_capacity(string.len());
 
-    macro_rules! eat_char {
+    macro_rules! eat {
         () => {
             let _: Option<(usize, char)> = chars.next();
         };
@@ -45,7 +45,7 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
             while let Some((j, c)) = chars.peek() {
                 k = *j;
                 if *c != '"' {
-                    eat_char!();
+                    eat!();
                 } else {
                     break;
                 }
@@ -61,7 +61,7 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
                 if let Some((j, c)) = chars.peek() {
                     k = *j;
                     if $f(*c) {
-                        eat_char!();
+                        eat!();
                     } else {
                         break;
                     }
@@ -118,7 +118,7 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
             '"' => {
                 if let Some((i, _)) = chars.next() {
                     tokens.push(Tkn::Str(get_str_literal!(i)));
-                    eat_char!();
+                    eat!();
                 }
             }
             _ => tokens.push(Tkn::Illegal(&string[i..(i + 1)])),

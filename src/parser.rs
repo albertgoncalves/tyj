@@ -195,8 +195,11 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Stmt<'a> {
             eat!(tokens);
             let ident: &str = get_ident(tokens);
             let args: Vec<&str> = get_args(tokens);
-            let body: Vec<Stmt> = get_body(tokens);
-            Stmt::Fn { ident, args, body }
+            Stmt::Fn {
+                ident,
+                args,
+                body: get_body(tokens),
+            }
         }
         Some(Tkn::Var) => {
             eat!(tokens);
