@@ -356,15 +356,38 @@ mod tests {
     }
 
     #[test]
+    fn declare_anon_fn() {
+        assert_tokens!(
+            "var f = function(x) {
+                return x + 0.1;
+            };",
+            vec![
+                Tkn::Var,
+                Tkn::Ident("f"),
+                Tkn::Equals,
+                Tkn::Fn,
+                Tkn::LParen,
+                Tkn::Ident("x"),
+                Tkn::RParen,
+                Tkn::LBrace,
+                Tkn::Ret,
+                Tkn::Ident("x"),
+                Tkn::BinOp("+"),
+                Tkn::Num("0.1"),
+                Tkn::Semicolon,
+                Tkn::RBrace,
+                Tkn::Semicolon,
+            ],
+        )
+    }
+
+    #[test]
     fn tiny_program() {
         assert_tokens!(
             "window.onload = function() {\
                 var a = 0.1;\
                 var b = 10;\
-                var c = a + b;\
-                var d = \"foo\";\
-                var e = \"bar\";\
-                var f = d + e;\
+                return a + b;\
             };",
             vec![
                 Tkn::Ident("window"),
@@ -385,29 +408,10 @@ mod tests {
                 Tkn::Equals,
                 Tkn::Num("10"),
                 Tkn::Semicolon,
-                Tkn::Var,
-                Tkn::Ident("c"),
-                Tkn::Equals,
+                Tkn::Ret,
                 Tkn::Ident("a"),
                 Tkn::BinOp("+"),
                 Tkn::Ident("b"),
-                Tkn::Semicolon,
-                Tkn::Var,
-                Tkn::Ident("d"),
-                Tkn::Equals,
-                Tkn::Str("foo"),
-                Tkn::Semicolon,
-                Tkn::Var,
-                Tkn::Ident("e"),
-                Tkn::Equals,
-                Tkn::Str("bar"),
-                Tkn::Semicolon,
-                Tkn::Var,
-                Tkn::Ident("f"),
-                Tkn::Equals,
-                Tkn::Ident("d"),
-                Tkn::BinOp("+"),
-                Tkn::Ident("e"),
                 Tkn::Semicolon,
                 Tkn::RBrace,
                 Tkn::Semicolon,

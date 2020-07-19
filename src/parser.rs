@@ -20,6 +20,10 @@ pub(crate) enum Expr<'a> {
         left: Box<Expr<'a>>,
         right: Box<Expr<'a>>,
     },
+    Fn {
+        args: Vec<&'a str>,
+        body: Vec<Stmt<'a>>,
+    },
     Null,
     Undef,
     Uninit,
@@ -80,8 +84,40 @@ fn get_prop<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Prop<'a> {
 fn get_infix_binding_power(op: &str) -> (u8, u8) {
     match op {
         "." => (9, 10),
+        "+" | "-" => (5, 6),
         _ => panic!(),
     }
+}
+
+fn get_anon_fn<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Expr<'a> {
+    eat_or_panic!(tokens, Tkn::LParen);
+    let mut args: Vec<&str> = Vec::new();
+    while let Some(t) = tokens.next() {
+        match t {
+            Tkn::Ident(x) => {
+                args.push(x);
+                match tokens.next() {
+                    Some(Tkn::Comma) => (),
+                    Some(Tkn::RParen) => break,
+                    _ => panic!(),
+                }
+            }
+            Tkn::RParen => break,
+            _ => panic!(),
+        }
+    }
+    let mut body: Vec<Stmt> = Vec::new();
+    eat_or_panic!(tokens, Tkn::LBrace);
+    while let Some(t) = tokens.peek() {
+        match t {
+            Tkn::RBrace => {
+                eat!(tokens);
+                break;
+            }
+            _ => body.push(get_stmt(tokens)),
+        }
+    }
+    Expr::Fn { args, body }
 }
 
 fn get_expr<'a, 'b>(
@@ -93,6 +129,7 @@ fn get_expr<'a, 'b>(
         Some(Tkn::Str(x)) => Expr::Str(x),
         Some(Tkn::Bool(x)) => Expr::Bool(x),
         Some(Tkn::Ident(x)) => Expr::Ref(x),
+        Some(Tkn::Fn) => get_anon_fn(tokens),
         Some(Tkn::Null) => Expr::Null,
         Some(Tkn::Undef) => Expr::Undef,
         Some(Tkn::LBrace) => {
@@ -137,6 +174,7 @@ fn get_expr<'a, 'b>(
     while let Some(t) = tokens.peek() {
         match t {
             Tkn::Dot => set_infix!("."),
+            Tkn::BinOp("+") => set_infix!("+"),
             _ => break,
         }
     }
@@ -216,21 +254,15 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Stmt<'a> {
             Stmt::Ret(expr)
         }
         _ => {
-            let expr: Expr = get_expr(tokens, 0);
-            match (&expr, tokens.peek()) {
-                (Expr::Ref(x), Some(Tkn::Equals)) => {
-                    eat!(tokens);
-                    let expr: Expr = get_expr(tokens, 0);
+            let a: Expr = get_expr(tokens, 0);
+            match tokens.next() {
+                Some(Tkn::Equals) => {
+                    let b: Expr = get_expr(tokens, 0);
                     eat_or_panic!(tokens, Tkn::Semicolon);
-                    Stmt::Assign {
-                        name: x,
-                        value: expr,
-                    }
+                    Stmt::Assign { r#ref: a, expr: b }
                 }
-                _ => {
-                    eat_or_panic!(tokens, Tkn::Semicolon);
-                    Stmt::Effect(expr)
-                }
+                Some(Tkn::Semicolon) => Stmt::Effect(a),
+                _ => panic!(),
             }
         }
     }
@@ -737,6 +769,98 @@ mod tests {
                     right: Box::new(Expr::Ref("b")),
                 }),
             ],
+        )
+    }
+
+    #[test]
+    fn declare_anon_fn() {
+        assert_ast!(
+            &[
+                Tkn::Var,
+                Tkn::Ident("f"),
+                Tkn::Equals,
+                Tkn::Fn,
+                Tkn::LParen,
+                Tkn::Ident("x"),
+                Tkn::RParen,
+                Tkn::LBrace,
+                Tkn::Ret,
+                Tkn::Ident("x"),
+                Tkn::BinOp("+"),
+                Tkn::Num("0.1"),
+                Tkn::Semicolon,
+                Tkn::RBrace,
+                Tkn::Semicolon,
+            ],
+            vec![Stmt::Decl {
+                ident: "f",
+                expr: Expr::Fn {
+                    args: vec!["x"],
+                    body: vec![Stmt::Ret(Expr::Infix {
+                        op: "+",
+                        left: Box::new(Expr::Ref("x")),
+                        right: Box::new(Expr::Num("0.1")),
+                    })],
+                }
+            }],
+        )
+    }
+
+    #[test]
+    fn tiny_program() {
+        assert_ast!(
+            &[
+                Tkn::Ident("window"),
+                Tkn::Dot,
+                Tkn::Ident("onload"),
+                Tkn::Equals,
+                Tkn::Fn,
+                Tkn::LParen,
+                Tkn::RParen,
+                Tkn::LBrace,
+                Tkn::Var,
+                Tkn::Ident("a"),
+                Tkn::Equals,
+                Tkn::Num("0.1"),
+                Tkn::Semicolon,
+                Tkn::Var,
+                Tkn::Ident("b"),
+                Tkn::Equals,
+                Tkn::Num("10"),
+                Tkn::Semicolon,
+                Tkn::Ret,
+                Tkn::Ident("a"),
+                Tkn::BinOp("+"),
+                Tkn::Ident("b"),
+                Tkn::Semicolon,
+                Tkn::RBrace,
+                Tkn::Semicolon,
+            ],
+            vec![Stmt::Assign {
+                r#ref: Expr::Infix {
+                    op: ".",
+                    left: Box::new(Expr::Ref("window")),
+                    right: Box::new(Expr::Ref("onload")),
+                },
+                expr: Expr::Fn {
+                    args: Vec::new(),
+                    body: vec![
+                        Stmt::Decl {
+                            ident: "a",
+                            expr: Expr::Num("0.1"),
+                        },
+                        Stmt::Decl {
+                            ident: "b",
+                            expr: Expr::Num("10"),
+                        },
+                        Stmt::Ret(Expr::Infix {
+                            op: "+",
+                            left: Box::new(Expr::Ref("a")),
+                            right: Box::new(Expr::Ref("b")),
+                        }),
+                    ],
+                }
+            }],
         )
     }
 }
