@@ -20,12 +20,12 @@ mod tests {
                 }"
             )),
             vec![Stmt::Fn {
-                name: "f",
+                ident: "f",
                 args: vec!["a", "b", "c"],
                 body: vec![
                     Stmt::Decl {
-                        name: "d",
-                        value: Expr::Obj(vec![
+                        ident: "d",
+                        expr: Expr::Obj(vec![
                             Prop {
                                 key: "a",
                                 value: Expr::Ref("a"),
