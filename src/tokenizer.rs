@@ -12,11 +12,15 @@ pub(crate) enum Tkn<'a> {
     Comma,
     Dot,
     Equals,
+    Minus,
+    Bang,
+    Incr,
+    Decr,
+    BinOp(&'a str),
     Var,
     Fn,
     Ret,
     Ident(&'a str),
-    BinOp(&'a str),
     Null,
     Undef,
     Num(&'a str),
@@ -114,7 +118,21 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
             '}' => tokens.push(Tkn::RBrace),
             '(' => tokens.push(Tkn::LParen),
             ')' => tokens.push(Tkn::RParen),
-            '+' => tokens.push(Tkn::BinOp(&string[i..(i + 1)])),
+            '+' => match chars.peek() {
+                Some((_, '+')) => {
+                    eat!();
+                    tokens.push(Tkn::Incr);
+                }
+                _ => tokens.push(Tkn::BinOp(&string[i..(i + 1)])),
+            },
+            '-' => match chars.peek() {
+                Some((_, '-')) => {
+                    eat!();
+                    tokens.push(Tkn::Decr);
+                }
+                _ => tokens.push(Tkn::Minus),
+            },
+            '!' => tokens.push(Tkn::Bang),
             '"' => {
                 if let Some((i, _)) = chars.next() {
                     tokens.push(Tkn::Str(get_str_literal!(i)));
@@ -414,6 +432,88 @@ mod tests {
                 Tkn::Ident("b"),
                 Tkn::Semicolon,
                 Tkn::RBrace,
+                Tkn::Semicolon,
+            ],
+        )
+    }
+
+    #[test]
+    fn prefix_operators() {
+        assert_tokens!(
+            "var a = !true;
+             var b = -1.0;",
+            vec![
+                Tkn::Var,
+                Tkn::Ident("a"),
+                Tkn::Equals,
+                Tkn::Bang,
+                Tkn::Bool("true"),
+                Tkn::Semicolon,
+                Tkn::Var,
+                Tkn::Ident("b"),
+                Tkn::Equals,
+                Tkn::Minus,
+                Tkn::Num("1.0"),
+                Tkn::Semicolon,
+            ],
+        )
+    }
+
+    #[test]
+    fn nested_expression() {
+        assert_tokens!(
+            "var x = (a + b) + ((c + d) + e);",
+            vec![
+                Tkn::Var,
+                Tkn::Ident("x"),
+                Tkn::Equals,
+                Tkn::LParen,
+                Tkn::Ident("a"),
+                Tkn::BinOp("+"),
+                Tkn::Ident("b"),
+                Tkn::RParen,
+                Tkn::BinOp("+"),
+                Tkn::LParen,
+                Tkn::LParen,
+                Tkn::Ident("c"),
+                Tkn::BinOp("+"),
+                Tkn::Ident("d"),
+                Tkn::RParen,
+                Tkn::BinOp("+"),
+                Tkn::Ident("e"),
+                Tkn::RParen,
+                Tkn::Semicolon,
+            ],
+        )
+    }
+
+    #[test]
+    fn increment() {
+        assert_tokens!(
+            "a++;
+             ++b;",
+            vec![
+                Tkn::Ident("a"),
+                Tkn::Incr,
+                Tkn::Semicolon,
+                Tkn::Incr,
+                Tkn::Ident("b"),
+                Tkn::Semicolon,
+            ],
+        )
+    }
+
+    #[test]
+    fn decrement() {
+        assert_tokens!(
+            "a--;
+             --b;",
+            vec![
+                Tkn::Ident("a"),
+                Tkn::Decr,
+                Tkn::Semicolon,
+                Tkn::Decr,
+                Tkn::Ident("b"),
                 Tkn::Semicolon,
             ],
         )

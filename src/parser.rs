@@ -15,10 +15,18 @@ pub(crate) enum Expr<'a> {
     Bool(&'a str),
     Obj(Vec<Prop<'a>>),
     Ref(&'a str),
+    Prefix {
+        op: &'a str,
+        expr: Box<Expr<'a>>,
+    },
     Infix {
         op: &'a str,
         left: Box<Expr<'a>>,
         right: Box<Expr<'a>>,
+    },
+    Postfix {
+        op: &'a str,
+        expr: Box<Expr<'a>>,
     },
     Fn {
         args: Vec<&'a str>,
@@ -120,15 +128,39 @@ fn get_body<'a, 'b>(
 
 fn get_fn<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Expr<'a> {
     let args: Vec<&str> = get_args(tokens);
-    let body: Vec<Stmt> = get_body(tokens);
-    Expr::Fn { args, body }
+    Expr::Fn {
+        args,
+        body: get_body(tokens),
+    }
 }
 
 fn get_expr<'a, 'b>(
     tokens: &mut Peekable<Iter<'b, Tkn<'a>>>,
     precedence: u8,
 ) -> Expr<'a> {
+    macro_rules! set_prefix {
+        ($op:expr $(,)?) => {{
+            let power: u8 = match $op {
+                "-" | "!" | "++" | "--" => 9,
+                _ => panic!(),
+            };
+            Expr::Prefix {
+                op: $op,
+                expr: Box::new(get_expr(tokens, power)),
+            }
+        }};
+    }
+
     let mut expr: Expr = match tokens.next() {
+        Some(Tkn::LParen) => {
+            let expr: Expr = get_expr(tokens, 0);
+            eat_or_panic!(tokens, Tkn::RParen);
+            expr
+        }
+        Some(Tkn::Minus) => set_prefix!("-"),
+        Some(Tkn::Bang) => set_prefix!("!"),
+        Some(Tkn::Incr) => set_prefix!("++"),
+        Some(Tkn::Decr) => set_prefix!("--"),
         Some(Tkn::Num(x)) => Expr::Num(x),
         Some(Tkn::Str(x)) => Expr::Str(x),
         Some(Tkn::Bool(x)) => Expr::Bool(x),
@@ -163,7 +195,7 @@ fn get_expr<'a, 'b>(
     macro_rules! set_infix {
         ($op:expr $(,)?) => {{
             let (l_power, r_power): (u8, u8) = match $op {
-                "." => (9, 10),
+                "." => (11, 12),
                 "+" | "-" => (5, 6),
                 _ => panic!(),
             };
@@ -179,10 +211,29 @@ fn get_expr<'a, 'b>(
         }};
     }
 
+    macro_rules! set_postfix {
+        ($op:expr $(,)?) => {{
+            let power: u8 = match $op {
+                "++" | "--" => 9,
+                _ => panic!(),
+            };
+            if power < precedence {
+                break;
+            }
+            eat!(tokens);
+            expr = Expr::Postfix {
+                op: $op,
+                expr: Box::new(expr),
+            };
+        }};
+    }
+
     while let Some(t) = tokens.peek() {
         match t {
             Tkn::Dot => set_infix!("."),
-            Tkn::BinOp("+") => set_infix!("+"),
+            Tkn::BinOp(x) => set_infix!(*x),
+            Tkn::Incr => set_postfix!("++"),
+            Tkn::Decr => set_postfix!("--"),
             _ => break,
         }
     }
@@ -843,6 +894,137 @@ mod tests {
                     ],
                 },
             }],
+        )
+    }
+
+    #[test]
+    fn prefix_operators() {
+        assert_ast!(
+            &[
+                Tkn::Var,
+                Tkn::Ident("a"),
+                Tkn::Equals,
+                Tkn::Bang,
+                Tkn::Bool("true"),
+                Tkn::Semicolon,
+                Tkn::Var,
+                Tkn::Ident("b"),
+                Tkn::Equals,
+                Tkn::Minus,
+                Tkn::Num("1.0"),
+                Tkn::Semicolon,
+            ],
+            vec![
+                Stmt::Decl {
+                    ident: "a",
+                    expr: Expr::Prefix {
+                        op: "!",
+                        expr: Box::new(Expr::Bool("true")),
+                    },
+                },
+                Stmt::Decl {
+                    ident: "b",
+                    expr: Expr::Prefix {
+                        op: "-",
+                        expr: Box::new(Expr::Num("1.0")),
+                    },
+                },
+            ],
+        )
+    }
+
+    #[test]
+    fn nested_expression() {
+        assert_ast!(
+            &[
+                Tkn::Var,
+                Tkn::Ident("x"),
+                Tkn::Equals,
+                Tkn::LParen,
+                Tkn::Ident("a"),
+                Tkn::BinOp("+"),
+                Tkn::Ident("b"),
+                Tkn::RParen,
+                Tkn::BinOp("+"),
+                Tkn::LParen,
+                Tkn::LParen,
+                Tkn::Ident("c"),
+                Tkn::BinOp("+"),
+                Tkn::Ident("d"),
+                Tkn::RParen,
+                Tkn::BinOp("+"),
+                Tkn::Ident("e"),
+                Tkn::RParen,
+                Tkn::Semicolon,
+            ],
+            vec![Stmt::Decl {
+                ident: "x",
+                expr: Expr::Infix {
+                    op: "+",
+                    left: Box::new(Expr::Infix {
+                        op: "+",
+                        left: Box::new(Expr::Ref("a")),
+                        right: Box::new(Expr::Ref("b")),
+                    }),
+                    right: Box::new(Expr::Infix {
+                        op: "+",
+                        left: Box::new(Expr::Infix {
+                            op: "+",
+                            left: Box::new(Expr::Ref("c")),
+                            right: Box::new(Expr::Ref("d")),
+                        }),
+                        right: Box::new(Expr::Ref("e")),
+                    }),
+                },
+            }],
+        )
+    }
+
+    #[test]
+    fn increment() {
+        assert_ast!(
+            &[
+                Tkn::Ident("a"),
+                Tkn::Incr,
+                Tkn::Semicolon,
+                Tkn::Incr,
+                Tkn::Ident("b"),
+                Tkn::Semicolon,
+            ],
+            vec![
+                Stmt::Effect(Expr::Postfix {
+                    op: "++",
+                    expr: Box::new(Expr::Ref("a")),
+                }),
+                Stmt::Effect(Expr::Prefix {
+                    op: "++",
+                    expr: Box::new(Expr::Ref("b")),
+                }),
+            ],
+        )
+    }
+
+    #[test]
+    fn decrement() {
+        assert_ast!(
+            &[
+                Tkn::Ident("a"),
+                Tkn::Decr,
+                Tkn::Semicolon,
+                Tkn::Decr,
+                Tkn::Ident("b"),
+                Tkn::Semicolon,
+            ],
+            vec![
+                Stmt::Effect(Expr::Postfix {
+                    op: "--",
+                    expr: Box::new(Expr::Ref("a")),
+                }),
+                Stmt::Effect(Expr::Prefix {
+                    op: "--",
+                    expr: Box::new(Expr::Ref("b")),
+                }),
+            ],
         )
     }
 }
