@@ -81,14 +81,6 @@ fn get_prop<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Prop<'a> {
     }
 }
 
-fn get_infix_binding_power(op: &str) -> (u8, u8) {
-    match op {
-        "." => (9, 10),
-        "+" | "-" => (5, 6),
-        _ => panic!(),
-    }
-}
-
 fn get_args<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Vec<&'a str> {
     eat_or_panic!(tokens, Tkn::LParen);
     let mut args: Vec<&str> = Vec::new();
@@ -170,7 +162,11 @@ fn get_expr<'a, 'b>(
 
     macro_rules! set_infix {
         ($op:expr $(,)?) => {{
-            let (l_power, r_power): (u8, u8) = get_infix_binding_power($op);
+            let (l_power, r_power): (u8, u8) = match $op {
+                "." => (9, 10),
+                "+" | "-" => (5, 6),
+                _ => panic!(),
+            };
             if l_power < precedence {
                 break;
             }
