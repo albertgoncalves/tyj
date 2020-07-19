@@ -29,7 +29,7 @@ fn is_numeric(c: char) -> bool {
     (c == '.') || c.is_digit(10)
 }
 
-fn get_tokens(string: &str) -> Vec<Tkn> {
+pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
     let mut chars: Peekable<CharIndices> = string.char_indices().peekable();
     let mut tokens: Vec<Tkn> = Vec::with_capacity(string.len());
 
@@ -133,26 +133,26 @@ mod tests {
 
     macro_rules! assert_token {
         ($a:expr, $b:expr $(,)?) => {
-            assert_eq!(get_tokens($a), vec![$b]);
+            assert_eq!(get_tokens($a), vec![$b])
         };
     }
 
     macro_rules! assert_tokens {
         ($a:expr, $b:expr $(,)?) => {
-            assert_eq!(get_tokens($a), $b);
+            assert_eq!(get_tokens($a), $b)
         };
     }
 
     #[test]
     fn null() {
         assert_token!("null", Tkn::Null);
-        assert_tokens!("null;", vec![Tkn::Null, Tkn::Semicolon]);
+        assert_tokens!("null;", vec![Tkn::Null, Tkn::Semicolon])
     }
 
     #[test]
     fn undefined() {
         assert_token!("undefined", Tkn::Undef);
-        assert_tokens!("undefined;", vec![Tkn::Undef, Tkn::Semicolon]);
+        assert_tokens!("undefined;", vec![Tkn::Undef, Tkn::Semicolon])
     }
 
     #[test]
@@ -166,13 +166,13 @@ mod tests {
         assert_tokens!("10;", vec![Tkn::Num("10"), Tkn::Semicolon]);
         assert_tokens!(".10;", vec![Tkn::Num(".10"), Tkn::Semicolon]);
         assert_tokens!("1.0;", vec![Tkn::Num("1.0"), Tkn::Semicolon]);
-        assert_tokens!("1.0.;", vec![Tkn::Illegal("1.0."), Tkn::Semicolon],);
+        assert_tokens!("1.0.;", vec![Tkn::Illegal("1.0."), Tkn::Semicolon])
     }
 
     #[test]
     fn string() {
         assert_token!("\"blah\"", Tkn::Str("blah"));
-        assert_tokens!("\"blah\";", vec![Tkn::Str("blah"), Tkn::Semicolon],);
+        assert_tokens!("\"blah\";", vec![Tkn::Str("blah"), Tkn::Semicolon])
     }
 
     #[test]
@@ -180,7 +180,7 @@ mod tests {
         assert_token!("true", Tkn::Bool("true"));
         assert_token!("false", Tkn::Bool("false"));
         assert_tokens!("true;", vec![Tkn::Bool("true"), Tkn::Semicolon]);
-        assert_tokens!("false;", vec![Tkn::Bool("false"), Tkn::Semicolon]);
+        assert_tokens!("false;", vec![Tkn::Bool("false"), Tkn::Semicolon])
     }
 
     #[test]
@@ -197,9 +197,38 @@ mod tests {
                 Tkn::Colon,
                 Tkn::Undef,
                 Tkn::RBrace,
-                Tkn::Semicolon
+                Tkn::Semicolon,
             ],
-        );
+        )
+    }
+
+    #[test]
+    fn object_fields() {
+        assert_tokens!(
+            "var x = { a: { b: 0 } };
+             x.a.b;",
+            vec![
+                Tkn::Var,
+                Tkn::Ident("x"),
+                Tkn::Equals,
+                Tkn::LBrace,
+                Tkn::Ident("a"),
+                Tkn::Colon,
+                Tkn::LBrace,
+                Tkn::Ident("b"),
+                Tkn::Colon,
+                Tkn::Num("0"),
+                Tkn::RBrace,
+                Tkn::RBrace,
+                Tkn::Semicolon,
+                Tkn::Ident("x"),
+                Tkn::Dot,
+                Tkn::Ident("a"),
+                Tkn::Dot,
+                Tkn::Ident("b"),
+                Tkn::Semicolon,
+            ],
+        )
     }
 
     #[test]
@@ -275,7 +304,55 @@ mod tests {
                 Tkn::Semicolon,
                 Tkn::RBrace,
             ],
-        );
+        )
+    }
+
+    #[test]
+    fn small_function() {
+        assert_tokens!(
+            "function f(a, b, c) {
+                var d = {
+                    a: a,
+                    b: b,
+                    c: c,
+                };
+                return d;
+            }",
+            vec![
+                Tkn::Fn,
+                Tkn::Ident("f"),
+                Tkn::LParen,
+                Tkn::Ident("a"),
+                Tkn::Comma,
+                Tkn::Ident("b"),
+                Tkn::Comma,
+                Tkn::Ident("c"),
+                Tkn::RParen,
+                Tkn::LBrace,
+                Tkn::Var,
+                Tkn::Ident("d"),
+                Tkn::Equals,
+                Tkn::LBrace,
+                Tkn::Ident("a"),
+                Tkn::Colon,
+                Tkn::Ident("a"),
+                Tkn::Comma,
+                Tkn::Ident("b"),
+                Tkn::Colon,
+                Tkn::Ident("b"),
+                Tkn::Comma,
+                Tkn::Ident("c"),
+                Tkn::Colon,
+                Tkn::Ident("c"),
+                Tkn::Comma,
+                Tkn::RBrace,
+                Tkn::Semicolon,
+                Tkn::Ret,
+                Tkn::Ident("d"),
+                Tkn::Semicolon,
+                Tkn::RBrace,
+            ],
+        )
     }
 
     #[test]
@@ -335,6 +412,6 @@ mod tests {
                 Tkn::RBrace,
                 Tkn::Semicolon,
             ],
-        );
+        )
     }
 }
