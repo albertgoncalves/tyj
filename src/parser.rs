@@ -157,10 +157,7 @@ fn get_expr<'a, 'b>(
             eat_or_panic!(tokens, Tkn::RParen);
             expr
         }
-        Some(Tkn::Minus) => set_prefix!("-"),
-        Some(Tkn::Bang) => set_prefix!("!"),
-        Some(Tkn::Incr) => set_prefix!("++"),
-        Some(Tkn::Decr) => set_prefix!("--"),
+        Some(Tkn::Op(x)) => set_prefix!(*x),
         Some(Tkn::Num(x)) => Expr::Num(x),
         Some(Tkn::Str(x)) => Expr::Str(x),
         Some(Tkn::Bool(x)) => Expr::Bool(x),
@@ -192,48 +189,43 @@ fn get_expr<'a, 'b>(
         _ => panic!(),
     };
 
-    macro_rules! set_infix {
+    macro_rules! set_postfix_or_infix {
         ($op:expr $(,)?) => {{
-            let (l_power, r_power): (u8, u8) = match $op {
-                "." => (11, 12),
-                "+" | "-" => (5, 6),
-                _ => panic!(),
+            let power: Option<u8> = match $op {
+                "++" | "--" => Some(9),
+                _ => None,
             };
-            if l_power < precedence {
-                break;
+            if let Some(power) = power {
+                if power < precedence {
+                    break;
+                }
+                eat!(tokens);
+                expr = Expr::Postfix {
+                    op: $op,
+                    expr: Box::new(expr),
+                };
+            } else {
+                let (l_power, r_power): (u8, u8) = match $op {
+                    "." => (11, 12),
+                    "+" | "-" => (5, 6),
+                    _ => panic!(),
+                };
+                if l_power < precedence {
+                    break;
+                }
+                eat!(tokens);
+                expr = Expr::Infix {
+                    op: $op,
+                    left: Box::new(expr),
+                    right: Box::new(get_expr(tokens, r_power)),
+                };
             }
-            eat!(tokens);
-            expr = Expr::Infix {
-                op: $op,
-                left: Box::new(expr),
-                right: Box::new(get_expr(tokens, r_power)),
-            };
-        }};
-    }
-
-    macro_rules! set_postfix {
-        ($op:expr $(,)?) => {{
-            let power: u8 = match $op {
-                "++" | "--" => 9,
-                _ => panic!(),
-            };
-            if power < precedence {
-                break;
-            }
-            eat!(tokens);
-            expr = Expr::Postfix {
-                op: $op,
-                expr: Box::new(expr),
-            };
         }};
     }
 
     while let Some(t) = tokens.peek() {
         match t {
-            Tkn::Dot => set_infix!("."),
-            Tkn::BinOp(x) => set_infix!(*x),
-            Tkn::Incr => set_postfix!("++"),
-            Tkn::Decr => set_postfix!("--"),
+            Tkn::Op(x) => set_postfix_or_infix!(*x),
             _ => break,
         }
     }
@@ -775,9 +767,9 @@ mod tests {
                 Tkn::RBrace,
                 Tkn::Semicolon,
                 Tkn::Ident("x"),
-                Tkn::Dot,
+                Tkn::Op("."),
                 Tkn::Ident("a"),
-                Tkn::Dot,
+                Tkn::Op("."),
                 Tkn::Ident("b"),
                 Tkn::Semicolon,
             ],
@@ -819,7 +811,7 @@ mod tests {
                 Tkn::LBrace,
                 Tkn::Ret,
                 Tkn::Ident("x"),
-                Tkn::BinOp("+"),
+                Tkn::Op("+"),
                 Tkn::Num("0.1"),
                 Tkn::Semicolon,
                 Tkn::RBrace,
@@ -844,7 +836,7 @@ mod tests {
         assert_ast!(
             &[
                 Tkn::Ident("window"),
-                Tkn::Dot,
+                Tkn::Op("."),
                 Tkn::Ident("onload"),
                 Tkn::Equals,
                 Tkn::Fn,
@@ -863,7 +855,7 @@ mod tests {
                 Tkn::Semicolon,
                 Tkn::Ret,
                 Tkn::Ident("a"),
-                Tkn::BinOp("+"),
+                Tkn::Op("+"),
                 Tkn::Ident("b"),
                 Tkn::Semicolon,
                 Tkn::RBrace,
@@ -904,13 +896,13 @@ mod tests {
                 Tkn::Var,
                 Tkn::Ident("a"),
                 Tkn::Equals,
-                Tkn::Bang,
+                Tkn::Op("!"),
                 Tkn::Bool("true"),
                 Tkn::Semicolon,
                 Tkn::Var,
                 Tkn::Ident("b"),
                 Tkn::Equals,
-                Tkn::Minus,
+                Tkn::Op("-"),
                 Tkn::Num("1.0"),
                 Tkn::Semicolon,
             ],
@@ -942,17 +934,17 @@ mod tests {
                 Tkn::Equals,
                 Tkn::LParen,
                 Tkn::Ident("a"),
-                Tkn::BinOp("+"),
+                Tkn::Op("+"),
                 Tkn::Ident("b"),
                 Tkn::RParen,
-                Tkn::BinOp("+"),
+                Tkn::Op("+"),
                 Tkn::LParen,
                 Tkn::LParen,
                 Tkn::Ident("c"),
-                Tkn::BinOp("+"),
+                Tkn::Op("+"),
                 Tkn::Ident("d"),
                 Tkn::RParen,
-                Tkn::BinOp("+"),
+                Tkn::Op("+"),
                 Tkn::Ident("e"),
                 Tkn::RParen,
                 Tkn::Semicolon,
@@ -985,9 +977,9 @@ mod tests {
         assert_ast!(
             &[
                 Tkn::Ident("a"),
-                Tkn::Incr,
+                Tkn::Op("++"),
                 Tkn::Semicolon,
-                Tkn::Incr,
+                Tkn::Op("++"),
                 Tkn::Ident("b"),
                 Tkn::Semicolon,
             ],
@@ -1009,9 +1001,9 @@ mod tests {
         assert_ast!(
             &[
                 Tkn::Ident("a"),
-                Tkn::Decr,
+                Tkn::Op("--"),
                 Tkn::Semicolon,
-                Tkn::Decr,
+                Tkn::Op("--"),
                 Tkn::Ident("b"),
                 Tkn::Semicolon,
             ],

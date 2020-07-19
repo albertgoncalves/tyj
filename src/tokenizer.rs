@@ -10,15 +10,10 @@ pub(crate) enum Tkn<'a> {
     Colon,
     Semicolon,
     Comma,
-    Dot,
     Equals,
-    Minus,
-    Bang,
-    Incr,
-    Decr,
-    BinOp(&'a str),
     Var,
     Fn,
+    Op(&'a str),
     Ret,
     Ident(&'a str),
     Null,
@@ -100,7 +95,7 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
             _ if is_numeric(c) => {
                 let num: &str = get_substring!(is_numeric, i);
                 if num == "." {
-                    tokens.push(Tkn::Dot);
+                    tokens.push(Tkn::Op("."));
                 } else if (num.matches('.').count() < 2)
                     && (0 < num.matches(|c: char| c.is_digit(10)).count())
                 {
@@ -113,7 +108,7 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
             ':' => tokens.push(Tkn::Colon),
             ';' => tokens.push(Tkn::Semicolon),
             ',' => tokens.push(Tkn::Comma),
-            '.' => tokens.push(Tkn::Dot),
+            '.' => tokens.push(Tkn::Op(".")),
             '{' => tokens.push(Tkn::LBrace),
             '}' => tokens.push(Tkn::RBrace),
             '(' => tokens.push(Tkn::LParen),
@@ -121,18 +116,18 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
             '+' => match chars.peek() {
                 Some((_, '+')) => {
                     eat!();
-                    tokens.push(Tkn::Incr);
+                    tokens.push(Tkn::Op("++"));
                 }
-                _ => tokens.push(Tkn::BinOp(&string[i..(i + 1)])),
+                _ => tokens.push(Tkn::Op(&string[i..(i + 1)])),
             },
             '-' => match chars.peek() {
                 Some((_, '-')) => {
                     eat!();
-                    tokens.push(Tkn::Decr);
+                    tokens.push(Tkn::Op("--"));
                 }
-                _ => tokens.push(Tkn::Minus),
+                _ => tokens.push(Tkn::Op("-")),
             },
-            '!' => tokens.push(Tkn::Bang),
+            '!' => tokens.push(Tkn::Op("!")),
             '"' => {
                 if let Some((i, _)) = chars.next() {
                     tokens.push(Tkn::Str(get_str_literal!(i)));
@@ -240,9 +235,9 @@ mod tests {
                 Tkn::RBrace,
                 Tkn::Semicolon,
                 Tkn::Ident("x"),
-                Tkn::Dot,
+                Tkn::Op("."),
                 Tkn::Ident("a"),
-                Tkn::Dot,
+                Tkn::Op("."),
                 Tkn::Ident("b"),
                 Tkn::Semicolon,
             ],
@@ -390,7 +385,7 @@ mod tests {
                 Tkn::LBrace,
                 Tkn::Ret,
                 Tkn::Ident("x"),
-                Tkn::BinOp("+"),
+                Tkn::Op("+"),
                 Tkn::Num("0.1"),
                 Tkn::Semicolon,
                 Tkn::RBrace,
@@ -409,7 +404,7 @@ mod tests {
             };",
             vec![
                 Tkn::Ident("window"),
-                Tkn::Dot,
+                Tkn::Op("."),
                 Tkn::Ident("onload"),
                 Tkn::Equals,
                 Tkn::Fn,
@@ -428,7 +423,7 @@ mod tests {
                 Tkn::Semicolon,
                 Tkn::Ret,
                 Tkn::Ident("a"),
-                Tkn::BinOp("+"),
+                Tkn::Op("+"),
                 Tkn::Ident("b"),
                 Tkn::Semicolon,
                 Tkn::RBrace,
@@ -446,13 +441,13 @@ mod tests {
                 Tkn::Var,
                 Tkn::Ident("a"),
                 Tkn::Equals,
-                Tkn::Bang,
+                Tkn::Op("!"),
                 Tkn::Bool("true"),
                 Tkn::Semicolon,
                 Tkn::Var,
                 Tkn::Ident("b"),
                 Tkn::Equals,
-                Tkn::Minus,
+                Tkn::Op("-"),
                 Tkn::Num("1.0"),
                 Tkn::Semicolon,
             ],
@@ -469,17 +464,17 @@ mod tests {
                 Tkn::Equals,
                 Tkn::LParen,
                 Tkn::Ident("a"),
-                Tkn::BinOp("+"),
+                Tkn::Op("+"),
                 Tkn::Ident("b"),
                 Tkn::RParen,
-                Tkn::BinOp("+"),
+                Tkn::Op("+"),
                 Tkn::LParen,
                 Tkn::LParen,
                 Tkn::Ident("c"),
-                Tkn::BinOp("+"),
+                Tkn::Op("+"),
                 Tkn::Ident("d"),
                 Tkn::RParen,
-                Tkn::BinOp("+"),
+                Tkn::Op("+"),
                 Tkn::Ident("e"),
                 Tkn::RParen,
                 Tkn::Semicolon,
@@ -494,9 +489,9 @@ mod tests {
              ++b;",
             vec![
                 Tkn::Ident("a"),
-                Tkn::Incr,
+                Tkn::Op("++"),
                 Tkn::Semicolon,
-                Tkn::Incr,
+                Tkn::Op("++"),
                 Tkn::Ident("b"),
                 Tkn::Semicolon,
             ],
@@ -510,9 +505,9 @@ mod tests {
              --b;",
             vec![
                 Tkn::Ident("a"),
-                Tkn::Decr,
+                Tkn::Op("--"),
                 Tkn::Semicolon,
-                Tkn::Decr,
+                Tkn::Op("--"),
                 Tkn::Ident("b"),
                 Tkn::Semicolon,
             ],
