@@ -294,10 +294,18 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Stmt<'a> {
 }
 
 pub(crate) fn get_ast<'a>(tokens: &[Tkn<'a>]) -> Vec<Stmt<'a>> {
+    let mut ast_tokens: Vec<Tkn> = Vec::new();
+    let mut comments: Vec<&str> = Vec::new();
+    for token in tokens {
+        match token {
+            Tkn::Comment(x) => comments.push(x),
+            _ => ast_tokens.push(*token),
+        }
+    }
     let mut ast: Vec<Stmt> = Vec::new();
-    let mut tokens: Peekable<Iter<'_, Tkn<'_>>> = tokens.iter().peekable();
-    while let Some(_) = tokens.peek() {
-        ast.push(get_stmt(&mut tokens));
+    let mut ast_tokens: Peekable<Iter<Tkn>> = ast_tokens.iter().peekable();
+    while let Some(_) = ast_tokens.peek() {
+        ast.push(get_stmt(&mut ast_tokens));
     }
     ast
 }
