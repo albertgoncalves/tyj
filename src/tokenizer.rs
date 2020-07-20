@@ -22,6 +22,7 @@ pub(crate) enum Tkn<'a> {
     Str(&'a str),
     Bool(&'a str),
     Illegal(&'a str),
+    Comment(&'a str),
 }
 
 fn is_numeric(c: char) -> bool {
@@ -136,6 +137,31 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
                 if let Some((i, _)) = chars.next() {
                     tokens.push(Tkn::Str(get_str_literal!(i)));
                     eat!();
+                }
+            }
+            '/' if chars.peek() == Some(&(i + 1, '/')) => {
+                eat!();
+                while let Some((j, c)) = chars.next() {
+                    match c {
+                        '\n' => {
+                            tokens.push(Tkn::Comment(&string[i..j]));
+                            break;
+                        }
+                        _ => (),
+                    }
+                }
+            }
+            '/' if chars.peek() == Some(&(i + 1, '*')) => {
+                eat!();
+                while let Some((j, c)) = chars.next() {
+                    match c {
+                        '*' if chars.peek() == Some(&(j + 1, '/')) => {
+                            eat!();
+                            tokens.push(Tkn::Comment(&string[i..(j + 2)]));
+                            break;
+                        }
+                        _ => (),
+                    }
                 }
             }
             _ => tokens.push(Tkn::Illegal(&string[i..(i + 1)])),
@@ -512,6 +538,46 @@ mod tests {
                 Tkn::Op("--"),
                 Tkn::Semicolon,
                 Tkn::Op("--"),
+                Tkn::Ident("b"),
+                Tkn::Semicolon,
+            ],
+        )
+    }
+
+    #[test]
+    fn comment() {
+        assert_tokens!(
+            "// Comment 1
+             var a;
+             /// Comment 2
+             var b;",
+            vec![
+                Tkn::Comment("// Comment 1"),
+                Tkn::Var,
+                Tkn::Ident("a"),
+                Tkn::Semicolon,
+                Tkn::Comment("/// Comment 2"),
+                Tkn::Var,
+                Tkn::Ident("b"),
+                Tkn::Semicolon,
+            ],
+        )
+    }
+
+    #[test]
+    fn multiline_comment() {
+        assert_tokens!(
+            "/* Comment 1 */
+             var a;
+             /** Comment 2 */
+             var b;",
+            vec![
+                Tkn::Comment("/* Comment 1 */"),
+                Tkn::Var,
+                Tkn::Ident("a"),
+                Tkn::Semicolon,
+                Tkn::Comment("/** Comment 2 */"),
+                Tkn::Var,
                 Tkn::Ident("b"),
                 Tkn::Semicolon,
             ],
