@@ -6,3 +6,4 @@
 !src/
 !*.rs
 !main
+!profile
