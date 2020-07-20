@@ -10,7 +10,8 @@ mod tests {
     fn parse_small_function() {
         assert_eq!(
             get_ast(&get_tokens(
-                "function f(a, b, c) {\n\
+                "// ...\n\
+                 function f(a, b, c) {\n\
                      var d = {\n\
                          a: a,\n\
                          b: b,\n\
@@ -54,13 +55,17 @@ mod tests {
     fn parse_operator_precedence() {
         assert_eq!(
             get_ast(&get_tokens(
-                "var x = {\n\
+                "/* ...\n\
+                  */\n\
+                 var x = {\n\
                      a: {\n\
                          b: 10,\n\
                      },\n\
                  };\n\
+                 // ...\n\
                  x.a.b++ + .01;\n\
                  ++x.a.b + .01;\n\
+                 /* ... */\n\
                  .01 + x.a.b++;\n\
                  .01 + ++x.a.b;"
             )),
