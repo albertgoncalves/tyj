@@ -86,7 +86,7 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
                     |c: char| c.is_alphabetic() || c.is_digit(10),
                     i,
                 );
-                let token: Tkn<'_> = match ident {
+                let token: Tkn = match ident {
                     "var" => Tkn::Var,
                     "function" => Tkn::Fn,
                     "return" => Tkn::Ret,
