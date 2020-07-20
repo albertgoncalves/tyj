@@ -10,14 +10,14 @@ mod tests {
     fn parse_small_function() {
         assert_eq!(
             get_ast(&get_tokens(
-                "function f(a, b, c) {
-                    var d = {
-                        a: a,
-                        b: b,
-                        c: c,
-                    };
-                    return d.a;
-                }"
+                "function f(a, b, c) {\n\
+                     var d = {\n\
+                         a: a,\n\
+                         b: b,\n\
+                         c: c,\n\
+                     };\n\
+                     return d.a;\n\
+                 }"
             )),
             vec![Stmt::Fn {
                 ident: "f",
@@ -54,15 +54,15 @@ mod tests {
     fn parse_operator_precedence() {
         assert_eq!(
             get_ast(&get_tokens(
-                "var x = {
-                    a: {
-                        b: 10,
-                    },
-                };
-                x.a.b++ + .01;
-                ++x.a.b + .01;
-                .01 + x.a.b++;
-                .01 + ++x.a.b;"
+                "var x = {\n\
+                     a: {\n\
+                         b: 10,\n\
+                     },\n\
+                 };\n\
+                 x.a.b++ + .01;\n\
+                 ++x.a.b + .01;\n\
+                 .01 + x.a.b++;\n\
+                 .01 + ++x.a.b;"
             )),
             vec![
                 Stmt::Decl {

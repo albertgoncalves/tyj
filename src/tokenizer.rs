@@ -248,7 +248,7 @@ mod tests {
     #[test]
     fn object_fields() {
         assert_tokens!(
-            "var x = { a: { b: 0 } };
+            "var x = { a: { b: 0 } };\n\
              x.a.b;",
             vec![
                 Tkn::Var,
@@ -291,15 +291,15 @@ mod tests {
     #[test]
     fn multiple_lines() {
         assert_tokens!(
-            "null;\
-             undefined;\
-             1;\
-             10;\
-             .10;\
-             1.0;\
-             \"blah\";\
-             true;\
-             false;\
+            "null;\n\
+             undefined;\n\
+             1;\n\
+             10;\n\
+             .10;\n\
+             1.0;\n\
+             \"blah\";\n\
+             true;\n\
+             false;\n\
              { a: 0.1 };",
             vec![
                 Tkn::Null,
@@ -333,9 +333,9 @@ mod tests {
     #[test]
     fn tiny_function() {
         assert_tokens!(
-            "function f() {
-                return 0;
-            }",
+            "function f() {\n\
+                 return 0;\n\
+             }",
             vec![
                 Tkn::Fn,
                 Tkn::Ident("f"),
@@ -353,14 +353,14 @@ mod tests {
     #[test]
     fn small_function() {
         assert_tokens!(
-            "function f(a, b, c) {
-                var d = {
-                    a: a,
-                    b: b,
-                    c: c,
-                };
-                return d;
-            }",
+            "function f(a, b, c) {\n\
+                 var d = {\n\
+                     a: a,\n\
+                     b: b,\n\
+                     c: c,\n\
+                 };\n\
+                 return d;\n\
+             }",
             vec![
                 Tkn::Fn,
                 Tkn::Ident("f"),
@@ -401,9 +401,9 @@ mod tests {
     #[test]
     fn declare_anonymous_function() {
         assert_tokens!(
-            "var f = function(x) {
-                return x + 0.1;
-            };",
+            "var f = function(x) {\n\
+                 return x + 0.1;\n\
+             };",
             vec![
                 Tkn::Var,
                 Tkn::Ident("f"),
@@ -427,11 +427,11 @@ mod tests {
     #[test]
     fn tiny_program() {
         assert_tokens!(
-            "window.onload = function() {\
-                var a = 0.1;\
-                var b = 10;\
-                return a + b;\
-            };",
+            "window.onload = function() {\n\
+                 var a = 0.1;\n\
+                 var b = 10;\n\
+                 return a + b;\n\
+             };",
             vec![
                 Tkn::Ident("window"),
                 Tkn::Op("."),
@@ -465,7 +465,7 @@ mod tests {
     #[test]
     fn prefix_operators() {
         assert_tokens!(
-            "var a = !true;
+            "var a = !true;\n\
              var b = -1.0;",
             vec![
                 Tkn::Var,
@@ -515,7 +515,7 @@ mod tests {
     #[test]
     fn increment() {
         assert_tokens!(
-            "a++;
+            "a++;\n\
              ++b;",
             vec![
                 Tkn::Ident("a"),
@@ -531,7 +531,7 @@ mod tests {
     #[test]
     fn decrement() {
         assert_tokens!(
-            "a--;
+            "a--;\n\
              --b;",
             vec![
                 Tkn::Ident("a"),
@@ -547,9 +547,9 @@ mod tests {
     #[test]
     fn comment() {
         assert_tokens!(
-            "// Comment 1
-             var a;
-             /// Comment 2
+            "// Comment 1\n\
+             var a;\n\
+             /// Comment 2\n\
              var b;",
             vec![
                 Tkn::Comment("// Comment 1"),
@@ -567,16 +567,22 @@ mod tests {
     #[test]
     fn multiline_comment() {
         assert_tokens!(
-            "/* Comment 1 */
-             var a;
-             /** Comment 2 */
+            "/* Comment 1 */\n\
+             var a;\n\
+             /* Comment 2\n\
+              * ...\n\
+              */\n\
              var b;",
             vec![
                 Tkn::Comment("/* Comment 1 */"),
                 Tkn::Var,
                 Tkn::Ident("a"),
                 Tkn::Semicolon,
-                Tkn::Comment("/** Comment 2 */"),
+                Tkn::Comment(
+                    "/* Comment 2\n\
+                      * ...\n\
+                      */"
+                ),
                 Tkn::Var,
                 Tkn::Ident("b"),
                 Tkn::Semicolon,
