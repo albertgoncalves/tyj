@@ -1,6 +1,8 @@
 use std::iter::Peekable;
 use std::str::CharIndices;
 
+const DECIMAL: u32 = 10;
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Tkn<'a> {
     LBrace,
@@ -26,7 +28,7 @@ pub(crate) enum Tkn<'a> {
 }
 
 fn is_numeric(c: char) -> bool {
-    (c == '.') || c.is_digit(10)
+    (c == '.') || c.is_digit(DECIMAL)
 }
 
 pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
@@ -83,7 +85,7 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
             _ if c.is_whitespace() => (),
             _ if c.is_alphabetic() => {
                 let ident: &str = get_substring!(
-                    |c: char| c.is_alphabetic() || c.is_digit(10),
+                    |c: char| c.is_alphabetic() || c.is_digit(DECIMAL),
                     i,
                 );
                 let token: Tkn = match ident {
@@ -102,7 +104,7 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
                 if num == "." {
                     tokens.push(Tkn::Op("."));
                 } else if (num.matches('.').count() < 2)
-                    && (0 < num.matches(|c: char| c.is_digit(10)).count())
+                    && (0 < num.matches(|c: char| c.is_digit(DECIMAL)).count())
                 {
                     tokens.push(Tkn::Num(num));
                 } else {
