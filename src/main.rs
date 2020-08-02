@@ -185,4 +185,60 @@ mod tests {
             }],
         );
     }
+
+    #[test]
+    fn parse_if_else_chain() {
+        assert_eq!(
+            get_ast(&get_tokens(
+                "var x = 0;
+                 var y;
+                 if (x === 0) {
+                     y = 0;
+                 } else if (x === -1) {
+                     y = 1;
+                 } else {
+                     y = 2;
+                 }"
+            )),
+            vec![
+                Stmt::Decl {
+                    ident: "x",
+                    expr: Expr::Num("0"),
+                },
+                Stmt::Decl {
+                    ident: "y",
+                    expr: Expr::Uninit,
+                },
+                Stmt::Cond {
+                    condition: Expr::Infix {
+                        op: "===",
+                        left: Box::new(Expr::Ref("x")),
+                        right: Box::new(Expr::Num("0")),
+                    },
+                    r#if: vec![Stmt::Assign {
+                        r#ref: Expr::Ref("y"),
+                        expr: Expr::Num("0"),
+                    }],
+                    r#else: vec![Stmt::Cond {
+                        condition: Expr::Infix {
+                            op: "===",
+                            left: Box::new(Expr::Ref("x")),
+                            right: Box::new(Expr::Prefix {
+                                op: "-",
+                                expr: Box::new(Expr::Num("1")),
+                            })
+                        },
+                        r#if: vec![Stmt::Assign {
+                            r#ref: Expr::Ref("y"),
+                            expr: Expr::Num("1"),
+                        }],
+                        r#else: vec![Stmt::Assign {
+                            r#ref: Expr::Ref("y"),
+                            expr: Expr::Num("2"),
+                        }],
+                    }],
+                },
+            ],
+        );
+    }
 }

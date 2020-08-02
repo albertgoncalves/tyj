@@ -53,6 +53,11 @@ pub(crate) enum Stmt<'a> {
         args: Vec<&'a str>,
         body: Vec<Stmt<'a>>,
     },
+    Cond {
+        condition: Expr<'a>,
+        r#if: Vec<Stmt<'a>>,
+        r#else: Vec<Stmt<'a>>,
+    },
     Effect(Expr<'a>),
 }
 
@@ -207,7 +212,10 @@ fn get_expr<'a, 'b>(
             } else {
                 let (l_power, r_power): (u8, u8) = match $op {
                     "." => (11, 12),
+                    "*" | "/" => (7, 8),
                     "+" | "-" => (5, 6),
+                    "<" | ">" | "<=" | ">=" => (3, 4),
+                    "===" | "!==" => (1, 2),
                     _ => panic!(),
                 };
                 if l_power < precedence {
@@ -242,6 +250,38 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Stmt<'a> {
                 ident,
                 args,
                 body: get_body(tokens),
+            }
+        }
+        Some(Tkn::If) => {
+            eat!(tokens);
+            eat_or_panic!(tokens, Tkn::LParen);
+            let condition: Expr = get_expr(tokens, 0);
+            eat_or_panic!(tokens, Tkn::RParen);
+            let r#if: Vec<Stmt> = get_body(tokens);
+            if let Some(Tkn::Else) = tokens.peek() {
+                eat!(tokens);
+                match tokens.peek() {
+                    Some(Tkn::If) => {
+                        return Stmt::Cond {
+                            condition,
+                            r#if,
+                            r#else: vec![get_stmt(tokens)],
+                        };
+                    }
+                    Some(Tkn::LBrace) => {
+                        return Stmt::Cond {
+                            condition,
+                            r#if,
+                            r#else: get_body(tokens),
+                        };
+                    }
+                    _ => panic!(),
+                }
+            }
+            Stmt::Cond {
+                condition,
+                r#if,
+                r#else: vec![],
             }
         }
         Some(Tkn::Var) => {
@@ -1024,6 +1064,73 @@ mod tests {
                     op: "--",
                     expr: Box::new(Expr::Ref("b")),
                 }),
+            ],
+        )
+    }
+
+    #[test]
+    fn r#if() {
+        assert_ast!(
+            &[
+                Tkn::If,
+                Tkn::LParen,
+                Tkn::Bool("true"),
+                Tkn::RParen,
+                Tkn::LBrace,
+                Tkn::Ret,
+                Tkn::Num("0"),
+                Tkn::Semicolon,
+                Tkn::RBrace,
+            ],
+            vec![Stmt::Cond {
+                condition: Expr::Bool("true"),
+                r#if: vec![Stmt::Ret(Expr::Num("0"))],
+                r#else: vec![],
+            }],
+        )
+    }
+
+    #[test]
+    fn if_else() {
+        assert_ast!(
+            &[
+                Tkn::Var,
+                Tkn::Ident("a"),
+                Tkn::Semicolon,
+                Tkn::If,
+                Tkn::LParen,
+                Tkn::Bool("true"),
+                Tkn::RParen,
+                Tkn::LBrace,
+                Tkn::Ident("a"),
+                Tkn::Op("="),
+                Tkn::Num("0"),
+                Tkn::Semicolon,
+                Tkn::RBrace,
+                Tkn::Else,
+                Tkn::LBrace,
+                Tkn::Ident("a"),
+                Tkn::Op("="),
+                Tkn::Num("1"),
+                Tkn::Semicolon,
+                Tkn::RBrace,
+            ],
+            vec![
+                Stmt::Decl {
+                    ident: "a",
+                    expr: Expr::Uninit,
+                },
+                Stmt::Cond {
+                    condition: Expr::Bool("true"),
+                    r#if: vec![Stmt::Assign {
+                        r#ref: Expr::Ref("a"),
+                        expr: Expr::Num("0"),
+                    }],
+                    r#else: vec![Stmt::Assign {
+                        r#ref: Expr::Ref("a"),
+                        expr: Expr::Num("1"),
+                    }],
+                },
             ],
         )
     }
