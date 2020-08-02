@@ -14,6 +14,14 @@ pub(crate) enum Tkn<'a> {
     Semicolon,
     Comma,
     Var,
+    If,
+    Else,
+    Switch,
+    Case,
+    Break,
+    Default,
+    For,
+    While,
     Fn,
     Op(&'a str),
     Ret,
@@ -84,6 +92,14 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
                 );
                 let token: Tkn = match ident {
                     "var" => Tkn::Var,
+                    "if" => Tkn::If,
+                    "else" => Tkn::Else,
+                    "switch" => Tkn::Switch,
+                    "case" => Tkn::Case,
+                    "break" => Tkn::Break,
+                    "default" => Tkn::Default,
+                    "for" => Tkn::For,
+                    "while" => Tkn::While,
                     "function" => Tkn::Fn,
                     "return" => Tkn::Ret,
                     "null" => Tkn::Null,
@@ -575,6 +591,178 @@ mod tests {
                 Tkn::Var,
                 Tkn::Ident("b"),
                 Tkn::Semicolon,
+            ],
+        )
+    }
+
+    #[test]
+    fn if_else() {
+        assert_tokens!(
+            "var a;
+             if (true) {
+                 a = 0;
+             } else {
+                 a = 1;
+             }",
+            vec![
+                Tkn::Var,
+                Tkn::Ident("a"),
+                Tkn::Semicolon,
+                Tkn::If,
+                Tkn::LParen,
+                Tkn::Bool("true"),
+                Tkn::RParen,
+                Tkn::LBrace,
+                Tkn::Ident("a"),
+                Tkn::Op("="),
+                Tkn::Num("0"),
+                Tkn::Semicolon,
+                Tkn::RBrace,
+                Tkn::Else,
+                Tkn::LBrace,
+                Tkn::Ident("a"),
+                Tkn::Op("="),
+                Tkn::Num("1"),
+                Tkn::Semicolon,
+                Tkn::RBrace,
+            ],
+        )
+    }
+
+    #[test]
+    fn switch_case() {
+        assert_tokens!(
+            "var x = true;
+             switch (x) {
+             case true: {
+                 console.log(\"true\");
+                 break;
+             }
+             case false: {
+                 console.log(\"false\");
+                 break;
+             }
+             default: {
+                 console.log(\"?\");
+             }
+             }",
+            vec![
+                Tkn::Var,
+                Tkn::Ident("x"),
+                Tkn::Op("="),
+                Tkn::Bool("true"),
+                Tkn::Semicolon,
+                Tkn::Switch,
+                Tkn::LParen,
+                Tkn::Ident("x"),
+                Tkn::RParen,
+                Tkn::LBrace,
+                Tkn::Case,
+                Tkn::Bool("true"),
+                Tkn::Colon,
+                Tkn::LBrace,
+                Tkn::Ident("console"),
+                Tkn::Op("."),
+                Tkn::Ident("log"),
+                Tkn::LParen,
+                Tkn::Str("true"),
+                Tkn::RParen,
+                Tkn::Semicolon,
+                Tkn::Break,
+                Tkn::Semicolon,
+                Tkn::RBrace,
+                Tkn::Case,
+                Tkn::Bool("false"),
+                Tkn::Colon,
+                Tkn::LBrace,
+                Tkn::Ident("console"),
+                Tkn::Op("."),
+                Tkn::Ident("log"),
+                Tkn::LParen,
+                Tkn::Str("false"),
+                Tkn::RParen,
+                Tkn::Semicolon,
+                Tkn::Break,
+                Tkn::Semicolon,
+                Tkn::RBrace,
+                Tkn::Default,
+                Tkn::Colon,
+                Tkn::LBrace,
+                Tkn::Ident("console"),
+                Tkn::Op("."),
+                Tkn::Ident("log"),
+                Tkn::LParen,
+                Tkn::Str("?"),
+                Tkn::RParen,
+                Tkn::Semicolon,
+                Tkn::RBrace,
+                Tkn::RBrace,
+            ],
+        )
+    }
+
+    #[test]
+    fn r#for() {
+        assert_tokens!(
+            "var x = 0;
+             for (var i = 0; i < 10; ++i) {
+                 x += 2;
+             }",
+            vec![
+                Tkn::Var,
+                Tkn::Ident("x"),
+                Tkn::Op("="),
+                Tkn::Num("0"),
+                Tkn::Semicolon,
+                Tkn::For,
+                Tkn::LParen,
+                Tkn::Var,
+                Tkn::Ident("i"),
+                Tkn::Op("="),
+                Tkn::Num("0"),
+                Tkn::Semicolon,
+                Tkn::Ident("i"),
+                Tkn::Op("<"),
+                Tkn::Num("10"),
+                Tkn::Semicolon,
+                Tkn::Op("++"),
+                Tkn::Ident("i"),
+                Tkn::RParen,
+                Tkn::LBrace,
+                Tkn::Ident("x"),
+                Tkn::Op("+="),
+                Tkn::Num("2"),
+                Tkn::Semicolon,
+                Tkn::RBrace,
+            ],
+        )
+    }
+
+    #[test]
+    fn r#while() {
+        assert_tokens!(
+            "var x = 0;
+             while (x < 10) {
+                 x += 2;
+             }",
+            vec![
+                Tkn::Var,
+                Tkn::Ident("x"),
+                Tkn::Op("="),
+                Tkn::Num("0"),
+                Tkn::Semicolon,
+                Tkn::While,
+                Tkn::LParen,
+                Tkn::Ident("x"),
+                Tkn::Op("<"),
+                Tkn::Num("10"),
+                Tkn::RParen,
+                Tkn::LBrace,
+                Tkn::Ident("x"),
+                Tkn::Op("+="),
+                Tkn::Num("2"),
+                Tkn::Semicolon,
+                Tkn::RBrace,
             ],
         )
     }
