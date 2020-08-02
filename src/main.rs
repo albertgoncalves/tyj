@@ -147,4 +147,42 @@ mod tests {
             ],
         );
     }
+
+    #[test]
+    fn parse_return_function() {
+        assert_eq!(
+            get_ast(&get_tokens(
+                "function f(a, b) {
+                     return function(c) {
+                         return {
+                             a: a,
+                             b: b,
+                             c: c,
+                         };
+                     };
+                 }"
+            )),
+            vec![Stmt::Fn {
+                ident: "f",
+                args: vec!["a", "b"],
+                body: vec![Stmt::Ret(Expr::Fn {
+                    args: vec!["c"],
+                    body: vec![Stmt::Ret(Expr::Obj(vec![
+                        Prop {
+                            key: "a",
+                            value: Expr::Ref("a"),
+                        },
+                        Prop {
+                            key: "b",
+                            value: Expr::Ref("b"),
+                        },
+                        Prop {
+                            key: "c",
+                            value: Expr::Ref("c"),
+                        },
+                    ]))],
+                })],
+            }],
+        );
+    }
 }
