@@ -18,7 +18,7 @@ mod tests {
                          c: c,\n\
                      };\n\
                      return d.a;\n\
-                 }"
+                 }",
             )),
             vec![Stmt::Fn {
                 ident: "f",
