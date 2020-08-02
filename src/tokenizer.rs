@@ -1,6 +1,7 @@
 use std::iter::Peekable;
 use std::str::CharIndices;
 
+const OPS: [char; 9] = ['=', '.', '+', '-', '*', '/', '<', '>', '!'];
 const DECIMAL: u32 = 10;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -12,7 +13,6 @@ pub(crate) enum Tkn<'a> {
     Colon,
     Semicolon,
     Comma,
-    Equals,
     Var,
     Fn,
     Op(&'a str),
@@ -28,7 +28,16 @@ pub(crate) enum Tkn<'a> {
 }
 
 fn is_numeric(c: char) -> bool {
-    (c == '.') || c.is_digit(DECIMAL)
+    c.is_digit(DECIMAL) || (c == '.')
+}
+
+fn is_op(c: char) -> bool {
+    for op in &OPS {
+        if c == *op {
+            return true;
+        }
+    }
+    false
 }
 
 pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
@@ -43,21 +52,6 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
                 panic!()
             }
         };
-    }
-
-    macro_rules! get_str_literal {
-        ($i:expr $(,)?) => {{
-            let mut k: usize = $i;
-            while let Some((j, c)) = chars.peek() {
-                k = *j;
-                if *c != '"' {
-                    eat!();
-                } else {
-                    break;
-                }
-            }
-            &string[$i..k]
-        }};
     }
 
     macro_rules! get_substring {
@@ -111,36 +105,6 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
                     tokens.push(Tkn::Illegal(num));
                 }
             }
-            '=' => tokens.push(Tkn::Equals),
-            ':' => tokens.push(Tkn::Colon),
-            ';' => tokens.push(Tkn::Semicolon),
-            ',' => tokens.push(Tkn::Comma),
-            '.' => tokens.push(Tkn::Op(".")),
-            '{' => tokens.push(Tkn::LBrace),
-            '}' => tokens.push(Tkn::RBrace),
-            '(' => tokens.push(Tkn::LParen),
-            ')' => tokens.push(Tkn::RParen),
-            '+' => match chars.peek() {
-                Some((_, '+')) => {
-                    eat!();
-                    tokens.push(Tkn::Op("++"));
-                }
-                _ => tokens.push(Tkn::Op(&string[i..(i + 1)])),
-            },
-            '-' => match chars.peek() {
-                Some((_, '-')) => {
-                    eat!();
-                    tokens.push(Tkn::Op("--"));
-                }
-                _ => tokens.push(Tkn::Op("-")),
-            },
-            '!' => tokens.push(Tkn::Op("!")),
-            '"' => {
-                if let Some((i, _)) = chars.next() {
-                    tokens.push(Tkn::Str(get_str_literal!(i)));
-                    eat!();
-                }
-            }
             '/' if chars.peek() == Some(&(i + 1, '/')) => {
                 eat!();
                 while let Some((j, c)) = chars.next() {
@@ -164,6 +128,29 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
                         }
                         _ => (),
                     }
+                }
+            }
+            ':' => tokens.push(Tkn::Colon),
+            ';' => tokens.push(Tkn::Semicolon),
+            ',' => tokens.push(Tkn::Comma),
+            '{' => tokens.push(Tkn::LBrace),
+            '}' => tokens.push(Tkn::RBrace),
+            '(' => tokens.push(Tkn::LParen),
+            ')' => tokens.push(Tkn::RParen),
+            _ if is_op(c) => tokens.push(Tkn::Op(get_substring!(is_op, i))),
+            '"' => {
+                if let Some((i, _)) = chars.next() {
+                    let mut k: usize = i;
+                    while let Some((j, c)) = chars.peek() {
+                        k = *j;
+                        if *c != '"' {
+                            eat!();
+                        } else {
+                            break;
+                        }
+                    }
+                    tokens.push(Tkn::Str(&string[i..k]));
+                    eat!();
                 }
             }
             _ => tokens.push(Tkn::Illegal(&string[i..(i + 1)])),
@@ -255,7 +242,7 @@ mod tests {
             vec![
                 Tkn::Var,
                 Tkn::Ident("x"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::LBrace,
                 Tkn::Ident("a"),
                 Tkn::Colon,
@@ -283,7 +270,7 @@ mod tests {
             vec![
                 Tkn::Var,
                 Tkn::Ident("a"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Str("null"),
                 Tkn::Semicolon,
             ],
@@ -376,7 +363,7 @@ mod tests {
                 Tkn::LBrace,
                 Tkn::Var,
                 Tkn::Ident("d"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::LBrace,
                 Tkn::Ident("a"),
                 Tkn::Colon,
@@ -409,7 +396,7 @@ mod tests {
             vec![
                 Tkn::Var,
                 Tkn::Ident("f"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Fn,
                 Tkn::LParen,
                 Tkn::Ident("x"),
@@ -438,19 +425,19 @@ mod tests {
                 Tkn::Ident("window"),
                 Tkn::Op("."),
                 Tkn::Ident("onload"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Fn,
                 Tkn::LParen,
                 Tkn::RParen,
                 Tkn::LBrace,
                 Tkn::Var,
                 Tkn::Ident("a"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Num("0.1"),
                 Tkn::Semicolon,
                 Tkn::Var,
                 Tkn::Ident("b"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Num("10"),
                 Tkn::Semicolon,
                 Tkn::Ret,
@@ -472,13 +459,13 @@ mod tests {
             vec![
                 Tkn::Var,
                 Tkn::Ident("a"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Op("!"),
                 Tkn::Bool("true"),
                 Tkn::Semicolon,
                 Tkn::Var,
                 Tkn::Ident("b"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Op("-"),
                 Tkn::Num("1.0"),
                 Tkn::Semicolon,
@@ -493,7 +480,7 @@ mod tests {
             vec![
                 Tkn::Var,
                 Tkn::Ident("x"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::LParen,
                 Tkn::Ident("a"),
                 Tkn::Op("+"),

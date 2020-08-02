@@ -157,7 +157,7 @@ fn get_expr<'a, 'b>(
             eat_or_panic!(tokens, Tkn::RParen);
             expr
         }
-        Some(Tkn::Op(x)) => set_prefix!(*x),
+        Some(Tkn::Op(x)) if *x != "=" => set_prefix!(*x),
         Some(Tkn::Num(x)) => Expr::Num(x),
         Some(Tkn::Str(x)) => Expr::Str(x),
         Some(Tkn::Bool(x)) => Expr::Bool(x),
@@ -225,7 +225,7 @@ fn get_expr<'a, 'b>(
 
     while let Some(t) = tokens.peek() {
         match t {
-            Tkn::Op(x) => set_postfix_or_infix!(*x),
+            Tkn::Op(x) if *x != "=" => set_postfix_or_infix!(*x),
             _ => break,
         }
     }
@@ -252,7 +252,7 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Stmt<'a> {
                     ident,
                     expr: Expr::Uninit,
                 },
-                Some(Tkn::Equals) => {
+                Some(Tkn::Op("=")) => {
                     let var: Stmt = Stmt::Decl {
                         ident,
                         expr: get_expr(tokens, 0),
@@ -281,7 +281,7 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Stmt<'a> {
         _ => {
             let a: Expr = get_expr(tokens, 0);
             match tokens.next() {
-                Some(Tkn::Equals) => {
+                Some(Tkn::Op("=")) => {
                     let b: Expr = get_expr(tokens, 0);
                     eat_or_panic!(tokens, Tkn::Semicolon);
                     Stmt::Assign { r#ref: a, expr: b }
@@ -327,7 +327,7 @@ mod tests {
             &[
                 Tkn::Var,
                 Tkn::Ident("x"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Num(".1"),
                 Tkn::Semicolon,
             ],
@@ -344,7 +344,7 @@ mod tests {
             &[
                 Tkn::Var,
                 Tkn::Ident("x"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Str("blah blah"),
                 Tkn::Semicolon,
             ],
@@ -361,7 +361,7 @@ mod tests {
             &[
                 Tkn::Var,
                 Tkn::Ident("x"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Bool("true"),
                 Tkn::Semicolon,
             ],
@@ -378,7 +378,7 @@ mod tests {
             &[
                 Tkn::Var,
                 Tkn::Ident("x"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Null,
                 Tkn::Semicolon,
             ],
@@ -395,7 +395,7 @@ mod tests {
             &[
                 Tkn::Var,
                 Tkn::Ident("x"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Undef,
                 Tkn::Semicolon,
             ],
@@ -412,7 +412,7 @@ mod tests {
             &[
                 Tkn::Var,
                 Tkn::Ident("x"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::LBrace,
                 Tkn::Ident("a"),
                 Tkn::Colon,
@@ -446,7 +446,7 @@ mod tests {
             &[
                 Tkn::Var,
                 Tkn::Ident("x"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::LBrace,
                 Tkn::RBrace,
                 Tkn::Semicolon,
@@ -464,7 +464,7 @@ mod tests {
             &[
                 Tkn::Var,
                 Tkn::Ident("x"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::LBrace,
                 Tkn::Ident("a"),
                 Tkn::Colon,
@@ -499,7 +499,7 @@ mod tests {
         let _: Vec<Stmt> = get_ast(&[
             Tkn::Var,
             Tkn::Ident("x"),
-            Tkn::Equals,
+            Tkn::Op("="),
             Tkn::LBrace,
             Tkn::Ident("a"),
             Tkn::Colon,
@@ -520,7 +520,7 @@ mod tests {
                 Tkn::Ident("x"),
                 Tkn::Semicolon,
                 Tkn::Ident("x"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Null,
                 Tkn::Semicolon,
             ],
@@ -543,32 +543,32 @@ mod tests {
             &[
                 Tkn::Var,
                 Tkn::Ident("a"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Num("1."),
                 Tkn::Semicolon,
                 Tkn::Var,
                 Tkn::Ident("b"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Str("blah"),
                 Tkn::Semicolon,
                 Tkn::Var,
                 Tkn::Ident("c"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Bool("false"),
                 Tkn::Semicolon,
                 Tkn::Var,
                 Tkn::Ident("d"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Null,
                 Tkn::Semicolon,
                 Tkn::Var,
                 Tkn::Ident("e"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Undef,
                 Tkn::Semicolon,
                 Tkn::Var,
                 Tkn::Ident("f"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::LBrace,
                 Tkn::Ident("key"),
                 Tkn::Colon,
@@ -709,7 +709,7 @@ mod tests {
                 Tkn::LBrace,
                 Tkn::Var,
                 Tkn::Ident("d"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::LBrace,
                 Tkn::Ident("a"),
                 Tkn::Colon,
@@ -763,7 +763,7 @@ mod tests {
             &[
                 Tkn::Var,
                 Tkn::Ident("x"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::LBrace,
                 Tkn::Ident("a"),
                 Tkn::Colon,
@@ -811,7 +811,7 @@ mod tests {
             &[
                 Tkn::Var,
                 Tkn::Ident("f"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Fn,
                 Tkn::LParen,
                 Tkn::Ident("x"),
@@ -846,19 +846,19 @@ mod tests {
                 Tkn::Ident("window"),
                 Tkn::Op("."),
                 Tkn::Ident("onload"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Fn,
                 Tkn::LParen,
                 Tkn::RParen,
                 Tkn::LBrace,
                 Tkn::Var,
                 Tkn::Ident("a"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Num("0.1"),
                 Tkn::Semicolon,
                 Tkn::Var,
                 Tkn::Ident("b"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Num("10"),
                 Tkn::Semicolon,
                 Tkn::Ret,
@@ -903,13 +903,13 @@ mod tests {
             &[
                 Tkn::Var,
                 Tkn::Ident("a"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Op("!"),
                 Tkn::Bool("true"),
                 Tkn::Semicolon,
                 Tkn::Var,
                 Tkn::Ident("b"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::Op("-"),
                 Tkn::Num("1.0"),
                 Tkn::Semicolon,
@@ -939,7 +939,7 @@ mod tests {
             &[
                 Tkn::Var,
                 Tkn::Ident("x"),
-                Tkn::Equals,
+                Tkn::Op("="),
                 Tkn::LParen,
                 Tkn::Ident("a"),
                 Tkn::Op("+"),
