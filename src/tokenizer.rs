@@ -54,11 +54,7 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
 
     macro_rules! eat {
         () => {
-            if let Some(_) = chars.next() {
-                ()
-            } else {
-                panic!()
-            }
+            let _: Option<(usize, char)> = chars.next();
         };
     }
 
