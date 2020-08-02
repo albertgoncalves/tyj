@@ -513,7 +513,7 @@ mod tests {
     }
 
     #[test]
-    fn declare_declare_assign() {
+    fn declare_assign() {
         assert_ast!(
             &[
                 Tkn::Var,
