@@ -1,6 +1,8 @@
 use std::iter::Peekable;
 use std::str::CharIndices;
 
+type Count = u8;
+
 const OPS: [char; 9] = ['=', '.', '+', '-', '*', '/', '<', '>', '!'];
 const DECIMAL: u32 = 10;
 
@@ -35,6 +37,12 @@ pub(crate) enum Tkn<'a> {
     Comment(&'a str),
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) struct Lex<'a> {
+    pub(crate) token: Tkn<'a>,
+    pub(crate) line: Count,
+}
+
 fn is_numeric(c: char) -> bool {
     c.is_digit(DECIMAL) || (c == '.')
 }
@@ -48,41 +56,47 @@ fn is_op(c: char) -> bool {
     false
 }
 
-pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
+pub(crate) fn get_tokens(string: &str) -> Vec<Lex> {
     let mut chars: Peekable<CharIndices> = string.char_indices().peekable();
-    let mut tokens: Vec<Tkn> = Vec::with_capacity(string.len());
+    let mut tokens: Vec<Lex> = Vec::with_capacity(string.len());
+    let mut line: Count = 0;
 
     macro_rules! eat {
-        () => {
+        () => {{
             let _: Option<(usize, char)> = chars.next();
-        };
+        }};
     }
 
     macro_rules! get_substring {
         ($f:expr, $i:expr $(,)?) => {{
             let mut k: usize = $i;
+            let mut n: Count = 0;
             loop {
                 if let Some((j, c)) = chars.peek() {
                     k = *j;
-                    if $f(*c) {
-                        eat!();
-                    } else {
-                        break;
+                    match c {
+                        '\n' => {
+                            n += 1;
+                            eat!();
+                        }
+                        _ if $f(*c) => eat!(),
+                        _ => break,
                     }
                 } else {
                     k += 1;
                     break;
                 }
             }
-            &string[$i..k]
+            (&string[$i..k], n)
         }};
     }
 
     while let Some((i, c)) = chars.next() {
         match c {
+            '\n' => line += 1,
             _ if c.is_whitespace() => (),
             _ if c.is_alphabetic() => {
-                let ident: &str = get_substring!(
+                let (ident, n): (&str, Count) = get_substring!(
                     |c: char| c.is_alphabetic() || c.is_digit(DECIMAL),
                     i,
                 );
@@ -103,26 +117,32 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
                     "true" | "false" => Tkn::Bool(ident),
                     _ => Tkn::Ident(ident),
                 };
-                tokens.push(token);
+                tokens.push(Lex { token, line });
+                line += n;
             }
             _ if is_numeric(c) => {
-                let num: &str = get_substring!(is_numeric, i);
+                let (num, n): (&str, Count) = get_substring!(is_numeric, i);
                 if num == "." {
-                    tokens.push(Tkn::Op("."));
+                    tokens.push(Lex { token: Tkn::Op("."), line });
                 } else if (num.matches('.').count() < 2)
                     && (0 < num.matches(|c: char| c.is_digit(DECIMAL)).count())
                 {
-                    tokens.push(Tkn::Num(num));
+                    tokens.push(Lex { token: Tkn::Num(num), line });
                 } else {
-                    tokens.push(Tkn::Illegal(num));
+                    tokens.push(Lex { token: Tkn::Illegal(num), line });
                 }
+                line += n;
             }
             '/' if chars.peek() == Some(&(i + 1, '/')) => {
                 eat!();
                 while let Some((j, c)) = chars.next() {
                     match c {
                         '\n' => {
-                            tokens.push(Tkn::Comment(&string[i..j]));
+                            tokens.push(Lex {
+                                token: Tkn::Comment(&string[i..j]),
+                                line,
+                            });
+                            line += 1;
                             break;
                         }
                         _ => (),
@@ -131,41 +151,57 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
             }
             '/' if chars.peek() == Some(&(i + 1, '*')) => {
                 eat!();
+                let mut n: Count = 0;
                 while let Some((j, c)) = chars.next() {
                     match c {
                         '*' if chars.peek() == Some(&(j + 1, '/')) => {
                             eat!();
-                            tokens.push(Tkn::Comment(&string[i..(j + 2)]));
+                            tokens.push(Lex {
+                                token: Tkn::Comment(&string[i..(j + 2)]),
+                                line,
+                            });
+                            line += n;
                             break;
                         }
+                        '\n' => n += 1,
                         _ => (),
                     }
                 }
             }
-            ':' => tokens.push(Tkn::Colon),
-            ';' => tokens.push(Tkn::Semicolon),
-            ',' => tokens.push(Tkn::Comma),
-            '{' => tokens.push(Tkn::LBrace),
-            '}' => tokens.push(Tkn::RBrace),
-            '(' => tokens.push(Tkn::LParen),
-            ')' => tokens.push(Tkn::RParen),
-            _ if is_op(c) => tokens.push(Tkn::Op(get_substring!(is_op, i))),
+            ':' => tokens.push(Lex { token: Tkn::Colon, line }),
+            ';' => tokens.push(Lex { token: Tkn::Semicolon, line }),
+            ',' => tokens.push(Lex { token: Tkn::Comma, line }),
+            '{' => tokens.push(Lex { token: Tkn::LBrace, line }),
+            '}' => tokens.push(Lex { token: Tkn::RBrace, line }),
+            '(' => tokens.push(Lex { token: Tkn::LParen, line }),
+            ')' => tokens.push(Lex { token: Tkn::RParen, line }),
+            _ if is_op(c) => {
+                let (op, n): (&str, Count) = get_substring!(is_op, i);
+                tokens.push(Lex { token: Tkn::Op(op), line });
+                line += n;
+            }
             '"' => {
                 if let Some((i, _)) = chars.next() {
                     let mut k: usize = i;
+                    let mut n: Count = 0;
                     while let Some((j, c)) = chars.peek() {
                         k = *j;
-                        if *c != '"' {
-                            eat!();
-                        } else {
-                            break;
+                        match c {
+                            '"' => break,
+                            '\n' => {
+                                eat!();
+                                n += 1;
+                            }
+                            _ => eat!(),
                         }
                     }
-                    tokens.push(Tkn::Str(&string[i..k]));
+                    tokens.push(Lex { token: Tkn::Str(&string[i..k]), line });
+                    line += n;
                     eat!();
                 }
             }
-            _ => tokens.push(Tkn::Illegal(&string[i..(i + 1)])),
+            _ => tokens
+                .push(Lex { token: Tkn::Illegal(&string[i..(i + 1)]), line }),
         }
     }
     tokens
@@ -173,7 +209,7 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Tkn> {
 
 #[cfg(test)]
 mod tests {
-    use super::{get_tokens, Tkn};
+    use super::{get_tokens, Lex, Tkn};
 
     macro_rules! assert_token {
         ($a:expr, $b:expr $(,)?) => {
@@ -189,42 +225,102 @@ mod tests {
 
     #[test]
     fn null() {
-        assert_token!("null", Tkn::Null);
-        assert_tokens!("null;", vec![Tkn::Null, Tkn::Semicolon])
+        assert_token!("null", Lex { token: Tkn::Null, line: 0 },);
+        assert_tokens!(
+            "null;",
+            vec![
+                Lex { token: Tkn::Null, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+            ],
+        )
     }
 
     #[test]
     fn undefined() {
-        assert_token!("undefined", Tkn::Undef);
-        assert_tokens!("undefined;", vec![Tkn::Undef, Tkn::Semicolon])
+        assert_token!("undefined", Lex { token: Tkn::Undef, line: 0 },);
+        assert_tokens!(
+            "undefined;",
+            vec![
+                Lex { token: Tkn::Undef, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+            ],
+        )
     }
 
     #[test]
     fn number() {
-        assert_token!("1", Tkn::Num("1"));
-        assert_token!("10", Tkn::Num("10"));
-        assert_token!(".10", Tkn::Num(".10"));
-        assert_token!("1.0", Tkn::Num("1.0"));
-        assert_token!("1.0.", Tkn::Illegal("1.0."));
-        assert_tokens!("1;", vec![Tkn::Num("1"), Tkn::Semicolon]);
-        assert_tokens!("10;", vec![Tkn::Num("10"), Tkn::Semicolon]);
-        assert_tokens!(".10;", vec![Tkn::Num(".10"), Tkn::Semicolon]);
-        assert_tokens!("1.0;", vec![Tkn::Num("1.0"), Tkn::Semicolon]);
-        assert_tokens!("1.0.;", vec![Tkn::Illegal("1.0."), Tkn::Semicolon])
+        assert_token!("1", Lex { token: Tkn::Num("1"), line: 0 });
+        assert_token!("10", Lex { token: Tkn::Num("10"), line: 0 });
+        assert_token!(".10", Lex { token: Tkn::Num(".10"), line: 0 });
+        assert_token!("1.0", Lex { token: Tkn::Num("1.0"), line: 0 });
+        assert_token!("1.0.", Lex { token: Tkn::Illegal("1.0."), line: 0 });
+        assert_tokens!(
+            "1;",
+            vec![
+                Lex { token: Tkn::Num("1"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+            ],
+        );
+        assert_tokens!(
+            "10;",
+            vec![
+                Lex { token: Tkn::Num("10"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+            ],
+        );
+        assert_tokens!(
+            ".10;",
+            vec![
+                Lex { token: Tkn::Num(".10"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+            ],
+        );
+        assert_tokens!(
+            "1.0;",
+            vec![
+                Lex { token: Tkn::Num("1.0"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+            ],
+        );
+        assert_tokens!(
+            "1.0.;",
+            vec![
+                Lex { token: Tkn::Illegal("1.0."), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+            ],
+        )
     }
 
     #[test]
     fn string() {
-        assert_token!("\"blah\"", Tkn::Str("blah"));
-        assert_tokens!("\"blah\";", vec![Tkn::Str("blah"), Tkn::Semicolon])
+        assert_token!("\"blah\"", Lex { token: Tkn::Str("blah"), line: 0 });
+        assert_tokens!(
+            "\"blah\";",
+            vec![
+                Lex { token: Tkn::Str("blah"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+            ],
+        )
     }
 
     #[test]
     fn bool() {
-        assert_token!("true", Tkn::Bool("true"));
-        assert_token!("false", Tkn::Bool("false"));
-        assert_tokens!("true;", vec![Tkn::Bool("true"), Tkn::Semicolon]);
-        assert_tokens!("false;", vec![Tkn::Bool("false"), Tkn::Semicolon])
+        assert_token!("true", Lex { token: Tkn::Bool("true"), line: 0 });
+        assert_token!("false", Lex { token: Tkn::Bool("false"), line: 0 });
+        assert_tokens!(
+            "true;",
+            vec![
+                Lex { token: Tkn::Bool("true"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+            ],
+        );
+        assert_tokens!(
+            "false;",
+            vec![
+                Lex { token: Tkn::Bool("false"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+            ],
+        )
     }
 
     #[test]
@@ -232,16 +328,16 @@ mod tests {
         assert_tokens!(
             "{ a: null, bc: undefined };",
             vec![
-                Tkn::LBrace,
-                Tkn::Ident("a"),
-                Tkn::Colon,
-                Tkn::Null,
-                Tkn::Comma,
-                Tkn::Ident("bc"),
-                Tkn::Colon,
-                Tkn::Undef,
-                Tkn::RBrace,
-                Tkn::Semicolon,
+                Lex { token: Tkn::LBrace, line: 0 },
+                Lex { token: Tkn::Ident("a"), line: 0 },
+                Lex { token: Tkn::Colon, line: 0 },
+                Lex { token: Tkn::Null, line: 0 },
+                Lex { token: Tkn::Comma, line: 0 },
+                Lex { token: Tkn::Ident("bc"), line: 0 },
+                Lex { token: Tkn::Colon, line: 0 },
+                Lex { token: Tkn::Undef, line: 0 },
+                Lex { token: Tkn::RBrace, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
             ],
         )
     }
@@ -252,25 +348,25 @@ mod tests {
             "var x = { a: { b: 0 } };\n\
              x.a.b;",
             vec![
-                Tkn::Var,
-                Tkn::Ident("x"),
-                Tkn::Op("="),
-                Tkn::LBrace,
-                Tkn::Ident("a"),
-                Tkn::Colon,
-                Tkn::LBrace,
-                Tkn::Ident("b"),
-                Tkn::Colon,
-                Tkn::Num("0"),
-                Tkn::RBrace,
-                Tkn::RBrace,
-                Tkn::Semicolon,
-                Tkn::Ident("x"),
-                Tkn::Op("."),
-                Tkn::Ident("a"),
-                Tkn::Op("."),
-                Tkn::Ident("b"),
-                Tkn::Semicolon,
+                Lex { token: Tkn::Var, line: 0 },
+                Lex { token: Tkn::Ident("x"), line: 0 },
+                Lex { token: Tkn::Op("="), line: 0 },
+                Lex { token: Tkn::LBrace, line: 0 },
+                Lex { token: Tkn::Ident("a"), line: 0 },
+                Lex { token: Tkn::Colon, line: 0 },
+                Lex { token: Tkn::LBrace, line: 0 },
+                Lex { token: Tkn::Ident("b"), line: 0 },
+                Lex { token: Tkn::Colon, line: 0 },
+                Lex { token: Tkn::Num("0"), line: 0 },
+                Lex { token: Tkn::RBrace, line: 0 },
+                Lex { token: Tkn::RBrace, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+                Lex { token: Tkn::Ident("x"), line: 1 },
+                Lex { token: Tkn::Op("."), line: 1 },
+                Lex { token: Tkn::Ident("a"), line: 1 },
+                Lex { token: Tkn::Op("."), line: 1 },
+                Lex { token: Tkn::Ident("b"), line: 1 },
+                Lex { token: Tkn::Semicolon, line: 1 },
             ],
         )
     }
@@ -280,11 +376,11 @@ mod tests {
         assert_tokens!(
             "var a = \"null\";",
             vec![
-                Tkn::Var,
-                Tkn::Ident("a"),
-                Tkn::Op("="),
-                Tkn::Str("null"),
-                Tkn::Semicolon,
+                Lex { token: Tkn::Var, line: 0 },
+                Lex { token: Tkn::Ident("a"), line: 0 },
+                Lex { token: Tkn::Op("="), line: 0 },
+                Lex { token: Tkn::Str("null"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
             ],
         )
     }
@@ -303,30 +399,30 @@ mod tests {
              false;\n\
              { a: 0.1 };",
             vec![
-                Tkn::Null,
-                Tkn::Semicolon,
-                Tkn::Undef,
-                Tkn::Semicolon,
-                Tkn::Num("1"),
-                Tkn::Semicolon,
-                Tkn::Num("10"),
-                Tkn::Semicolon,
-                Tkn::Num(".10"),
-                Tkn::Semicolon,
-                Tkn::Num("1.0"),
-                Tkn::Semicolon,
-                Tkn::Str("blah"),
-                Tkn::Semicolon,
-                Tkn::Bool("true"),
-                Tkn::Semicolon,
-                Tkn::Bool("false"),
-                Tkn::Semicolon,
-                Tkn::LBrace,
-                Tkn::Ident("a"),
-                Tkn::Colon,
-                Tkn::Num("0.1"),
-                Tkn::RBrace,
-                Tkn::Semicolon,
+                Lex { token: Tkn::Null, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+                Lex { token: Tkn::Undef, line: 1 },
+                Lex { token: Tkn::Semicolon, line: 1 },
+                Lex { token: Tkn::Num("1"), line: 2 },
+                Lex { token: Tkn::Semicolon, line: 2 },
+                Lex { token: Tkn::Num("10"), line: 3 },
+                Lex { token: Tkn::Semicolon, line: 3 },
+                Lex { token: Tkn::Num(".10"), line: 4 },
+                Lex { token: Tkn::Semicolon, line: 4 },
+                Lex { token: Tkn::Num("1.0"), line: 5 },
+                Lex { token: Tkn::Semicolon, line: 5 },
+                Lex { token: Tkn::Str("blah"), line: 6 },
+                Lex { token: Tkn::Semicolon, line: 6 },
+                Lex { token: Tkn::Bool("true"), line: 7 },
+                Lex { token: Tkn::Semicolon, line: 7 },
+                Lex { token: Tkn::Bool("false"), line: 8 },
+                Lex { token: Tkn::Semicolon, line: 8 },
+                Lex { token: Tkn::LBrace, line: 9 },
+                Lex { token: Tkn::Ident("a"), line: 9 },
+                Lex { token: Tkn::Colon, line: 9 },
+                Lex { token: Tkn::Num("0.1"), line: 9 },
+                Lex { token: Tkn::RBrace, line: 9 },
+                Lex { token: Tkn::Semicolon, line: 9 },
             ],
         )
     }
@@ -338,15 +434,15 @@ mod tests {
                  return 0;\n\
              }",
             vec![
-                Tkn::Fn,
-                Tkn::Ident("f"),
-                Tkn::LParen,
-                Tkn::RParen,
-                Tkn::LBrace,
-                Tkn::Ret,
-                Tkn::Num("0"),
-                Tkn::Semicolon,
-                Tkn::RBrace,
+                Lex { token: Tkn::Fn, line: 0 },
+                Lex { token: Tkn::Ident("f"), line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::LBrace, line: 0 },
+                Lex { token: Tkn::Ret, line: 1 },
+                Lex { token: Tkn::Num("0"), line: 1 },
+                Lex { token: Tkn::Semicolon, line: 1 },
+                Lex { token: Tkn::RBrace, line: 2 },
             ],
         )
     }
@@ -363,38 +459,38 @@ mod tests {
                  return d;\n\
              }",
             vec![
-                Tkn::Fn,
-                Tkn::Ident("f"),
-                Tkn::LParen,
-                Tkn::Ident("a"),
-                Tkn::Comma,
-                Tkn::Ident("b"),
-                Tkn::Comma,
-                Tkn::Ident("c"),
-                Tkn::RParen,
-                Tkn::LBrace,
-                Tkn::Var,
-                Tkn::Ident("d"),
-                Tkn::Op("="),
-                Tkn::LBrace,
-                Tkn::Ident("a"),
-                Tkn::Colon,
-                Tkn::Ident("a"),
-                Tkn::Comma,
-                Tkn::Ident("b"),
-                Tkn::Colon,
-                Tkn::Ident("b"),
-                Tkn::Comma,
-                Tkn::Ident("c"),
-                Tkn::Colon,
-                Tkn::Ident("c"),
-                Tkn::Comma,
-                Tkn::RBrace,
-                Tkn::Semicolon,
-                Tkn::Ret,
-                Tkn::Ident("d"),
-                Tkn::Semicolon,
-                Tkn::RBrace,
+                Lex { token: Tkn::Fn, line: 0 },
+                Lex { token: Tkn::Ident("f"), line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("a"), line: 0 },
+                Lex { token: Tkn::Comma, line: 0 },
+                Lex { token: Tkn::Ident("b"), line: 0 },
+                Lex { token: Tkn::Comma, line: 0 },
+                Lex { token: Tkn::Ident("c"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::LBrace, line: 0 },
+                Lex { token: Tkn::Var, line: 1 },
+                Lex { token: Tkn::Ident("d"), line: 1 },
+                Lex { token: Tkn::Op("="), line: 1 },
+                Lex { token: Tkn::LBrace, line: 1 },
+                Lex { token: Tkn::Ident("a"), line: 2 },
+                Lex { token: Tkn::Colon, line: 2 },
+                Lex { token: Tkn::Ident("a"), line: 2 },
+                Lex { token: Tkn::Comma, line: 2 },
+                Lex { token: Tkn::Ident("b"), line: 3 },
+                Lex { token: Tkn::Colon, line: 3 },
+                Lex { token: Tkn::Ident("b"), line: 3 },
+                Lex { token: Tkn::Comma, line: 3 },
+                Lex { token: Tkn::Ident("c"), line: 4 },
+                Lex { token: Tkn::Colon, line: 4 },
+                Lex { token: Tkn::Ident("c"), line: 4 },
+                Lex { token: Tkn::Comma, line: 4 },
+                Lex { token: Tkn::RBrace, line: 5 },
+                Lex { token: Tkn::Semicolon, line: 5 },
+                Lex { token: Tkn::Ret, line: 6 },
+                Lex { token: Tkn::Ident("d"), line: 6 },
+                Lex { token: Tkn::Semicolon, line: 6 },
+                Lex { token: Tkn::RBrace, line: 7 },
             ],
         )
     }
@@ -406,21 +502,21 @@ mod tests {
                  return x + 0.1;\n\
              };",
             vec![
-                Tkn::Var,
-                Tkn::Ident("f"),
-                Tkn::Op("="),
-                Tkn::Fn,
-                Tkn::LParen,
-                Tkn::Ident("x"),
-                Tkn::RParen,
-                Tkn::LBrace,
-                Tkn::Ret,
-                Tkn::Ident("x"),
-                Tkn::Op("+"),
-                Tkn::Num("0.1"),
-                Tkn::Semicolon,
-                Tkn::RBrace,
-                Tkn::Semicolon,
+                Lex { token: Tkn::Var, line: 0 },
+                Lex { token: Tkn::Ident("f"), line: 0 },
+                Lex { token: Tkn::Op("="), line: 0 },
+                Lex { token: Tkn::Fn, line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("x"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::LBrace, line: 0 },
+                Lex { token: Tkn::Ret, line: 1 },
+                Lex { token: Tkn::Ident("x"), line: 1 },
+                Lex { token: Tkn::Op("+"), line: 1 },
+                Lex { token: Tkn::Num("0.1"), line: 1 },
+                Lex { token: Tkn::Semicolon, line: 1 },
+                Lex { token: Tkn::RBrace, line: 2 },
+                Lex { token: Tkn::Semicolon, line: 2 },
             ],
         )
     }
@@ -434,31 +530,31 @@ mod tests {
                  return a + b;\n\
              };",
             vec![
-                Tkn::Ident("window"),
-                Tkn::Op("."),
-                Tkn::Ident("onload"),
-                Tkn::Op("="),
-                Tkn::Fn,
-                Tkn::LParen,
-                Tkn::RParen,
-                Tkn::LBrace,
-                Tkn::Var,
-                Tkn::Ident("a"),
-                Tkn::Op("="),
-                Tkn::Num("0.1"),
-                Tkn::Semicolon,
-                Tkn::Var,
-                Tkn::Ident("b"),
-                Tkn::Op("="),
-                Tkn::Num("10"),
-                Tkn::Semicolon,
-                Tkn::Ret,
-                Tkn::Ident("a"),
-                Tkn::Op("+"),
-                Tkn::Ident("b"),
-                Tkn::Semicolon,
-                Tkn::RBrace,
-                Tkn::Semicolon,
+                Lex { token: Tkn::Ident("window"), line: 0 },
+                Lex { token: Tkn::Op("."), line: 0 },
+                Lex { token: Tkn::Ident("onload"), line: 0 },
+                Lex { token: Tkn::Op("="), line: 0 },
+                Lex { token: Tkn::Fn, line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::LBrace, line: 0 },
+                Lex { token: Tkn::Var, line: 1 },
+                Lex { token: Tkn::Ident("a"), line: 1 },
+                Lex { token: Tkn::Op("="), line: 1 },
+                Lex { token: Tkn::Num("0.1"), line: 1 },
+                Lex { token: Tkn::Semicolon, line: 1 },
+                Lex { token: Tkn::Var, line: 2 },
+                Lex { token: Tkn::Ident("b"), line: 2 },
+                Lex { token: Tkn::Op("="), line: 2 },
+                Lex { token: Tkn::Num("10"), line: 2 },
+                Lex { token: Tkn::Semicolon, line: 2 },
+                Lex { token: Tkn::Ret, line: 3 },
+                Lex { token: Tkn::Ident("a"), line: 3 },
+                Lex { token: Tkn::Op("+"), line: 3 },
+                Lex { token: Tkn::Ident("b"), line: 3 },
+                Lex { token: Tkn::Semicolon, line: 3 },
+                Lex { token: Tkn::RBrace, line: 4 },
+                Lex { token: Tkn::Semicolon, line: 4 },
             ],
         )
     }
@@ -469,18 +565,18 @@ mod tests {
             "var a = !true;\n\
              var b = -1.0;",
             vec![
-                Tkn::Var,
-                Tkn::Ident("a"),
-                Tkn::Op("="),
-                Tkn::Op("!"),
-                Tkn::Bool("true"),
-                Tkn::Semicolon,
-                Tkn::Var,
-                Tkn::Ident("b"),
-                Tkn::Op("="),
-                Tkn::Op("-"),
-                Tkn::Num("1.0"),
-                Tkn::Semicolon,
+                Lex { token: Tkn::Var, line: 0 },
+                Lex { token: Tkn::Ident("a"), line: 0 },
+                Lex { token: Tkn::Op("="), line: 0 },
+                Lex { token: Tkn::Op("!"), line: 0 },
+                Lex { token: Tkn::Bool("true"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+                Lex { token: Tkn::Var, line: 1 },
+                Lex { token: Tkn::Ident("b"), line: 1 },
+                Lex { token: Tkn::Op("="), line: 1 },
+                Lex { token: Tkn::Op("-"), line: 1 },
+                Lex { token: Tkn::Num("1.0"), line: 1 },
+                Lex { token: Tkn::Semicolon, line: 1 },
             ],
         )
     }
@@ -490,25 +586,25 @@ mod tests {
         assert_tokens!(
             "var x = (a + b) + ((c + d) + e);",
             vec![
-                Tkn::Var,
-                Tkn::Ident("x"),
-                Tkn::Op("="),
-                Tkn::LParen,
-                Tkn::Ident("a"),
-                Tkn::Op("+"),
-                Tkn::Ident("b"),
-                Tkn::RParen,
-                Tkn::Op("+"),
-                Tkn::LParen,
-                Tkn::LParen,
-                Tkn::Ident("c"),
-                Tkn::Op("+"),
-                Tkn::Ident("d"),
-                Tkn::RParen,
-                Tkn::Op("+"),
-                Tkn::Ident("e"),
-                Tkn::RParen,
-                Tkn::Semicolon,
+                Lex { token: Tkn::Var, line: 0 },
+                Lex { token: Tkn::Ident("x"), line: 0 },
+                Lex { token: Tkn::Op("="), line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("a"), line: 0 },
+                Lex { token: Tkn::Op("+"), line: 0 },
+                Lex { token: Tkn::Ident("b"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::Op("+"), line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("c"), line: 0 },
+                Lex { token: Tkn::Op("+"), line: 0 },
+                Lex { token: Tkn::Ident("d"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::Op("+"), line: 0 },
+                Lex { token: Tkn::Ident("e"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
             ],
         )
     }
@@ -519,12 +615,12 @@ mod tests {
             "a++;\n\
              ++b;",
             vec![
-                Tkn::Ident("a"),
-                Tkn::Op("++"),
-                Tkn::Semicolon,
-                Tkn::Op("++"),
-                Tkn::Ident("b"),
-                Tkn::Semicolon,
+                Lex { token: Tkn::Ident("a"), line: 0 },
+                Lex { token: Tkn::Op("++"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+                Lex { token: Tkn::Op("++"), line: 1 },
+                Lex { token: Tkn::Ident("b"), line: 1 },
+                Lex { token: Tkn::Semicolon, line: 1 },
             ],
         )
     }
@@ -535,12 +631,12 @@ mod tests {
             "a--;\n\
              --b;",
             vec![
-                Tkn::Ident("a"),
-                Tkn::Op("--"),
-                Tkn::Semicolon,
-                Tkn::Op("--"),
-                Tkn::Ident("b"),
-                Tkn::Semicolon,
+                Lex { token: Tkn::Ident("a"), line: 0 },
+                Lex { token: Tkn::Op("--"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+                Lex { token: Tkn::Op("--"), line: 1 },
+                Lex { token: Tkn::Ident("b"), line: 1 },
+                Lex { token: Tkn::Semicolon, line: 1 },
             ],
         )
     }
@@ -553,14 +649,14 @@ mod tests {
              /// Comment 2\n\
              var b;",
             vec![
-                Tkn::Comment("// Comment 1"),
-                Tkn::Var,
-                Tkn::Ident("a"),
-                Tkn::Semicolon,
-                Tkn::Comment("/// Comment 2"),
-                Tkn::Var,
-                Tkn::Ident("b"),
-                Tkn::Semicolon,
+                Lex { token: Tkn::Comment("// Comment 1"), line: 0 },
+                Lex { token: Tkn::Var, line: 1 },
+                Lex { token: Tkn::Ident("a"), line: 1 },
+                Lex { token: Tkn::Semicolon, line: 1 },
+                Lex { token: Tkn::Comment("/// Comment 2"), line: 2 },
+                Lex { token: Tkn::Var, line: 3 },
+                Lex { token: Tkn::Ident("b"), line: 3 },
+                Lex { token: Tkn::Semicolon, line: 3 },
             ],
         )
     }
@@ -575,18 +671,21 @@ mod tests {
               */\n\
              var b;",
             vec![
-                Tkn::Comment("/* Comment 1 */"),
-                Tkn::Var,
-                Tkn::Ident("a"),
-                Tkn::Semicolon,
-                Tkn::Comment(
-                    "/* Comment 2\n\
-                      * ...\n\
-                      */"
-                ),
-                Tkn::Var,
-                Tkn::Ident("b"),
-                Tkn::Semicolon,
+                Lex { token: Tkn::Comment("/* Comment 1 */"), line: 0 },
+                Lex { token: Tkn::Var, line: 1 },
+                Lex { token: Tkn::Ident("a"), line: 1 },
+                Lex { token: Tkn::Semicolon, line: 1 },
+                Lex {
+                    token: Tkn::Comment(
+                        "/* Comment 2\n\
+                          * ...\n\
+                          */"
+                    ),
+                    line: 2,
+                },
+                Lex { token: Tkn::Var, line: 5 },
+                Lex { token: Tkn::Ident("b"), line: 5 },
+                Lex { token: Tkn::Semicolon, line: 5 },
             ],
         )
     }
@@ -601,26 +700,26 @@ mod tests {
                  a = 1;
              }",
             vec![
-                Tkn::Var,
-                Tkn::Ident("a"),
-                Tkn::Semicolon,
-                Tkn::If,
-                Tkn::LParen,
-                Tkn::Bool("true"),
-                Tkn::RParen,
-                Tkn::LBrace,
-                Tkn::Ident("a"),
-                Tkn::Op("="),
-                Tkn::Num("0"),
-                Tkn::Semicolon,
-                Tkn::RBrace,
-                Tkn::Else,
-                Tkn::LBrace,
-                Tkn::Ident("a"),
-                Tkn::Op("="),
-                Tkn::Num("1"),
-                Tkn::Semicolon,
-                Tkn::RBrace,
+                Lex { token: Tkn::Var, line: 0 },
+                Lex { token: Tkn::Ident("a"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+                Lex { token: Tkn::If, line: 1 },
+                Lex { token: Tkn::LParen, line: 1 },
+                Lex { token: Tkn::Bool("true"), line: 1 },
+                Lex { token: Tkn::RParen, line: 1 },
+                Lex { token: Tkn::LBrace, line: 1 },
+                Lex { token: Tkn::Ident("a"), line: 2 },
+                Lex { token: Tkn::Op("="), line: 2 },
+                Lex { token: Tkn::Num("0"), line: 2 },
+                Lex { token: Tkn::Semicolon, line: 2 },
+                Lex { token: Tkn::RBrace, line: 3 },
+                Lex { token: Tkn::Else, line: 3 },
+                Lex { token: Tkn::LBrace, line: 3 },
+                Lex { token: Tkn::Ident("a"), line: 4 },
+                Lex { token: Tkn::Op("="), line: 4 },
+                Lex { token: Tkn::Num("1"), line: 4 },
+                Lex { token: Tkn::Semicolon, line: 4 },
+                Lex { token: Tkn::RBrace, line: 5 },
             ],
         )
     }
@@ -643,56 +742,56 @@ mod tests {
              }
              }",
             vec![
-                Tkn::Var,
-                Tkn::Ident("x"),
-                Tkn::Op("="),
-                Tkn::Bool("true"),
-                Tkn::Semicolon,
-                Tkn::Switch,
-                Tkn::LParen,
-                Tkn::Ident("x"),
-                Tkn::RParen,
-                Tkn::LBrace,
-                Tkn::Case,
-                Tkn::Bool("true"),
-                Tkn::Colon,
-                Tkn::LBrace,
-                Tkn::Ident("console"),
-                Tkn::Op("."),
-                Tkn::Ident("log"),
-                Tkn::LParen,
-                Tkn::Str("true"),
-                Tkn::RParen,
-                Tkn::Semicolon,
-                Tkn::Break,
-                Tkn::Semicolon,
-                Tkn::RBrace,
-                Tkn::Case,
-                Tkn::Bool("false"),
-                Tkn::Colon,
-                Tkn::LBrace,
-                Tkn::Ident("console"),
-                Tkn::Op("."),
-                Tkn::Ident("log"),
-                Tkn::LParen,
-                Tkn::Str("false"),
-                Tkn::RParen,
-                Tkn::Semicolon,
-                Tkn::Break,
-                Tkn::Semicolon,
-                Tkn::RBrace,
-                Tkn::Default,
-                Tkn::Colon,
-                Tkn::LBrace,
-                Tkn::Ident("console"),
-                Tkn::Op("."),
-                Tkn::Ident("log"),
-                Tkn::LParen,
-                Tkn::Str("?"),
-                Tkn::RParen,
-                Tkn::Semicolon,
-                Tkn::RBrace,
-                Tkn::RBrace,
+                Lex { token: Tkn::Var, line: 0 },
+                Lex { token: Tkn::Ident("x"), line: 0 },
+                Lex { token: Tkn::Op("="), line: 0 },
+                Lex { token: Tkn::Bool("true"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+                Lex { token: Tkn::Switch, line: 1 },
+                Lex { token: Tkn::LParen, line: 1 },
+                Lex { token: Tkn::Ident("x"), line: 1 },
+                Lex { token: Tkn::RParen, line: 1 },
+                Lex { token: Tkn::LBrace, line: 1 },
+                Lex { token: Tkn::Case, line: 2 },
+                Lex { token: Tkn::Bool("true"), line: 2 },
+                Lex { token: Tkn::Colon, line: 2 },
+                Lex { token: Tkn::LBrace, line: 2 },
+                Lex { token: Tkn::Ident("console"), line: 3 },
+                Lex { token: Tkn::Op("."), line: 3 },
+                Lex { token: Tkn::Ident("log"), line: 3 },
+                Lex { token: Tkn::LParen, line: 3 },
+                Lex { token: Tkn::Str("true"), line: 3 },
+                Lex { token: Tkn::RParen, line: 3 },
+                Lex { token: Tkn::Semicolon, line: 3 },
+                Lex { token: Tkn::Break, line: 4 },
+                Lex { token: Tkn::Semicolon, line: 4 },
+                Lex { token: Tkn::RBrace, line: 5 },
+                Lex { token: Tkn::Case, line: 6 },
+                Lex { token: Tkn::Bool("false"), line: 6 },
+                Lex { token: Tkn::Colon, line: 6 },
+                Lex { token: Tkn::LBrace, line: 6 },
+                Lex { token: Tkn::Ident("console"), line: 7 },
+                Lex { token: Tkn::Op("."), line: 7 },
+                Lex { token: Tkn::Ident("log"), line: 7 },
+                Lex { token: Tkn::LParen, line: 7 },
+                Lex { token: Tkn::Str("false"), line: 7 },
+                Lex { token: Tkn::RParen, line: 7 },
+                Lex { token: Tkn::Semicolon, line: 7 },
+                Lex { token: Tkn::Break, line: 8 },
+                Lex { token: Tkn::Semicolon, line: 8 },
+                Lex { token: Tkn::RBrace, line: 9 },
+                Lex { token: Tkn::Default, line: 10 },
+                Lex { token: Tkn::Colon, line: 10 },
+                Lex { token: Tkn::LBrace, line: 10 },
+                Lex { token: Tkn::Ident("console"), line: 11 },
+                Lex { token: Tkn::Op("."), line: 11 },
+                Lex { token: Tkn::Ident("log"), line: 11 },
+                Lex { token: Tkn::LParen, line: 11 },
+                Lex { token: Tkn::Str("?"), line: 11 },
+                Lex { token: Tkn::RParen, line: 11 },
+                Lex { token: Tkn::Semicolon, line: 11 },
+                Lex { token: Tkn::RBrace, line: 12 },
+                Lex { token: Tkn::RBrace, line: 13 },
             ],
         )
     }
@@ -705,31 +804,31 @@ mod tests {
                  x += 2;
              }",
             vec![
-                Tkn::Var,
-                Tkn::Ident("x"),
-                Tkn::Op("="),
-                Tkn::Num("0"),
-                Tkn::Semicolon,
-                Tkn::For,
-                Tkn::LParen,
-                Tkn::Var,
-                Tkn::Ident("i"),
-                Tkn::Op("="),
-                Tkn::Num("0"),
-                Tkn::Semicolon,
-                Tkn::Ident("i"),
-                Tkn::Op("<"),
-                Tkn::Num("10"),
-                Tkn::Semicolon,
-                Tkn::Op("++"),
-                Tkn::Ident("i"),
-                Tkn::RParen,
-                Tkn::LBrace,
-                Tkn::Ident("x"),
-                Tkn::Op("+="),
-                Tkn::Num("2"),
-                Tkn::Semicolon,
-                Tkn::RBrace,
+                Lex { token: Tkn::Var, line: 0 },
+                Lex { token: Tkn::Ident("x"), line: 0 },
+                Lex { token: Tkn::Op("="), line: 0 },
+                Lex { token: Tkn::Num("0"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+                Lex { token: Tkn::For, line: 1 },
+                Lex { token: Tkn::LParen, line: 1 },
+                Lex { token: Tkn::Var, line: 1 },
+                Lex { token: Tkn::Ident("i"), line: 1 },
+                Lex { token: Tkn::Op("="), line: 1 },
+                Lex { token: Tkn::Num("0"), line: 1 },
+                Lex { token: Tkn::Semicolon, line: 1 },
+                Lex { token: Tkn::Ident("i"), line: 1 },
+                Lex { token: Tkn::Op("<"), line: 1 },
+                Lex { token: Tkn::Num("10"), line: 1 },
+                Lex { token: Tkn::Semicolon, line: 1 },
+                Lex { token: Tkn::Op("++"), line: 1 },
+                Lex { token: Tkn::Ident("i"), line: 1 },
+                Lex { token: Tkn::RParen, line: 1 },
+                Lex { token: Tkn::LBrace, line: 1 },
+                Lex { token: Tkn::Ident("x"), line: 2 },
+                Lex { token: Tkn::Op("+="), line: 2 },
+                Lex { token: Tkn::Num("2"), line: 2 },
+                Lex { token: Tkn::Semicolon, line: 2 },
+                Lex { token: Tkn::RBrace, line: 3 },
             ],
         )
     }
@@ -742,23 +841,63 @@ mod tests {
                  x += 2;
              }",
             vec![
-                Tkn::Var,
-                Tkn::Ident("x"),
-                Tkn::Op("="),
-                Tkn::Num("0"),
-                Tkn::Semicolon,
-                Tkn::While,
-                Tkn::LParen,
-                Tkn::Ident("x"),
-                Tkn::Op("<"),
-                Tkn::Num("10"),
-                Tkn::RParen,
-                Tkn::LBrace,
-                Tkn::Ident("x"),
-                Tkn::Op("+="),
-                Tkn::Num("2"),
-                Tkn::Semicolon,
-                Tkn::RBrace,
+                Lex { token: Tkn::Var, line: 0 },
+                Lex { token: Tkn::Ident("x"), line: 0 },
+                Lex { token: Tkn::Op("="), line: 0 },
+                Lex { token: Tkn::Num("0"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+                Lex { token: Tkn::While, line: 1 },
+                Lex { token: Tkn::LParen, line: 1 },
+                Lex { token: Tkn::Ident("x"), line: 1 },
+                Lex { token: Tkn::Op("<"), line: 1 },
+                Lex { token: Tkn::Num("10"), line: 1 },
+                Lex { token: Tkn::RParen, line: 1 },
+                Lex { token: Tkn::LBrace, line: 1 },
+                Lex { token: Tkn::Ident("x"), line: 2 },
+                Lex { token: Tkn::Op("+="), line: 2 },
+                Lex { token: Tkn::Num("2"), line: 2 },
+                Lex { token: Tkn::Semicolon, line: 2 },
+                Lex { token: Tkn::RBrace, line: 3 },
+            ],
+        )
+    }
+
+    #[test]
+    fn function_calls() {
+        assert_tokens!(
+            "f(a)(b);",
+            vec![
+                Lex { token: Tkn::Ident("f"), line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("a"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("b"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+            ],
+        )
+    }
+
+    #[test]
+    fn function_calls_nested() {
+        assert_tokens!(
+            "f(a(x)(y))(b);",
+            vec![
+                Lex { token: Tkn::Ident("f"), line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("a"), line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("x"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("y"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("b"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
             ],
         )
     }
