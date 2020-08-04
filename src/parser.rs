@@ -15,23 +15,11 @@ pub(crate) enum Expr<'a> {
     Bool(&'a str),
     Obj(Vec<Prop<'a>>),
     Ref(&'a str),
-    Prefix {
-        op: &'a str,
-        expr: Box<Expr<'a>>,
-    },
-    Infix {
-        op: &'a str,
-        left: Box<Expr<'a>>,
-        right: Box<Expr<'a>>,
-    },
-    Postfix {
-        op: &'a str,
-        expr: Box<Expr<'a>>,
-    },
-    Fn {
-        args: Vec<&'a str>,
-        body: Vec<Stmt<'a>>,
-    },
+    Prefix { op: &'a str, expr: Box<Expr<'a>> },
+    Infix { op: &'a str, left: Box<Expr<'a>>, right: Box<Expr<'a>> },
+    Postfix { op: &'a str, expr: Box<Expr<'a>> },
+    Fn { args: Vec<&'a str>, body: Vec<Stmt<'a>> },
+    Call { expr: Box<Expr<'a>>, args: Vec<Expr<'a>> },
     Null,
     Undef,
     Uninit,
@@ -39,25 +27,11 @@ pub(crate) enum Expr<'a> {
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Stmt<'a> {
-    Decl {
-        ident: &'a str,
-        expr: Expr<'a>,
-    },
-    Assign {
-        r#ref: Expr<'a>,
-        expr: Expr<'a>,
-    },
+    Decl { ident: &'a str, expr: Expr<'a> },
+    Assign { r#ref: Expr<'a>, expr: Expr<'a> },
     Ret(Expr<'a>),
-    Fn {
-        ident: &'a str,
-        args: Vec<&'a str>,
-        body: Vec<Stmt<'a>>,
-    },
-    Cond {
-        condition: Expr<'a>,
-        r#if: Vec<Stmt<'a>>,
-        r#else: Vec<Stmt<'a>>,
-    },
+    Fn { ident: &'a str, args: Vec<&'a str>, body: Vec<Stmt<'a>> },
+    Cond { condition: Expr<'a>, r#if: Vec<Stmt<'a>>, r#else: Vec<Stmt<'a>> },
     Effect(Expr<'a>),
 }
 
@@ -88,10 +62,7 @@ fn get_ident<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> &'a str {
 fn get_prop<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Prop<'a> {
     let key: &str = get_ident(tokens);
     eat_or_panic!(tokens, Tkn::Colon);
-    Prop {
-        key,
-        value: get_expr(tokens, 0),
-    }
+    Prop { key, value: get_expr(tokens, 0) }
 }
 
 fn get_args<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Vec<&'a str> {
@@ -133,10 +104,7 @@ fn get_body<'a, 'b>(
 
 fn get_fn<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Expr<'a> {
     let args: Vec<&str> = get_args(tokens);
-    Expr::Fn {
-        args,
-        body: get_body(tokens),
-    }
+    Expr::Fn { args, body: get_body(tokens) }
 }
 
 fn get_expr<'a, 'b>(
@@ -149,10 +117,7 @@ fn get_expr<'a, 'b>(
                 "-" | "!" | "++" | "--" => 9,
                 _ => panic!(),
             };
-            Expr::Prefix {
-                op: $op,
-                expr: Box::new(get_expr(tokens, power)),
-            }
+            Expr::Prefix { op: $op, expr: Box::new(get_expr(tokens, power)) }
         }};
     }
 
@@ -205,10 +170,7 @@ fn get_expr<'a, 'b>(
                     break;
                 }
                 eat!(tokens);
-                expr = Expr::Postfix {
-                    op: $op,
-                    expr: Box::new(expr),
-                };
+                expr = Expr::Postfix { op: $op, expr: Box::new(expr) };
             } else {
                 let (l_power, r_power): (u8, u8) = match $op {
                     "." => (11, 12),
@@ -246,11 +208,7 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Stmt<'a> {
             eat!(tokens);
             let ident: &str = get_ident(tokens);
             let args: Vec<&str> = get_args(tokens);
-            Stmt::Fn {
-                ident,
-                args,
-                body: get_body(tokens),
-            }
+            Stmt::Fn { ident, args, body: get_body(tokens) }
         }
         Some(Tkn::If) => {
             eat!(tokens);
@@ -278,11 +236,7 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Tkn<'a>>>) -> Stmt<'a> {
                     _ => panic!(),
                 }
             }
-            Stmt::Cond {
-                condition,
-                r#if,
-                r#else: vec![],
-            }
+            Stmt::Cond { condition, r#if, r#else: vec![] }
         }
         Some(Tkn::Var) => {
             eat!(tokens);
@@ -371,10 +325,7 @@ mod tests {
                 Tkn::Num(".1"),
                 Tkn::Semicolon,
             ],
-            vec![Stmt::Decl {
-                ident: "x",
-                expr: Expr::Num(".1"),
-            }],
+            vec![Stmt::Decl { ident: "x", expr: Expr::Num(".1") }],
         )
     }
 
@@ -388,10 +339,7 @@ mod tests {
                 Tkn::Str("blah blah"),
                 Tkn::Semicolon,
             ],
-            vec![Stmt::Decl {
-                ident: "x",
-                expr: Expr::Str("blah blah"),
-            }],
+            vec![Stmt::Decl { ident: "x", expr: Expr::Str("blah blah") }],
         )
     }
 
@@ -405,10 +353,7 @@ mod tests {
                 Tkn::Bool("true"),
                 Tkn::Semicolon,
             ],
-            vec![Stmt::Decl {
-                ident: "x",
-                expr: Expr::Bool("true"),
-            }],
+            vec![Stmt::Decl { ident: "x", expr: Expr::Bool("true") }],
         )
     }
 
@@ -422,10 +367,7 @@ mod tests {
                 Tkn::Null,
                 Tkn::Semicolon,
             ],
-            vec![Stmt::Decl {
-                ident: "x",
-                expr: Expr::Null,
-            }],
+            vec![Stmt::Decl { ident: "x", expr: Expr::Null }],
         )
     }
 
@@ -439,10 +381,7 @@ mod tests {
                 Tkn::Undef,
                 Tkn::Semicolon,
             ],
-            vec![Stmt::Decl {
-                ident: "x",
-                expr: Expr::Undef,
-            }],
+            vec![Stmt::Decl { ident: "x", expr: Expr::Undef }],
         )
     }
 
@@ -467,14 +406,8 @@ mod tests {
             vec![Stmt::Decl {
                 ident: "x",
                 expr: Expr::Obj(vec![
-                    Prop {
-                        key: "a",
-                        value: Expr::Null,
-                    },
-                    Prop {
-                        key: "bc",
-                        value: Expr::Undef,
-                    },
+                    Prop { key: "a", value: Expr::Null },
+                    Prop { key: "bc", value: Expr::Undef },
                 ]),
             }],
         )
@@ -491,10 +424,7 @@ mod tests {
                 Tkn::RBrace,
                 Tkn::Semicolon,
             ],
-            vec![Stmt::Decl {
-                ident: "x",
-                expr: Expr::Obj(Vec::new()),
-            }],
+            vec![Stmt::Decl { ident: "x", expr: Expr::Obj(Vec::new()) }],
         )
     }
 
@@ -520,14 +450,8 @@ mod tests {
             vec![Stmt::Decl {
                 ident: "x",
                 expr: Expr::Obj(vec![
-                    Prop {
-                        key: "a",
-                        value: Expr::Null,
-                    },
-                    Prop {
-                        key: "bc",
-                        value: Expr::Undef,
-                    },
+                    Prop { key: "a", value: Expr::Null },
+                    Prop { key: "bc", value: Expr::Undef },
                 ]),
             }],
         )
@@ -565,14 +489,8 @@ mod tests {
                 Tkn::Semicolon,
             ],
             vec![
-                Stmt::Decl {
-                    ident: "x",
-                    expr: Expr::Uninit,
-                },
-                Stmt::Assign {
-                    r#ref: Expr::Ref("x"),
-                    expr: Expr::Null,
-                },
+                Stmt::Decl { ident: "x", expr: Expr::Uninit },
+                Stmt::Assign { r#ref: Expr::Ref("x"), expr: Expr::Null },
             ],
         )
     }
@@ -617,26 +535,11 @@ mod tests {
                 Tkn::Semicolon,
             ],
             vec![
-                Stmt::Decl {
-                    ident: "a",
-                    expr: Expr::Num("1."),
-                },
-                Stmt::Decl {
-                    ident: "b",
-                    expr: Expr::Str("blah"),
-                },
-                Stmt::Decl {
-                    ident: "c",
-                    expr: Expr::Bool("false"),
-                },
-                Stmt::Decl {
-                    ident: "d",
-                    expr: Expr::Null,
-                },
-                Stmt::Decl {
-                    ident: "e",
-                    expr: Expr::Undef,
-                },
+                Stmt::Decl { ident: "a", expr: Expr::Num("1.") },
+                Stmt::Decl { ident: "b", expr: Expr::Str("blah") },
+                Stmt::Decl { ident: "c", expr: Expr::Bool("false") },
+                Stmt::Decl { ident: "d", expr: Expr::Null },
+                Stmt::Decl { ident: "e", expr: Expr::Undef },
                 Stmt::Decl {
                     ident: "f",
                     expr: Expr::Obj(vec![Prop {
@@ -670,14 +573,8 @@ mod tests {
                 Tkn::Semicolon,
             ],
             vec![Stmt::Ret(Expr::Obj(vec![
-                Prop {
-                    key: "ab",
-                    value: Expr::Null,
-                },
-                Prop {
-                    key: "cd",
-                    value: Expr::Undef,
-                },
+                Prop { key: "ab", value: Expr::Null },
+                Prop { key: "cd", value: Expr::Undef },
             ]))],
         )
     }
@@ -701,11 +598,7 @@ mod tests {
                 Tkn::LBrace,
                 Tkn::RBrace,
             ],
-            vec![Stmt::Fn {
-                ident: "f",
-                args: Vec::new(),
-                body: Vec::new(),
-            }],
+            vec![Stmt::Fn { ident: "f", args: Vec::new(), body: Vec::new() }],
         )
     }
 
@@ -777,18 +670,9 @@ mod tests {
                     Stmt::Decl {
                         ident: "d",
                         expr: Expr::Obj(vec![
-                            Prop {
-                                key: "a",
-                                value: Expr::Ref("a"),
-                            },
-                            Prop {
-                                key: "b",
-                                value: Expr::Ref("b"),
-                            },
-                            Prop {
-                                key: "c",
-                                value: Expr::Ref("c"),
-                            },
+                            Prop { key: "a", value: Expr::Ref("a") },
+                            Prop { key: "b", value: Expr::Ref("b") },
+                            Prop { key: "c", value: Expr::Ref("c") },
                         ]),
                     },
                     Stmt::Ret(Expr::Ref("d")),
@@ -918,14 +802,8 @@ mod tests {
                 expr: Expr::Fn {
                     args: Vec::new(),
                     body: vec![
-                        Stmt::Decl {
-                            ident: "a",
-                            expr: Expr::Num("0.1"),
-                        },
-                        Stmt::Decl {
-                            ident: "b",
-                            expr: Expr::Num("10"),
-                        },
+                        Stmt::Decl { ident: "a", expr: Expr::Num("0.1") },
+                        Stmt::Decl { ident: "b", expr: Expr::Num("10") },
                         Stmt::Ret(Expr::Infix {
                             op: "+",
                             left: Box::new(Expr::Ref("a")),
@@ -1116,10 +994,7 @@ mod tests {
                 Tkn::RBrace,
             ],
             vec![
-                Stmt::Decl {
-                    ident: "a",
-                    expr: Expr::Uninit,
-                },
+                Stmt::Decl { ident: "a", expr: Expr::Uninit },
                 Stmt::Cond {
                     condition: Expr::Bool("true"),
                     r#if: vec![Stmt::Assign {

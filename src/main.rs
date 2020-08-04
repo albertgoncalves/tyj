@@ -27,18 +27,9 @@ mod tests {
                     Stmt::Decl {
                         ident: "d",
                         expr: Expr::Obj(vec![
-                            Prop {
-                                key: "a",
-                                value: Expr::Ref("a"),
-                            },
-                            Prop {
-                                key: "b",
-                                value: Expr::Ref("b"),
-                            },
-                            Prop {
-                                key: "c",
-                                value: Expr::Ref("c"),
-                            },
+                            Prop { key: "a", value: Expr::Ref("a") },
+                            Prop { key: "b", value: Expr::Ref("b") },
+                            Prop { key: "c", value: Expr::Ref("c") },
                         ]),
                     },
                     Stmt::Ret(Expr::Infix {
@@ -168,18 +159,9 @@ mod tests {
                 body: vec![Stmt::Ret(Expr::Fn {
                     args: vec!["c"],
                     body: vec![Stmt::Ret(Expr::Obj(vec![
-                        Prop {
-                            key: "a",
-                            value: Expr::Ref("a"),
-                        },
-                        Prop {
-                            key: "b",
-                            value: Expr::Ref("b"),
-                        },
-                        Prop {
-                            key: "c",
-                            value: Expr::Ref("c"),
-                        },
+                        Prop { key: "a", value: Expr::Ref("a") },
+                        Prop { key: "b", value: Expr::Ref("b") },
+                        Prop { key: "c", value: Expr::Ref("c") },
                     ]))],
                 })],
             }],
@@ -201,14 +183,8 @@ mod tests {
                  }"
             )),
             vec![
-                Stmt::Decl {
-                    ident: "x",
-                    expr: Expr::Num("0"),
-                },
-                Stmt::Decl {
-                    ident: "y",
-                    expr: Expr::Uninit,
-                },
+                Stmt::Decl { ident: "x", expr: Expr::Num("0") },
+                Stmt::Decl { ident: "y", expr: Expr::Uninit },
                 Stmt::Cond {
                     condition: Expr::Infix {
                         op: "===",
