@@ -58,7 +58,7 @@ mod tests {
                  ++x.a.b + .01;\n\
                  /* ... */\n\
                  .01 + x.a.b++;\n\
-                 .01 + ++x.a.b;"
+                 .01 + ++x.a.b;",
             )),
             vec![
                 Stmt::Decl {
@@ -151,7 +151,7 @@ mod tests {
                              c: c,
                          };
                      };
-                 }"
+                 }",
             )),
             vec![Stmt::Fn {
                 ident: "f",
@@ -180,7 +180,7 @@ mod tests {
                      y = 1;
                  } else {
                      y = 2;
-                 }"
+                 }",
             )),
             vec![
                 Stmt::Decl { ident: "x", expr: Expr::Num("0") },
