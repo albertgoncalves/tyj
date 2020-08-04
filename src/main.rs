@@ -217,4 +217,19 @@ mod tests {
             ],
         );
     }
+
+    #[test]
+    fn parse_console_log() {
+        assert_eq!(
+            get_ast(&get_tokens("console.log(\"Hello, world!\");")),
+            vec![Stmt::Effect(Expr::Call {
+                expr: Box::new(Expr::Infix {
+                    op: ".",
+                    left: Box::new(Expr::Ref("console")),
+                    right: Box::new(Expr::Ref("log")),
+                }),
+                args: vec![Expr::Str("Hello, world!")],
+            })],
+        );
+    }
 }

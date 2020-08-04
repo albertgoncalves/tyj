@@ -207,6 +207,23 @@ fn get_expr<'a, 'b>(
             _ => break,
         }
     }
+    if precedence == 0 {
+        while let Some(Lex { token: Tkn::LParen, .. }) = tokens.peek() {
+            eat!(tokens);
+            let mut args: Vec<Expr> = Vec::new();
+            while let Some(lex) = tokens.peek() {
+                match lex {
+                    Lex { token: Tkn::Comma, .. } => eat!(tokens),
+                    Lex { token: Tkn::RParen, .. } => {
+                        eat!(tokens);
+                        break;
+                    }
+                    _ => args.push(get_expr(tokens, 0)),
+                }
+            }
+            expr = Expr::Call { expr: Box::new(expr), args }
+        }
+    }
     expr
 }
 
@@ -1025,6 +1042,91 @@ mod tests {
                     }],
                 },
             ],
+        )
+    }
+
+    #[test]
+    fn function_calls() {
+        assert_ast!(
+            &[
+                Lex { token: Tkn::Ident("f"), line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("a"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("b"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+            ],
+            vec![Stmt::Effect(Expr::Call {
+                expr: Box::new(Expr::Call {
+                    expr: Box::new(Expr::Ref("f")),
+                    args: vec![Expr::Ref("a")],
+                }),
+                args: vec![Expr::Ref("b")],
+            })],
+        )
+    }
+
+    #[test]
+    fn function_calls_more_parens() {
+        assert_ast!(
+            &[
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("f"), line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("a"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("b"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+            ],
+            vec![Stmt::Effect(Expr::Call {
+                expr: Box::new(Expr::Call {
+                    expr: Box::new(Expr::Ref("f")),
+                    args: vec![Expr::Ref("a")],
+                }),
+                args: vec![Expr::Ref("b")],
+            })],
+        )
+    }
+
+    #[test]
+    fn function_calls_nested() {
+        assert_ast!(
+            &[
+                Lex { token: Tkn::Ident("f"), line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("a"), line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("x"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("y"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("b"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+            ],
+            vec![Stmt::Effect(Expr::Call {
+                expr: Box::new(Expr::Call {
+                    expr: Box::new(Expr::Ref("f")),
+                    args: vec![Expr::Call {
+                        expr: Box::new(Expr::Call {
+                            expr: Box::new(Expr::Ref("a")),
+                            args: vec![Expr::Ref("x")],
+                        }),
+                        args: vec![Expr::Ref("y")],
+                    }],
+                }),
+                args: vec![Expr::Ref("b")],
+            })],
         )
     }
 }
