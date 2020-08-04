@@ -26,12 +26,20 @@ pub(crate) enum Expr<'a> {
 }
 
 #[derive(Debug, PartialEq)]
+pub(crate) struct Case<'a> {
+    pub(crate) expr: Expr<'a>,
+    pub(crate) body: Vec<Stmt<'a>>,
+}
+
+#[derive(Debug, PartialEq)]
 pub(crate) enum Stmt<'a> {
     Decl { ident: &'a str, expr: Expr<'a> },
     Assign { r#ref: Expr<'a>, expr: Expr<'a> },
     Ret(Expr<'a>),
     Fn { ident: &'a str, args: Vec<&'a str>, body: Vec<Stmt<'a>> },
     Cond { condition: Expr<'a>, r#if: Vec<Stmt<'a>>, r#else: Vec<Stmt<'a>> },
+    Switch { expr: Expr<'a>, cases: Vec<Case<'a>>, default: Vec<Stmt<'a>> },
+    Break,
     Effect(Expr<'a>),
 }
 
@@ -261,7 +269,31 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Stmt<'a> {
                     _ => panic!(format!("{:?}", tokens.peek())),
                 }
             }
-            Stmt::Cond { condition, r#if, r#else: vec![] }
+            Stmt::Cond { condition, r#if, r#else: Vec::new() }
+        }
+        Some(Lex { token: Tkn::Switch, .. }) => {
+            eat!(tokens);
+            eat_or_panic!(tokens, Tkn::LParen);
+            let expr: Expr = get_expr(tokens, 0);
+            eat_or_panic!(tokens, Tkn::RParen);
+            eat_or_panic!(tokens, Tkn::LBrace);
+            let mut cases: Vec<Case> = Vec::new();
+            while let Some(Lex { token: Tkn::Case, .. }) = tokens.peek() {
+                eat!(tokens);
+                let expr: Expr = get_expr(tokens, 0);
+                eat_or_panic!(tokens, Tkn::Colon);
+                cases.push(Case { expr, body: get_body(tokens) });
+            }
+            let default: Vec<Stmt> =
+                if let Some(Lex { token: Tkn::Default, .. }) = tokens.peek() {
+                    eat!(tokens);
+                    eat_or_panic!(tokens, Tkn::Colon);
+                    get_body(tokens)
+                } else {
+                    Vec::new()
+                };
+            eat_or_panic!(tokens, Tkn::RBrace);
+            Stmt::Switch { expr, cases, default }
         }
         Some(Lex { token: Tkn::Var, .. }) => {
             eat!(tokens);
@@ -294,6 +326,11 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Stmt<'a> {
                 }
             };
             Stmt::Ret(expr)
+        }
+        Some(Lex { token: Tkn::Break, .. }) => {
+            eat!(tokens);
+            eat_or_panic!(tokens, Tkn::Semicolon);
+            Stmt::Break
         }
         _ => {
             let a: Expr = get_expr(tokens, 0);
@@ -330,7 +367,7 @@ pub(crate) fn get_ast<'a>(tokens: &[Lex<'a>]) -> Vec<Stmt<'a>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{get_ast, Expr, Prop, Stmt};
+    use super::{get_ast, Case, Expr, Prop, Stmt};
     use crate::tokenizer::{Lex, Tkn};
 
     macro_rules! assert_ast {
@@ -998,7 +1035,7 @@ mod tests {
             vec![Stmt::Cond {
                 condition: Expr::Bool("true"),
                 r#if: vec![Stmt::Ret(Expr::Num("0"))],
-                r#else: vec![],
+                r#else: Vec::new(),
             }],
         )
     }
@@ -1127,6 +1164,108 @@ mod tests {
                 }),
                 args: vec![Expr::Ref("b")],
             })],
+        )
+    }
+
+    #[test]
+    fn switch() {
+        assert_ast!(
+            &[
+                Lex { token: Tkn::Var, line: 0 },
+                Lex { token: Tkn::Ident("x"), line: 0 },
+                Lex { token: Tkn::Op("="), line: 0 },
+                Lex { token: Tkn::Bool("true"), line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+                Lex { token: Tkn::Switch, line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Ident("x"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::LBrace, line: 0 },
+                Lex { token: Tkn::Case, line: 0 },
+                Lex { token: Tkn::Bool("true"), line: 0 },
+                Lex { token: Tkn::Colon, line: 0 },
+                Lex { token: Tkn::LBrace, line: 0 },
+                Lex { token: Tkn::Ident("console"), line: 0 },
+                Lex { token: Tkn::Op("."), line: 0 },
+                Lex { token: Tkn::Ident("log"), line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Str("true"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+                Lex { token: Tkn::Break, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+                Lex { token: Tkn::RBrace, line: 0 },
+                Lex { token: Tkn::Case, line: 0 },
+                Lex { token: Tkn::Bool("false"), line: 0 },
+                Lex { token: Tkn::Colon, line: 0 },
+                Lex { token: Tkn::LBrace, line: 0 },
+                Lex { token: Tkn::Ident("console"), line: 0 },
+                Lex { token: Tkn::Op("."), line: 0 },
+                Lex { token: Tkn::Ident("log"), line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Str("false"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+                Lex { token: Tkn::Break, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+                Lex { token: Tkn::RBrace, line: 0 },
+                Lex { token: Tkn::Default, line: 0 },
+                Lex { token: Tkn::Colon, line: 0 },
+                Lex { token: Tkn::LBrace, line: 0 },
+                Lex { token: Tkn::Ident("console"), line: 0 },
+                Lex { token: Tkn::Op("."), line: 0 },
+                Lex { token: Tkn::Ident("log"), line: 0 },
+                Lex { token: Tkn::LParen, line: 0 },
+                Lex { token: Tkn::Str("?"), line: 0 },
+                Lex { token: Tkn::RParen, line: 0 },
+                Lex { token: Tkn::Semicolon, line: 0 },
+                Lex { token: Tkn::RBrace, line: 0 },
+                Lex { token: Tkn::RBrace, line: 0 },
+            ],
+            vec![
+                Stmt::Decl { ident: "x", expr: Expr::Bool("true") },
+                Stmt::Switch {
+                    expr: Expr::Ref("x"),
+                    cases: vec![
+                        Case {
+                            expr: Expr::Bool("true"),
+                            body: vec![
+                                Stmt::Effect(Expr::Call {
+                                    expr: Box::new(Expr::Infix {
+                                        op: ".",
+                                        left: Box::new(Expr::Ref("console")),
+                                        right: Box::new(Expr::Ref("log")),
+                                    }),
+                                    args: vec![Expr::Str("true")],
+                                }),
+                                Stmt::Break,
+                            ],
+                        },
+                        Case {
+                            expr: Expr::Bool("false"),
+                            body: vec![
+                                Stmt::Effect(Expr::Call {
+                                    expr: Box::new(Expr::Infix {
+                                        op: ".",
+                                        left: Box::new(Expr::Ref("console")),
+                                        right: Box::new(Expr::Ref("log")),
+                                    }),
+                                    args: vec![Expr::Str("false")],
+                                }),
+                                Stmt::Break,
+                            ],
+                        },
+                    ],
+                    default: vec![Stmt::Effect(Expr::Call {
+                        expr: Box::new(Expr::Infix {
+                            op: ".",
+                            left: Box::new(Expr::Ref("console")),
+                            right: Box::new(Expr::Ref("log")),
+                        }),
+                        args: vec![Expr::Str("?")],
+                    })],
+                },
+            ],
         )
     }
 }

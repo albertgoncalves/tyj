@@ -3,7 +3,7 @@ mod tokenizer;
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::{get_ast, Expr, Prop, Stmt};
+    use crate::parser::{get_ast, Case, Expr, Prop, Stmt};
     use crate::tokenizer::get_tokens;
 
     #[test]
@@ -214,6 +214,91 @@ mod tests {
                         }],
                     }],
                 },
+            ],
+        );
+    }
+
+    #[test]
+    fn parse_switch() {
+        assert_eq!(
+            get_ast(&get_tokens(
+                "var x = 0;
+                 var y;
+                 var a = 0;
+                 var b = 1;
+                 switch (x) {
+                 case a: {
+                     y = \"0\";
+                     break;
+                 }
+                 case b: {
+                     y = \"1\";
+                     break;
+                 }
+                 default: {
+                     y = undefined;
+                 }
+                 }
+                 console.log(y);",
+            )),
+            vec![
+                Stmt::Decl {
+                    ident: "x",
+                    expr: Expr::Num("0"),
+                },
+                Stmt::Decl {
+                    ident: "y",
+                    expr: Expr::Uninit,
+                },
+                Stmt::Decl {
+                    ident: "a",
+                    expr: Expr::Num("0"),
+                },
+                Stmt::Decl {
+                    ident: "b",
+                    expr: Expr::Num("1"),
+                },
+                Stmt::Switch {
+                    expr: Expr::Ref("x"),
+                    cases: vec![
+                        Case {
+                            expr: Expr::Ref("a"),
+                            body: vec![
+                                Stmt::Assign {
+                                    r#ref: Expr::Ref("y"),
+                                    expr: Expr::Str("0"),
+                                },
+                                Stmt::Break,
+                            ],
+                        },
+                        Case {
+                            expr: Expr::Ref("b"),
+                            body: vec![
+                                Stmt::Assign {
+                                    r#ref: Expr::Ref("y"),
+                                    expr: Expr::Str("1"),
+                                },
+                                Stmt::Break,
+                            ],
+                        },
+                    ],
+                    default: vec![
+                        Stmt::Assign {
+                            r#ref: Expr::Ref("y"),
+                            expr: Expr::Undef,
+                        },
+                    ],
+                },
+                Stmt::Effect(
+                    Expr::Call {
+                        expr: Box::new(Expr::Infix {
+                            op: ".",
+                            left: Box::new(Expr::Ref("console")),
+                            right: Box::new(Expr::Ref("log")),
+                        }),
+                        args: vec![Expr::Ref("y")],
+                    }
+                ),
             ],
         );
     }
