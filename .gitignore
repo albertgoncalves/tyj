@@ -4,6 +4,8 @@
 !.shellhook
 !*.toml
 !src/
+!parser/
+!tokenizer/
 !*.rs
 !main
 !profile
