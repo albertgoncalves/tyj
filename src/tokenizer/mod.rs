@@ -59,9 +59,9 @@ fn is_op(c: char) -> bool {
     false
 }
 
-pub(crate) fn get_tokens(string: &str) -> Vec<Lex> {
-    let mut chars: Peekable<CharIndices> = string.char_indices().peekable();
-    let mut tokens: Vec<Lex> = Vec::with_capacity(string.len());
+pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
+    let mut chars: Peekable<CharIndices> = source.char_indices().peekable();
+    let mut tokens: Vec<Lex> = Vec::with_capacity(source.len());
     let mut line: Count = 0;
 
     macro_rules! eat {
@@ -86,7 +86,7 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Lex> {
                     break;
                 }
             }
-            &string[$i..k]
+            &source[$i..k]
         }};
     }
 
@@ -136,7 +136,7 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Lex> {
                     match c {
                         '\n' => {
                             tokens.push(Lex {
-                                token: Tkn::Comment(&string[i..j]),
+                                token: Tkn::Comment(&source[i..j]),
                                 line,
                             });
                             line += 1;
@@ -154,7 +154,7 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Lex> {
                         '*' if chars.peek() == Some(&(j + 1, '/')) => {
                             eat!();
                             tokens.push(Lex {
-                                token: Tkn::Comment(&string[i..(j + 2)]),
+                                token: Tkn::Comment(&source[i..(j + 2)]),
                                 line,
                             });
                             line += n;
@@ -191,13 +191,13 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Lex> {
                             _ => eat!(),
                         }
                     }
-                    tokens.push(Lex { token: Tkn::Str(&string[i..k]), line });
+                    tokens.push(Lex { token: Tkn::Str(&source[i..k]), line });
                     line += n;
                     eat!();
                 }
             }
             _ => tokens
-                .push(Lex { token: Tkn::Illegal(&string[i..(i + 1)]), line }),
+                .push(Lex { token: Tkn::Illegal(&source[i..(i + 1)]), line }),
         }
     }
     tokens
