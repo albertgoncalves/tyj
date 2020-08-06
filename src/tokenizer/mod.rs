@@ -73,24 +73,20 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Lex> {
     macro_rules! get_substring {
         ($f:expr, $i:expr $(,)?) => {{
             let mut k: usize = $i;
-            let mut n: Count = 0;
             loop {
                 if let Some((j, c)) = chars.peek() {
                     k = *j;
-                    match c {
-                        '\n' => {
-                            n += 1;
-                            eat!();
-                        }
-                        _ if $f(*c) => eat!(),
-                        _ => break,
+                    if $f(*c) {
+                        eat!()
+                    } else {
+                        break;
                     }
                 } else {
                     k += 1;
                     break;
                 }
             }
-            (&string[$i..k], n)
+            &string[$i..k]
         }};
     }
 
@@ -99,7 +95,7 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Lex> {
             '\n' => line += 1,
             _ if c.is_whitespace() => (),
             _ if c.is_alphabetic() => {
-                let (ident, n): (&str, Count) = get_substring!(
+                let ident: &str = get_substring!(
                     |c: char| c.is_alphabetic() || c.is_digit(DECIMAL),
                     i,
                 );
@@ -121,10 +117,9 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Lex> {
                     _ => Tkn::Ident(ident),
                 };
                 tokens.push(Lex { token, line });
-                line += n;
             }
             _ if is_numeric(c) => {
-                let (num, n): (&str, Count) = get_substring!(is_numeric, i);
+                let num: &str = get_substring!(is_numeric, i);
                 if num == "." {
                     tokens.push(Lex { token: Tkn::Op("."), line });
                 } else if (num.matches('.').count() < 2)
@@ -134,7 +129,6 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Lex> {
                 } else {
                     tokens.push(Lex { token: Tkn::Illegal(num), line });
                 }
-                line += n;
             }
             '/' if chars.peek() == Some(&(i + 1, '/')) => {
                 eat!();
@@ -179,9 +173,8 @@ pub(crate) fn get_tokens(string: &str) -> Vec<Lex> {
             '(' => tokens.push(Lex { token: Tkn::LParen, line }),
             ')' => tokens.push(Lex { token: Tkn::RParen, line }),
             _ if is_op(c) => {
-                let (op, n): (&str, Count) = get_substring!(is_op, i);
+                let op: &str = get_substring!(is_op, i);
                 tokens.push(Lex { token: Tkn::Op(op), line });
-                line += n;
             }
             '"' => {
                 if let Some((i, _)) = chars.next() {
