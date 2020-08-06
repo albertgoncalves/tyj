@@ -242,22 +242,10 @@ mod tests {
                  console.log(y);",
             )),
             vec![
-                Stmt::Decl {
-                    ident: "x",
-                    expr: Expr::Num("0"),
-                },
-                Stmt::Decl {
-                    ident: "y",
-                    expr: Expr::Uninit,
-                },
-                Stmt::Decl {
-                    ident: "a",
-                    expr: Expr::Num("0"),
-                },
-                Stmt::Decl {
-                    ident: "b",
-                    expr: Expr::Num("1"),
-                },
+                Stmt::Decl { ident: "x", expr: Expr::Num("0") },
+                Stmt::Decl { ident: "y", expr: Expr::Uninit },
+                Stmt::Decl { ident: "a", expr: Expr::Num("0") },
+                Stmt::Decl { ident: "b", expr: Expr::Num("1") },
                 Stmt::Switch {
                     expr: Expr::Ref("x"),
                     cases: vec![
@@ -282,23 +270,19 @@ mod tests {
                             ],
                         },
                     ],
-                    default: vec![
-                        Stmt::Assign {
-                            r#ref: Expr::Ref("y"),
-                            expr: Expr::Undef,
-                        },
-                    ],
+                    default: vec![Stmt::Assign {
+                        r#ref: Expr::Ref("y"),
+                        expr: Expr::Undef,
+                    }],
                 },
-                Stmt::Effect(
-                    Expr::Call {
-                        expr: Box::new(Expr::Infix {
-                            op: ".",
-                            left: Box::new(Expr::Ref("console")),
-                            right: Box::new(Expr::Ref("log")),
-                        }),
-                        args: vec![Expr::Ref("y")],
-                    }
-                ),
+                Stmt::Effect(Expr::Call {
+                    expr: Box::new(Expr::Infix {
+                        op: ".",
+                        left: Box::new(Expr::Ref("console")),
+                        right: Box::new(Expr::Ref("log")),
+                    }),
+                    args: vec![Expr::Ref("y")],
+                }),
             ],
         );
     }
