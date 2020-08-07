@@ -1,22 +1,16 @@
 use super::{get_ast, Case, Expr, Prop, Stmt, StmtPlus};
-use crate::tokenizer::{Tkn, TknPlus};
+use crate::tokenizer::get_tokens;
 
 macro_rules! assert_ast {
     ($a:expr, $b:expr $(,)?) => {
-        assert_eq!(get_ast($a), $b)
+        assert_eq!(get_ast(&get_tokens($a)), $b)
     };
 }
 
 #[test]
 fn declare_number() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Num(".1"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "var x = .1;",
         vec![StmtPlus {
             statement: Stmt::Decl { ident: "x", expr: Expr::Num(".1") },
             line: 0,
@@ -27,13 +21,7 @@ fn declare_number() {
 #[test]
 fn declare_string() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Str("blah blah"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "var x = \"blah blah\";",
         vec![StmtPlus {
             statement: Stmt::Decl { ident: "x", expr: Expr::Str("blah blah") },
             line: 0,
@@ -44,13 +32,7 @@ fn declare_string() {
 #[test]
 fn declare_bool() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Bool("true"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "var x = true;",
         vec![StmtPlus {
             statement: Stmt::Decl { ident: "x", expr: Expr::Bool("true") },
             line: 0,
@@ -61,13 +43,7 @@ fn declare_bool() {
 #[test]
 fn declare_null() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Null, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "var x = null;",
         vec![StmtPlus {
             statement: Stmt::Decl { ident: "x", expr: Expr::Null },
             line: 0,
@@ -78,13 +54,7 @@ fn declare_null() {
 #[test]
 fn declare_undefined() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Undef, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "var x = undefined;",
         vec![StmtPlus {
             statement: Stmt::Decl { ident: "x", expr: Expr::Undef },
             line: 0,
@@ -95,21 +65,7 @@ fn declare_undefined() {
 #[test]
 fn declare_object() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::Null, line: 0 },
-            TknPlus { token: Tkn::Comma, line: 0 },
-            TknPlus { token: Tkn::Ident("bc"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::Undef, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "var x = { a: null, bc: undefined };",
         vec![StmtPlus {
             statement: Stmt::Decl {
                 ident: "x",
@@ -126,14 +82,7 @@ fn declare_object() {
 #[test]
 fn declare_empty_object() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "var x = {};",
         vec![StmtPlus {
             statement: Stmt::Decl { ident: "x", expr: Expr::Obj(Vec::new()) },
             line: 0,
@@ -144,22 +93,10 @@ fn declare_empty_object() {
 #[test]
 fn declare_object_trailing_comma() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::Null, line: 0 },
-            TknPlus { token: Tkn::Comma, line: 0 },
-            TknPlus { token: Tkn::Ident("bc"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::Undef, line: 0 },
-            TknPlus { token: Tkn::Comma, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "var x = {
+             a: null,
+             bc: undefined,
+         };",
         vec![StmtPlus {
             statement: Stmt::Decl {
                 ident: "x",
@@ -176,34 +113,15 @@ fn declare_object_trailing_comma() {
 #[test]
 #[should_panic]
 fn declare_object_missing_comma() {
-    let _: Vec<StmtPlus> = get_ast(&[
-        TknPlus { token: Tkn::Var, line: 0 },
-        TknPlus { token: Tkn::Ident("x"), line: 0 },
-        TknPlus { token: Tkn::Op("="), line: 0 },
-        TknPlus { token: Tkn::LBrace, line: 0 },
-        TknPlus { token: Tkn::Ident("a"), line: 0 },
-        TknPlus { token: Tkn::Colon, line: 0 },
-        TknPlus { token: Tkn::Null, line: 0 },
-        TknPlus { token: Tkn::Ident("bc"), line: 0 },
-        TknPlus { token: Tkn::Colon, line: 0 },
-        TknPlus { token: Tkn::Undef, line: 0 },
-        TknPlus { token: Tkn::RBrace, line: 0 },
-        TknPlus { token: Tkn::Semicolon, line: 0 },
-    ]);
+    let _: Vec<StmtPlus> =
+        get_ast(&get_tokens("var x = { a: null bc: undefined };"));
 }
 
 #[test]
 fn declare_assign() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Null, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "var x;
+         x = null;",
         vec![
             StmtPlus {
                 statement: Stmt::Decl { ident: "x", expr: Expr::Uninit },
@@ -214,7 +132,7 @@ fn declare_assign() {
                     r#ref: Expr::Ref("x"),
                     expr: Expr::Null,
                 },
-                line: 0,
+                line: 1,
             },
         ],
     )
@@ -223,42 +141,14 @@ fn declare_assign() {
 #[test]
 fn multiple_declares() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Num("1."), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Str("blah"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("c"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Bool("false"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("d"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Null, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("e"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Undef, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("f"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ident("key"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::Str("value"), line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "var a = 1.;
+         var b = \"blah\";
+         var c = false;
+         var d = null;
+         var e = undefined;
+         var f = {
+             key: \"value\",
+         };",
         vec![
             StmtPlus {
                 statement: Stmt::Decl { ident: "a", expr: Expr::Num("1.") },
@@ -266,22 +156,22 @@ fn multiple_declares() {
             },
             StmtPlus {
                 statement: Stmt::Decl { ident: "b", expr: Expr::Str("blah") },
-                line: 0,
+                line: 1,
             },
             StmtPlus {
                 statement: Stmt::Decl {
                     ident: "c",
                     expr: Expr::Bool("false")
                 },
-                line: 0,
+                line: 2,
             },
             StmtPlus {
                 statement: Stmt::Decl { ident: "d", expr: Expr::Null },
-                line: 0,
+                line: 3,
             },
             StmtPlus {
                 statement: Stmt::Decl { ident: "e", expr: Expr::Undef },
-                line: 0,
+                line: 4,
             },
             StmtPlus {
                 statement: Stmt::Decl {
@@ -291,7 +181,7 @@ fn multiple_declares() {
                         value: Expr::Str("value"),
                     }]),
                 },
-                line: 0,
+                line: 5,
             },
         ],
     )
@@ -300,10 +190,7 @@ fn multiple_declares() {
 #[test]
 fn return_nothing() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Ret, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "return;",
         vec![StmtPlus { statement: Stmt::Ret(Expr::Undef), line: 0 }],
     )
 }
@@ -311,19 +198,10 @@ fn return_nothing() {
 #[test]
 fn return_object() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Ret, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ident("ab"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::Null, line: 0 },
-            TknPlus { token: Tkn::Comma, line: 0 },
-            TknPlus { token: Tkn::Ident("cd"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::Undef, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "return {
+             ab: null,
+             cd: undefined
+         };",
         vec![StmtPlus {
             statement: Stmt::Ret(Expr::Obj(vec![
                 Prop { key: "ab", value: Expr::Null },
@@ -337,12 +215,7 @@ fn return_object() {
 #[test]
 fn return_empty_object() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Ret, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "return {};",
         vec![StmtPlus {
             statement: Stmt::Ret(Expr::Obj(Vec::new())),
             line: 0,
@@ -353,14 +226,7 @@ fn return_empty_object() {
 #[test]
 fn function_nothing() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Fn, line: 0 },
-            TknPlus { token: Tkn::Ident("f"), line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-        ],
+        "function f() {}",
         vec![StmtPlus {
             statement: Stmt::Fn {
                 ident: "f",
@@ -375,26 +241,16 @@ fn function_nothing() {
 #[test]
 fn function_return_nothing() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Fn, line: 0 },
-            TknPlus { token: Tkn::Ident("f"), line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Comma, line: 0 },
-            TknPlus { token: Tkn::Ident("y"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ret, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-        ],
+        "function f(x, y) {
+             return;
+         }",
         vec![StmtPlus {
             statement: Stmt::Fn {
                 ident: "f",
                 args: vec!["x", "y"],
                 body: vec![StmtPlus {
                     statement: Stmt::Ret(Expr::Undef),
-                    line: 0,
+                    line: 1,
                 }],
             },
             line: 0,
@@ -405,40 +261,14 @@ fn function_return_nothing() {
 #[test]
 fn function_multiple_lines() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Fn, line: 0 },
-            TknPlus { token: Tkn::Ident("f"), line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Comma, line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::Comma, line: 0 },
-            TknPlus { token: Tkn::Ident("c"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("d"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Comma, line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::Comma, line: 0 },
-            TknPlus { token: Tkn::Ident("c"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::Ident("c"), line: 0 },
-            TknPlus { token: Tkn::Comma, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Ret, line: 0 },
-            TknPlus { token: Tkn::Ident("d"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-        ],
+        "function f(a, b, c) {
+             var d = {
+                 a: a,
+                 b: b,
+                 c: c,
+             };
+             return d;
+         }",
         vec![StmtPlus {
             statement: Stmt::Fn {
                 ident: "f",
@@ -453,9 +283,9 @@ fn function_multiple_lines() {
                                 Prop { key: "c", value: Expr::Ref("c") },
                             ]),
                         },
-                        line: 0,
+                        line: 1,
                     },
-                    StmtPlus { statement: Stmt::Ret(Expr::Ref("d")), line: 0 },
+                    StmtPlus { statement: Stmt::Ret(Expr::Ref("d")), line: 6 },
                 ],
             },
             line: 0,
@@ -466,27 +296,12 @@ fn function_multiple_lines() {
 #[test]
 fn object_fields() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::Num("0"), line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Op("."), line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Op("."), line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "var x = {
+             a: {
+                 b: 0,
+             },
+         };
+         x.a.b;",
         vec![
             StmtPlus {
                 statement: Stmt::Decl {
@@ -511,7 +326,7 @@ fn object_fields() {
                     }),
                     right: Box::new(Expr::Ref("b")),
                 }),
-                line: 0,
+                line: 5,
             },
         ],
     )
@@ -520,23 +335,9 @@ fn object_fields() {
 #[test]
 fn declare_anonymous_function() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("f"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Fn, line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ret, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Op("+"), line: 0 },
-            TknPlus { token: Tkn::Num("0.1"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "var f = function(x) {
+             return x + 0.1;
+         };",
         vec![StmtPlus {
             statement: Stmt::Decl {
                 ident: "f",
@@ -548,7 +349,7 @@ fn declare_anonymous_function() {
                             left: Box::new(Expr::Ref("x")),
                             right: Box::new(Expr::Num("0.1")),
                         }),
-                        line: 0,
+                        line: 1,
                     }],
                 }
             },
@@ -560,33 +361,11 @@ fn declare_anonymous_function() {
 #[test]
 fn tiny_program() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Ident("window"), line: 0 },
-            TknPlus { token: Tkn::Op("."), line: 0 },
-            TknPlus { token: Tkn::Ident("onload"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Fn, line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Num("0.1"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Num("10"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Ret, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Op("+"), line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "window.onload = function() {
+             var a = 0.1;
+             var b = 10;
+             return a + b;
+         };",
         vec![StmtPlus {
             statement: Stmt::Assign {
                 r#ref: Expr::Infix {
@@ -602,14 +381,14 @@ fn tiny_program() {
                                 ident: "a",
                                 expr: Expr::Num("0.1"),
                             },
-                            line: 0,
+                            line: 1,
                         },
                         StmtPlus {
                             statement: Stmt::Decl {
                                 ident: "b",
                                 expr: Expr::Num("10"),
                             },
-                            line: 0,
+                            line: 2,
                         },
                         StmtPlus {
                             statement: Stmt::Ret(Expr::Infix {
@@ -617,7 +396,7 @@ fn tiny_program() {
                                 left: Box::new(Expr::Ref("a")),
                                 right: Box::new(Expr::Ref("b")),
                             }),
-                            line: 0,
+                            line: 3,
                         },
                     ],
                 },
@@ -630,20 +409,8 @@ fn tiny_program() {
 #[test]
 fn prefix_operators() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Op("!"), line: 0 },
-            TknPlus { token: Tkn::Bool("true"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Op("-"), line: 0 },
-            TknPlus { token: Tkn::Num("1.0"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "var a = !true;
+         var b = -1.0;",
         vec![
             StmtPlus {
                 statement: Stmt::Decl {
@@ -663,7 +430,7 @@ fn prefix_operators() {
                         expr: Box::new(Expr::Num("1.0")),
                     },
                 },
-                line: 0,
+                line: 1,
             },
         ],
     )
@@ -672,27 +439,7 @@ fn prefix_operators() {
 #[test]
 fn nested_expression() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Op("+"), line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::Op("+"), line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Ident("c"), line: 0 },
-            TknPlus { token: Tkn::Op("+"), line: 0 },
-            TknPlus { token: Tkn::Ident("d"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::Op("+"), line: 0 },
-            TknPlus { token: Tkn::Ident("e"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "var x = (a + b) + ((c + d) + e);",
         vec![StmtPlus {
             statement: Stmt::Decl {
                 ident: "x",
@@ -722,14 +469,8 @@ fn nested_expression() {
 #[test]
 fn increment() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Op("++"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Op("++"), line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "a++;
+         ++b;",
         vec![
             StmtPlus {
                 statement: Stmt::Effect(Expr::Postfix {
@@ -743,7 +484,7 @@ fn increment() {
                     op: "++",
                     expr: Box::new(Expr::Ref("b")),
                 }),
-                line: 0,
+                line: 1,
             },
         ],
     )
@@ -752,14 +493,8 @@ fn increment() {
 #[test]
 fn decrement() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Op("--"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Op("--"), line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "a--;
+         --b;",
         vec![
             StmtPlus {
                 statement: Stmt::Effect(Expr::Postfix {
@@ -773,7 +508,7 @@ fn decrement() {
                     op: "--",
                     expr: Box::new(Expr::Ref("b")),
                 }),
-                line: 0,
+                line: 1,
             },
         ],
     )
@@ -782,23 +517,15 @@ fn decrement() {
 #[test]
 fn r#if() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::If, line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Bool("true"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ret, line: 0 },
-            TknPlus { token: Tkn::Num("0"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-        ],
+        "if (true) {
+             return 0;
+         }",
         vec![StmtPlus {
             statement: Stmt::Cond {
                 condition: Expr::Bool("true"),
                 r#if: vec![StmtPlus {
                     statement: Stmt::Ret(Expr::Num("0")),
-                    line: 0,
+                    line: 1,
                 }],
                 r#else: Vec::new(),
             },
@@ -810,28 +537,12 @@ fn r#if() {
 #[test]
 fn if_else() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::If, line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Bool("true"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Num("0"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::Else, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Num("1"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-        ],
+        "var a;
+         if (true) {
+             a = 0;
+         } else {
+             a = 1;
+         }",
         vec![
             StmtPlus {
                 statement: Stmt::Decl { ident: "a", expr: Expr::Uninit },
@@ -845,17 +556,17 @@ fn if_else() {
                             r#ref: Expr::Ref("a"),
                             expr: Expr::Num("0"),
                         },
-                        line: 0,
+                        line: 2,
                     }],
                     r#else: vec![StmtPlus {
                         statement: Stmt::Assign {
                             r#ref: Expr::Ref("a"),
                             expr: Expr::Num("1"),
                         },
-                        line: 0,
+                        line: 4,
                     }],
                 },
-                line: 0,
+                line: 1,
             },
         ],
     )
@@ -864,16 +575,7 @@ fn if_else() {
 #[test]
 fn function_calls() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Ident("f"), line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "f(a)(b);",
         vec![StmtPlus {
             statement: Stmt::Effect(Expr::Call {
                 expr: Box::new(Expr::Call {
@@ -890,20 +592,7 @@ fn function_calls() {
 #[test]
 fn function_calls_more_parens() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Ident("f"), line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "((f(a))(b));",
         vec![StmtPlus {
             statement: Stmt::Effect(Expr::Call {
                 expr: Box::new(Expr::Call {
@@ -920,22 +609,7 @@ fn function_calls_more_parens() {
 #[test]
 fn function_calls_nested() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Ident("f"), line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Ident("y"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-        ],
+        "f(a(x)(y))(b);",
         vec![StmtPlus {
             statement: Stmt::Effect(Expr::Call {
                 expr: Box::new(Expr::Call {
@@ -956,60 +630,280 @@ fn function_calls_nested() {
 }
 
 #[test]
-fn switch() {
+fn small_function() {
     assert_ast!(
-        &[
-            TknPlus { token: Tkn::Var, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::Op("="), line: 0 },
-            TknPlus { token: Tkn::Bool("true"), line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Switch, line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Case, line: 0 },
-            TknPlus { token: Tkn::Bool("true"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ident("console"), line: 0 },
-            TknPlus { token: Tkn::Op("."), line: 0 },
-            TknPlus { token: Tkn::Ident("log"), line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Str("true"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Break, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::Case, line: 0 },
-            TknPlus { token: Tkn::Bool("false"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ident("console"), line: 0 },
-            TknPlus { token: Tkn::Op("."), line: 0 },
-            TknPlus { token: Tkn::Ident("log"), line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Str("false"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Break, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::Default, line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ident("console"), line: 0 },
-            TknPlus { token: Tkn::Op("."), line: 0 },
-            TknPlus { token: Tkn::Ident("log"), line: 0 },
-            TknPlus { token: Tkn::LParen, line: 0 },
-            TknPlus { token: Tkn::Str("?"), line: 0 },
-            TknPlus { token: Tkn::RParen, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
+        "// ...
+         function f(a, b, c) {
+             var d = {
+                 a: a,
+                 b: b,
+                 c: c,
+             };
+             return d.a;
+         }",
+        vec![StmtPlus {
+            statement: Stmt::Fn {
+                ident: "f",
+                args: vec!["a", "b", "c"],
+                body: vec![
+                    StmtPlus {
+                        statement: Stmt::Decl {
+                            ident: "d",
+                            expr: Expr::Obj(vec![
+                                Prop { key: "a", value: Expr::Ref("a") },
+                                Prop { key: "b", value: Expr::Ref("b") },
+                                Prop { key: "c", value: Expr::Ref("c") },
+                            ]),
+                        },
+                        line: 2,
+                    },
+                    StmtPlus {
+                        statement: Stmt::Ret(Expr::Infix {
+                            op: ".",
+                            left: Box::new(Expr::Ref("d")),
+                            right: Box::new(Expr::Ref("a")),
+                        }),
+                        line: 7,
+                    },
+                ],
+            },
+            line: 1,
+        }],
+    );
+}
+
+#[test]
+fn operator_precedence() {
+    assert_ast!(
+        "/* ...
+          */
+         var x = {
+             a: {
+                 b: 10,
+             },
+         };
+         // ...
+         x.a.b++ + .01;
+         ++x.a.b + .01;
+         /* ... */
+         .01 + x.a.b++;
+         .01 + ++x.a.b;",
+        vec![
+            StmtPlus {
+                statement: Stmt::Decl {
+                    ident: "x",
+                    expr: Expr::Obj(vec![Prop {
+                        key: "a",
+                        value: Expr::Obj(vec![Prop {
+                            key: "b",
+                            value: Expr::Num("10"),
+                        }]),
+                    }]),
+                },
+                line: 2,
+            },
+            StmtPlus {
+                statement: Stmt::Effect(Expr::Infix {
+                    op: "+",
+                    left: Box::new(Expr::Postfix {
+                        op: "++",
+                        expr: Box::new(Expr::Infix {
+                            op: ".",
+                            left: Box::new(Expr::Infix {
+                                op: ".",
+                                left: Box::new(Expr::Ref("x")),
+                                right: Box::new(Expr::Ref("a")),
+                            }),
+                            right: Box::new(Expr::Ref("b")),
+                        }),
+                    }),
+                    right: Box::new(Expr::Num(".01")),
+                }),
+                line: 8,
+            },
+            StmtPlus {
+                statement: Stmt::Effect(Expr::Infix {
+                    op: "+",
+                    left: Box::new(Expr::Prefix {
+                        op: "++",
+                        expr: Box::new(Expr::Infix {
+                            op: ".",
+                            left: Box::new(Expr::Infix {
+                                op: ".",
+                                left: Box::new(Expr::Ref("x")),
+                                right: Box::new(Expr::Ref("a")),
+                            }),
+                            right: Box::new(Expr::Ref("b")),
+                        }),
+                    }),
+                    right: Box::new(Expr::Num(".01")),
+                }),
+                line: 9,
+            },
+            StmtPlus {
+                statement: Stmt::Effect(Expr::Infix {
+                    op: "+",
+                    left: Box::new(Expr::Num(".01")),
+                    right: Box::new(Expr::Postfix {
+                        op: "++",
+                        expr: Box::new(Expr::Infix {
+                            op: ".",
+                            left: Box::new(Expr::Infix {
+                                op: ".",
+                                left: Box::new(Expr::Ref("x")),
+                                right: Box::new(Expr::Ref("a")),
+                            }),
+                            right: Box::new(Expr::Ref("b")),
+                        }),
+                    }),
+                }),
+                line: 11,
+            },
+            StmtPlus {
+                statement: Stmt::Effect(Expr::Infix {
+                    op: "+",
+                    left: Box::new(Expr::Num(".01")),
+                    right: Box::new(Expr::Prefix {
+                        op: "++",
+                        expr: Box::new(Expr::Infix {
+                            op: ".",
+                            left: Box::new(Expr::Infix {
+                                op: ".",
+                                left: Box::new(Expr::Ref("x")),
+                                right: Box::new(Expr::Ref("a")),
+                            }),
+                            right: Box::new(Expr::Ref("b")),
+                        }),
+                    }),
+                }),
+                line: 12,
+            },
         ],
+    );
+}
+
+#[test]
+fn return_function() {
+    assert_ast!(
+        "function f(a, b) {
+             return function(c) {
+                 return {
+                     a: a,
+                     b: b,
+                     c: c,
+                 };
+             };
+         }",
+        vec![StmtPlus {
+            statement: Stmt::Fn {
+                ident: "f",
+                args: vec!["a", "b"],
+                body: vec![StmtPlus {
+                    statement: Stmt::Ret(Expr::Fn {
+                        args: vec!["c"],
+                        body: vec![StmtPlus {
+                            statement: Stmt::Ret(Expr::Obj(vec![
+                                Prop { key: "a", value: Expr::Ref("a") },
+                                Prop { key: "b", value: Expr::Ref("b") },
+                                Prop { key: "c", value: Expr::Ref("c") },
+                            ])),
+                            line: 2,
+                        }],
+                    }),
+                    line: 1,
+                }],
+            },
+            line: 0,
+        }],
+    );
+}
+
+#[test]
+fn parse_if_else_chain() {
+    assert_ast!(
+        "var x = 0;
+         var y;
+         if (x === 0) {
+             y = 0;
+         } else if (x === -1) {
+             y = 1;
+         } else {
+             y = 2;
+         }",
+        vec![
+            StmtPlus {
+                statement: Stmt::Decl { ident: "x", expr: Expr::Num("0") },
+                line: 0,
+            },
+            StmtPlus {
+                statement: Stmt::Decl { ident: "y", expr: Expr::Uninit },
+                line: 1,
+            },
+            StmtPlus {
+                statement: Stmt::Cond {
+                    condition: Expr::Infix {
+                        op: "===",
+                        left: Box::new(Expr::Ref("x")),
+                        right: Box::new(Expr::Num("0")),
+                    },
+                    r#if: vec![StmtPlus {
+                        statement: Stmt::Assign {
+                            r#ref: Expr::Ref("y"),
+                            expr: Expr::Num("0"),
+                        },
+                        line: 3,
+                    }],
+                    r#else: vec![StmtPlus {
+                        statement: Stmt::Cond {
+                            condition: Expr::Infix {
+                                op: "===",
+                                left: Box::new(Expr::Ref("x")),
+                                right: Box::new(Expr::Prefix {
+                                    op: "-",
+                                    expr: Box::new(Expr::Num("1")),
+                                }),
+                            },
+                            r#if: vec![StmtPlus {
+                                statement: Stmt::Assign {
+                                    r#ref: Expr::Ref("y"),
+                                    expr: Expr::Num("1"),
+                                },
+                                line: 5,
+                            }],
+                            r#else: vec![StmtPlus {
+                                statement: Stmt::Assign {
+                                    r#ref: Expr::Ref("y"),
+                                    expr: Expr::Num("2"),
+                                },
+                                line: 7,
+                            }],
+                        },
+                        line: 4,
+                    }],
+                },
+                line: 2,
+            },
+        ],
+    );
+}
+
+#[test]
+fn switch_simple() {
+    assert_ast!(
+        "var x = true;
+         switch (x) {
+         case true: {
+             console.log(\"true\");
+             break;
+         }
+         case false: {
+             console.log(\"false\");
+             break;
+         }
+         default: {
+             console.log(\"?\");
+         }
+         }",
         vec![
             StmtPlus {
                 statement: Stmt::Decl { ident: "x", expr: Expr::Bool("true") },
@@ -1033,9 +927,9 @@ fn switch() {
                                         }),
                                         args: vec![Expr::Str("true")],
                                     }),
-                                    line: 0,
+                                    line: 3,
                                 },
-                                StmtPlus { statement: Stmt::Break, line: 0 },
+                                StmtPlus { statement: Stmt::Break, line: 4 },
                             ],
                         },
                         Case {
@@ -1052,9 +946,9 @@ fn switch() {
                                         }),
                                         args: vec![Expr::Str("false")],
                                     }),
-                                    line: 0,
+                                    line: 7,
                                 },
-                                StmtPlus { statement: Stmt::Break, line: 0 },
+                                StmtPlus { statement: Stmt::Break, line: 8 },
                             ],
                         },
                     ],
@@ -1067,11 +961,123 @@ fn switch() {
                             }),
                             args: vec![Expr::Str("?")],
                         }),
-                        line: 0,
+                        line: 11,
                     }],
                 },
-                line: 0,
+                line: 1,
             },
         ],
     )
+}
+
+#[test]
+fn switch() {
+    assert_ast!(
+        "var x = 0;
+         var y;
+         var a = 0;
+         var b = 1;
+         switch (x) {
+         case a: {
+             y = \"0\";
+             break;
+         }
+         case b: {
+             y = \"1\";
+             break;
+         }
+         default: {
+             y = undefined;
+         }
+         }
+         console.log(y);",
+        vec![
+            StmtPlus {
+                statement: Stmt::Decl { ident: "x", expr: Expr::Num("0") },
+                line: 0,
+            },
+            StmtPlus {
+                statement: Stmt::Decl { ident: "y", expr: Expr::Uninit },
+                line: 1,
+            },
+            StmtPlus {
+                statement: Stmt::Decl { ident: "a", expr: Expr::Num("0") },
+                line: 2,
+            },
+            StmtPlus {
+                statement: Stmt::Decl { ident: "b", expr: Expr::Num("1") },
+                line: 3,
+            },
+            StmtPlus {
+                statement: Stmt::Switch {
+                    expr: Expr::Ref("x"),
+                    cases: vec![
+                        Case {
+                            expr: Expr::Ref("a"),
+                            body: vec![
+                                StmtPlus {
+                                    statement: Stmt::Assign {
+                                        r#ref: Expr::Ref("y"),
+                                        expr: Expr::Str("0"),
+                                    },
+                                    line: 6,
+                                },
+                                StmtPlus { statement: Stmt::Break, line: 7 },
+                            ],
+                        },
+                        Case {
+                            expr: Expr::Ref("b"),
+                            body: vec![
+                                StmtPlus {
+                                    statement: Stmt::Assign {
+                                        r#ref: Expr::Ref("y"),
+                                        expr: Expr::Str("1"),
+                                    },
+                                    line: 10,
+                                },
+                                StmtPlus { statement: Stmt::Break, line: 11 },
+                            ],
+                        },
+                    ],
+                    default: vec![StmtPlus {
+                        statement: Stmt::Assign {
+                            r#ref: Expr::Ref("y"),
+                            expr: Expr::Undef,
+                        },
+                        line: 14,
+                    }],
+                },
+                line: 4,
+            },
+            StmtPlus {
+                statement: Stmt::Effect(Expr::Call {
+                    expr: Box::new(Expr::Infix {
+                        op: ".",
+                        left: Box::new(Expr::Ref("console")),
+                        right: Box::new(Expr::Ref("log")),
+                    }),
+                    args: vec![Expr::Ref("y")],
+                }),
+                line: 17,
+            },
+        ],
+    );
+}
+
+#[test]
+fn console_log() {
+    assert_ast!(
+        "console.log(\"Hello, world!\");",
+        vec![StmtPlus {
+            statement: Stmt::Effect(Expr::Call {
+                expr: Box::new(Expr::Infix {
+                    op: ".",
+                    left: Box::new(Expr::Ref("console")),
+                    right: Box::new(Expr::Ref("log")),
+                }),
+                args: vec![Expr::Str("Hello, world!")],
+            }),
+            line: 0,
+        }],
+    );
 }

@@ -118,6 +118,7 @@ fn object() {
         "{
 
              a: null,
+
              bc: undefined
 
          };",
@@ -127,11 +128,11 @@ fn object() {
             TknPlus { token: Tkn::Colon, line: 2 },
             TknPlus { token: Tkn::Null, line: 2 },
             TknPlus { token: Tkn::Comma, line: 2 },
-            TknPlus { token: Tkn::Ident("bc"), line: 3 },
-            TknPlus { token: Tkn::Colon, line: 3 },
-            TknPlus { token: Tkn::Undef, line: 3 },
-            TknPlus { token: Tkn::RBrace, line: 5 },
-            TknPlus { token: Tkn::Semicolon, line: 5 },
+            TknPlus { token: Tkn::Ident("bc"), line: 4 },
+            TknPlus { token: Tkn::Colon, line: 4 },
+            TknPlus { token: Tkn::Undef, line: 4 },
+            TknPlus { token: Tkn::RBrace, line: 6 },
+            TknPlus { token: Tkn::Semicolon, line: 6 },
         ],
     )
 }
@@ -139,28 +140,32 @@ fn object() {
 #[test]
 fn object_fields() {
     assert_tokens!(
-        "var x = { a: { b: 0 } };
+        "var x = {
+             a: {
+                 b: 0
+             }
+         };
          x.a.b;",
         vec![
             TknPlus { token: Tkn::Var, line: 0 },
             TknPlus { token: Tkn::Ident("x"), line: 0 },
             TknPlus { token: Tkn::Op("="), line: 0 },
             TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ident("a"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::LBrace, line: 0 },
-            TknPlus { token: Tkn::Ident("b"), line: 0 },
-            TknPlus { token: Tkn::Colon, line: 0 },
-            TknPlus { token: Tkn::Num("0"), line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::RBrace, line: 0 },
-            TknPlus { token: Tkn::Semicolon, line: 0 },
-            TknPlus { token: Tkn::Ident("x"), line: 1 },
-            TknPlus { token: Tkn::Op("."), line: 1 },
             TknPlus { token: Tkn::Ident("a"), line: 1 },
-            TknPlus { token: Tkn::Op("."), line: 1 },
-            TknPlus { token: Tkn::Ident("b"), line: 1 },
-            TknPlus { token: Tkn::Semicolon, line: 1 },
+            TknPlus { token: Tkn::Colon, line: 1 },
+            TknPlus { token: Tkn::LBrace, line: 1 },
+            TknPlus { token: Tkn::Ident("b"), line: 2 },
+            TknPlus { token: Tkn::Colon, line: 2 },
+            TknPlus { token: Tkn::Num("0"), line: 2 },
+            TknPlus { token: Tkn::RBrace, line: 3 },
+            TknPlus { token: Tkn::RBrace, line: 4 },
+            TknPlus { token: Tkn::Semicolon, line: 4 },
+            TknPlus { token: Tkn::Ident("x"), line: 5 },
+            TknPlus { token: Tkn::Op("."), line: 5 },
+            TknPlus { token: Tkn::Ident("a"), line: 5 },
+            TknPlus { token: Tkn::Op("."), line: 5 },
+            TknPlus { token: Tkn::Ident("b"), line: 5 },
+            TknPlus { token: Tkn::Semicolon, line: 5 },
         ],
     )
 }
