@@ -4,7 +4,7 @@ mod test;
 use std::iter::Peekable;
 use std::str::CharIndices;
 
-type Count = u8;
+pub(crate) type Count = u8;
 
 const OPS: [char; 9] = ['=', '.', '+', '-', '*', '/', '<', '>', '!'];
 const DECIMAL: u32 = 10;
@@ -41,7 +41,7 @@ pub(crate) enum Tkn<'a> {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) struct Lex<'a> {
+pub(crate) struct TknPlus<'a> {
     pub(crate) token: Tkn<'a>,
     pub(crate) line: Count,
 }
@@ -59,9 +59,9 @@ fn is_op(c: char) -> bool {
     false
 }
 
-pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
+pub(crate) fn get_tokens(source: &str) -> Vec<TknPlus> {
     let mut chars: Peekable<CharIndices> = source.char_indices().peekable();
-    let mut tokens: Vec<Lex> = Vec::with_capacity(source.len());
+    let mut tokens: Vec<TknPlus> = Vec::with_capacity(source.len());
     let mut line: Count = 0;
 
     macro_rules! eat {
@@ -116,18 +116,18 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
                     "true" | "false" => Tkn::Bool(ident),
                     _ => Tkn::Ident(ident),
                 };
-                tokens.push(Lex { token, line });
+                tokens.push(TknPlus { token, line });
             }
             _ if is_numeric(c) => {
                 let num: &str = get_substring!(is_numeric, i);
                 if num == "." {
-                    tokens.push(Lex { token: Tkn::Op("."), line });
+                    tokens.push(TknPlus { token: Tkn::Op("."), line });
                 } else if (num.matches('.').count() < 2)
                     && (0 < num.matches(|c: char| c.is_digit(DECIMAL)).count())
                 {
-                    tokens.push(Lex { token: Tkn::Num(num), line });
+                    tokens.push(TknPlus { token: Tkn::Num(num), line });
                 } else {
-                    tokens.push(Lex { token: Tkn::Illegal(num), line });
+                    tokens.push(TknPlus { token: Tkn::Illegal(num), line });
                 }
             }
             '/' if chars.peek() == Some(&(i + 1, '/')) => {
@@ -135,7 +135,7 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
                 while let Some((j, c)) = chars.next() {
                     match c {
                         '\n' => {
-                            tokens.push(Lex {
+                            tokens.push(TknPlus {
                                 token: Tkn::Comment(&source[i..j]),
                                 line,
                             });
@@ -153,7 +153,7 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
                     match c {
                         '*' if chars.peek() == Some(&(j + 1, '/')) => {
                             eat!();
-                            tokens.push(Lex {
+                            tokens.push(TknPlus {
                                 token: Tkn::Comment(&source[i..(j + 2)]),
                                 line,
                             });
@@ -165,16 +165,16 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
                     }
                 }
             }
-            ':' => tokens.push(Lex { token: Tkn::Colon, line }),
-            ';' => tokens.push(Lex { token: Tkn::Semicolon, line }),
-            ',' => tokens.push(Lex { token: Tkn::Comma, line }),
-            '{' => tokens.push(Lex { token: Tkn::LBrace, line }),
-            '}' => tokens.push(Lex { token: Tkn::RBrace, line }),
-            '(' => tokens.push(Lex { token: Tkn::LParen, line }),
-            ')' => tokens.push(Lex { token: Tkn::RParen, line }),
+            ':' => tokens.push(TknPlus { token: Tkn::Colon, line }),
+            ';' => tokens.push(TknPlus { token: Tkn::Semicolon, line }),
+            ',' => tokens.push(TknPlus { token: Tkn::Comma, line }),
+            '{' => tokens.push(TknPlus { token: Tkn::LBrace, line }),
+            '}' => tokens.push(TknPlus { token: Tkn::RBrace, line }),
+            '(' => tokens.push(TknPlus { token: Tkn::LParen, line }),
+            ')' => tokens.push(TknPlus { token: Tkn::RParen, line }),
             _ if is_op(c) => {
                 let op: &str = get_substring!(is_op, i);
-                tokens.push(Lex { token: Tkn::Op(op), line });
+                tokens.push(TknPlus { token: Tkn::Op(op), line });
             }
             '"' => {
                 if let Some((i, _)) = chars.next() {
@@ -191,13 +191,18 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
                             _ => eat!(),
                         }
                     }
-                    tokens.push(Lex { token: Tkn::Str(&source[i..k]), line });
+                    tokens.push(TknPlus {
+                        token: Tkn::Str(&source[i..k]),
+                        line,
+                    });
                     line += n;
                     eat!();
                 }
             }
-            _ => tokens
-                .push(Lex { token: Tkn::Illegal(&source[i..(i + 1)]), line }),
+            _ => tokens.push(TknPlus {
+                token: Tkn::Illegal(&source[i..(i + 1)]),
+                line,
+            }),
         }
     }
     tokens
