@@ -68,6 +68,7 @@ pub(crate) enum Stmt<'a> {
         ident: &'a str,
         expr: Expr<'a>,
     },
+    Decls(Vec<&'a str>),
     Assign {
         op: &'a str,
         r#ref: Expr<'a>,
@@ -493,6 +494,18 @@ fn get_stmt<'a, 'b>(
             let ident: &str = get_ident(tokens);
             let token: Option<&TknPlus> = tokens.next();
             match token {
+                Some(TknPlus { token: Tkn::Comma, .. }) => {
+                    let mut idents: Vec<&str> = vec![ident];
+                    while let Some(token) = tokens.peek() {
+                        match token {
+                            TknPlus { token: Tkn::Comma, .. } => eat!(tokens),
+                            TknPlus { token: Tkn::Semicolon, .. } => break,
+                            _ => idents.push(get_ident(tokens)),
+                        }
+                    }
+                    eat_or_panic!(tokens, Tkn::Semicolon);
+                    StmtPlus { statement: Stmt::Decls(idents), line: *line }
+                }
                 Some(TknPlus { token: Tkn::Semicolon, .. }) => StmtPlus {
                     statement: Stmt::Decl { ident, expr: Expr::Uninit },
                     line: *line,

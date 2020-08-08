@@ -140,7 +140,7 @@ fn declare_assign() {
 }
 
 #[test]
-fn multiple_declares() {
+fn mixed_declares() {
     assert_ast!(
         "var a = 1.;
          var b = \"blah\";
@@ -1682,6 +1682,17 @@ fn scoped_array_access() {
                 },
             ]),
             line: 1,
+        }],
+    )
+}
+
+#[test]
+fn multiple_declares() {
+    assert_ast!(
+        "var x, y, z;",
+        vec![StmtPlus {
+            statement: Stmt::Decls(vec!["x", "y", "z"]),
+            line: 0,
         }],
     )
 }
