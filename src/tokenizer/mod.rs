@@ -4,7 +4,7 @@ mod test;
 use std::iter::Peekable;
 use std::str::CharIndices;
 
-pub(crate) type Count = u8;
+pub(crate) type Count = u16;
 
 const OPS: [char; 14] =
     ['=', '.', '+', '-', '*', '%', '<', '>', '!', '~', '&', '^', '|', '/'];
