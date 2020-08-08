@@ -100,7 +100,9 @@ pub(crate) fn get_tokens(source: &str) -> Vec<TknPlus> {
             _ if c.is_whitespace() => (),
             _ if c.is_alphabetic() => {
                 let ident: &str = get_substring!(
-                    |c: char| c.is_alphabetic() || c.is_digit(DECIMAL),
+                    |c: char| c.is_alphabetic()
+                        || c.is_digit(DECIMAL)
+                        || c == '_',
                     i,
                 );
                 let token: Tkn = match ident {
