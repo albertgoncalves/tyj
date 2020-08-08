@@ -1081,3 +1081,18 @@ fn console_log() {
         }],
     );
 }
+
+#[test]
+fn scopes() {
+    assert_ast!(
+        "{
+             {
+                 var x = null;
+             }
+         }",
+        vec![StmtPlus {
+            statement: Stmt::Decl { ident: "x", expr: Expr::Null },
+            line: 2,
+        }],
+    );
+}
