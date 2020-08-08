@@ -1453,3 +1453,165 @@ fn update_assign() {
         ],
     )
 }
+
+#[test]
+fn r#while() {
+    assert_ast!(
+        "var i = 0;
+         while (i < 10) {
+             console.log(i++);
+         }",
+        vec![
+            StmtPlus {
+                statement: Stmt::Decl { ident: "i", expr: Expr::Num("0") },
+                line: 0,
+            },
+            StmtPlus {
+                statement: Stmt::While {
+                    condition: Expr::Infix {
+                        op: "<",
+                        left: Box::new(Expr::Ref("i")),
+                        right: Box::new(Expr::Num("10")),
+                    },
+                    body: vec![StmtPlus {
+                        statement: Stmt::Effect(Expr::Call {
+                            expr: Box::new(Expr::Infix {
+                                op: ".",
+                                left: Box::new(Expr::Ref("console")),
+                                right: Box::new(Expr::Ref("log")),
+                            }),
+                            args: vec![Expr::Postfix {
+                                op: "++",
+                                expr: Box::new(Expr::Ref("i")),
+                            }],
+                        }),
+                        line: 2,
+                    }],
+                },
+                line: 1,
+            },
+        ],
+    )
+}
+
+#[test]
+fn r#for() {
+    assert_ast!(
+        "for (var i = 0; i < 10; ++i) {
+             console.log(i);
+         }",
+        vec![StmtPlus {
+            statement: Stmt::For {
+                init: Some(Box::new(StmtPlus {
+                    statement: Stmt::Decl { ident: "i", expr: Expr::Num("0") },
+                    line: 0,
+                })),
+                condition: Some(Expr::Infix {
+                    op: "<",
+                    left: Box::new(Expr::Ref("i")),
+                    right: Box::new(Expr::Num("10")),
+                }),
+                update: Some(Box::new(StmtPlus {
+                    statement: Stmt::Effect(Expr::Prefix {
+                        op: "++",
+                        expr: Box::new(Expr::Ref("i")),
+                    }),
+                    line: 0,
+                })),
+                body: vec![StmtPlus {
+                    statement: Stmt::Effect(Expr::Call {
+                        expr: Box::new(Expr::Infix {
+                            op: ".",
+                            left: Box::new(Expr::Ref("console")),
+                            right: Box::new(Expr::Ref("log")),
+                        }),
+                        args: vec![Expr::Ref("i")],
+                    }),
+                    line: 1,
+                }],
+            },
+            line: 0,
+        }],
+    )
+}
+
+#[test]
+fn for_empty() {
+    assert_ast!(
+        "for (;;) {
+             console.log(i);
+         }",
+        vec![StmtPlus {
+            statement: Stmt::For {
+                init: None,
+                condition: None,
+                update: None,
+                body: vec![StmtPlus {
+                    statement: Stmt::Effect(Expr::Call {
+                        expr: Box::new(Expr::Infix {
+                            op: ".",
+                            left: Box::new(Expr::Ref("console")),
+                            right: Box::new(Expr::Ref("log")),
+                        }),
+                        args: vec![Expr::Ref("i")],
+                    }),
+                    line: 1,
+                }],
+            },
+            line: 0,
+        }],
+    )
+}
+
+#[test]
+fn for_update() {
+    assert_ast!(
+        "var i;
+         for (i = 0; i < 10; i += 2) {
+             console.log(i);
+         }",
+        vec![
+            StmtPlus {
+                statement: Stmt::Decl { ident: "i", expr: Expr::Uninit },
+                line: 0,
+            },
+            StmtPlus {
+                statement: Stmt::For {
+                    init: Some(Box::new(StmtPlus {
+                        statement: Stmt::Assign {
+                            op: "=",
+                            r#ref: Expr::Ref("i"),
+                            expr: Expr::Num("0"),
+                        },
+                        line: 1,
+                    })),
+                    condition: Some(Expr::Infix {
+                        op: "<",
+                        left: Box::new(Expr::Ref("i")),
+                        right: Box::new(Expr::Num("10")),
+                    }),
+                    update: Some(Box::new(StmtPlus {
+                        statement: Stmt::Assign {
+                            op: "+=",
+                            r#ref: Expr::Ref("i"),
+                            expr: Expr::Num("2"),
+                        },
+                        line: 1,
+                    })),
+                    body: vec![StmtPlus {
+                        statement: Stmt::Effect(Expr::Call {
+                            expr: Box::new(Expr::Infix {
+                                op: ".",
+                                left: Box::new(Expr::Ref("console")),
+                                right: Box::new(Expr::Ref("log")),
+                            }),
+                            args: vec![Expr::Ref("i")],
+                        }),
+                        line: 2,
+                    }],
+                },
+                line: 1,
+            },
+        ],
+    )
+}

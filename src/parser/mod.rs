@@ -83,6 +83,16 @@ pub(crate) enum Stmt<'a> {
         r#if: Vec<StmtPlus<'a>>,
         r#else: Vec<StmtPlus<'a>>,
     },
+    While {
+        condition: Expr<'a>,
+        body: Vec<StmtPlus<'a>>,
+    },
+    For {
+        init: Option<Box<StmtPlus<'a>>>,
+        condition: Option<Expr<'a>>,
+        update: Option<Box<StmtPlus<'a>>>,
+        body: Vec<StmtPlus<'a>>,
+    },
     Switch {
         expr: Expr<'a>,
         cases: Vec<Case<'a>>,
@@ -365,6 +375,73 @@ fn get_stmt<'a, 'b>(
             }
             StmtPlus {
                 statement: Stmt::Cond { condition, r#if, r#else: Vec::new() },
+                line: *line,
+            }
+        }
+        Some(TknPlus { token: Tkn::While, line }) => {
+            eat!(tokens);
+            eat_or_panic!(tokens, Tkn::LParen);
+            let condition: Expr = get_expr(tokens, 0);
+            eat_or_panic!(tokens, Tkn::RParen);
+            let body: Vec<StmtPlus> = get_body(tokens);
+            StmtPlus {
+                statement: Stmt::While { condition, body },
+                line: *line,
+            }
+        }
+        Some(TknPlus { token: Tkn::For, line }) => {
+            eat!(tokens);
+            eat_or_panic!(tokens, Tkn::LParen);
+            let init: Option<Box<StmtPlus>> = match tokens.peek() {
+                Some(TknPlus { token: Tkn::Semicolon, .. }) => {
+                    eat!(tokens);
+                    None
+                }
+                _ => Some(Box::new(get_stmt(tokens))),
+            };
+            let condition: Option<Expr> = match tokens.peek() {
+                Some(TknPlus { token: Tkn::Semicolon, .. }) => None,
+                _ => Some(get_expr(tokens, 0)),
+            };
+            eat_or_panic!(tokens, Tkn::Semicolon);
+            let update: Option<Box<StmtPlus>> = {
+                let token: Option<&&TknPlus> = tokens.peek();
+                match token {
+                    Some(TknPlus { token: Tkn::RParen, .. }) => None,
+                    Some(TknPlus { line, .. }) => {
+                        let a: Expr = get_expr(tokens, 0);
+                        let token: Option<&&TknPlus> = tokens.peek();
+                        match token {
+                            Some(TknPlus { token: Tkn::Op(x), .. })
+                                if is_assign_op(*x) =>
+                            {
+                                eat!(tokens);
+                                let b: Expr = get_expr(tokens, 0);
+                                Some(Box::new(StmtPlus {
+                                    statement: Stmt::Assign {
+                                        op: x,
+                                        r#ref: a,
+                                        expr: b,
+                                    },
+                                    line: *line,
+                                }))
+                            }
+                            Some(TknPlus { token: Tkn::RParen, .. }) => {
+                                Some(Box::new(StmtPlus {
+                                    statement: Stmt::Effect(a),
+                                    line: *line,
+                                }))
+                            }
+                            _ => panic!(format!("{:?}", token)),
+                        }
+                    }
+                    _ => panic!(format!("{:?}", token)),
+                }
+            };
+            eat_or_panic!(tokens, Tkn::RParen);
+            let body: Vec<StmtPlus> = get_body(tokens);
+            StmtPlus {
+                statement: Stmt::For { init, condition, update, body },
                 line: *line,
             }
         }
