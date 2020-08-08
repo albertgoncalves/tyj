@@ -21,6 +21,7 @@ pub(crate) enum Tkn<'a> {
     Var,
     If,
     Else,
+    Ternary,
     Switch,
     Case,
     Break,
@@ -169,6 +170,7 @@ pub(crate) fn get_tokens(source: &str) -> Vec<TknPlus> {
             '}' => tokens.push(TknPlus { token: Tkn::RBrace, line }),
             '(' => tokens.push(TknPlus { token: Tkn::LParen, line }),
             ')' => tokens.push(TknPlus { token: Tkn::RParen, line }),
+            '?' => tokens.push(TknPlus { token: Tkn::Ternary, line }),
             _ if is_op(c) => {
                 let op: &str = get_substring!(is_op, i);
                 tokens.push(TknPlus { token: Tkn::Op(op), line });

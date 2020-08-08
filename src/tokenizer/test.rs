@@ -696,3 +696,21 @@ fn function_calls_nested() {
         ],
     )
 }
+
+#[test]
+fn ternary_operator() {
+    assert_tokens!(
+        "var x = y ? 0 : 1;",
+        vec![
+            TknPlus { token: Tkn::Var, line: 0 },
+            TknPlus { token: Tkn::Ident("x"), line: 0 },
+            TknPlus { token: Tkn::Op("="), line: 0 },
+            TknPlus { token: Tkn::Ident("y"), line: 0 },
+            TknPlus { token: Tkn::Ternary, line: 0 },
+            TknPlus { token: Tkn::Num("0"), line: 0 },
+            TknPlus { token: Tkn::Colon, line: 0 },
+            TknPlus { token: Tkn::Num("1"), line: 0 },
+            TknPlus { token: Tkn::Semicolon, line: 0 },
+        ],
+    )
+}

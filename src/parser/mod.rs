@@ -18,11 +18,32 @@ pub(crate) enum Expr<'a> {
     Bool(&'a str),
     Obj(Vec<Prop<'a>>),
     Ref(&'a str),
-    Prefix { op: &'a str, expr: Box<Expr<'a>> },
-    Infix { op: &'a str, left: Box<Expr<'a>>, right: Box<Expr<'a>> },
-    Postfix { op: &'a str, expr: Box<Expr<'a>> },
-    Fn { args: Vec<&'a str>, body: Vec<StmtPlus<'a>> },
-    Call { expr: Box<Expr<'a>>, args: Vec<Expr<'a>> },
+    Prefix {
+        op: &'a str,
+        expr: Box<Expr<'a>>,
+    },
+    Infix {
+        op: &'a str,
+        left: Box<Expr<'a>>,
+        right: Box<Expr<'a>>,
+    },
+    Postfix {
+        op: &'a str,
+        expr: Box<Expr<'a>>,
+    },
+    Ternary {
+        condition: Box<Expr<'a>>,
+        r#if: Box<Expr<'a>>,
+        r#else: Box<Expr<'a>>,
+    },
+    Fn {
+        args: Vec<&'a str>,
+        body: Vec<StmtPlus<'a>>,
+    },
+    Call {
+        expr: Box<Expr<'a>>,
+        args: Vec<Expr<'a>>,
+    },
     Null,
     Undef,
     Uninit,
@@ -260,6 +281,17 @@ fn get_expr<'a, 'b>(
                 }
             }
             expr = Expr::Call { expr: Box::new(expr), args }
+        }
+        if let Some(TknPlus { token: Tkn::Ternary, .. }) = tokens.peek() {
+            eat!(tokens);
+            let r#if: Expr = get_expr(tokens, 0);
+            eat_or_panic!(tokens, Tkn::Colon);
+            let r#else: Expr = get_expr(tokens, 0);
+            expr = Expr::Ternary {
+                condition: Box::new(expr),
+                r#if: Box::new(r#if),
+                r#else: Box::new(r#else),
+            }
         }
     }
     expr

@@ -1094,5 +1094,27 @@ fn scopes() {
             statement: Stmt::Decl { ident: "x", expr: Expr::Null },
             line: 2,
         }],
-    );
+    )
+}
+
+#[test]
+fn ternary_operator() {
+    assert_ast!(
+        "var x = y === 0 ? 0 : 1;",
+        vec![StmtPlus {
+            statement: Stmt::Decl {
+                ident: "x",
+                expr: Expr::Ternary {
+                    condition: Box::new(Expr::Infix {
+                        op: "===",
+                        left: Box::new(Expr::Ref("y")),
+                        right: Box::new(Expr::Num("0")),
+                    }),
+                    r#if: Box::new(Expr::Num("0")),
+                    r#else: Box::new(Expr::Num("1")),
+                },
+            },
+            line: 0,
+        }],
+    )
 }
