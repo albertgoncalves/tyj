@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -eu
 
 export FLAGS=(
     -C "opt-level=0"
@@ -29,5 +29,13 @@ export FLAGS=(
 export RUST_BACKTRACE=1
 
 rustfmt --verbose "$WD/src/main.rs"
-rustc -o "$WD/bin/test" "${FLAGS[@]}" --test "$WD/src/main.rs"
-"$WD/bin/test"
+
+set +u
+
+if [ -z "$1" ]; then
+    rustc -o "$WD/bin/test" "${FLAGS[@]}" --test "$WD/src/main.rs"
+    "$WD/bin/test"
+else
+    rustc -o "$WD/bin/main" "${FLAGS[@]}" "$WD/src/main.rs"
+    "$WD/bin/main" < "$1"
+fi
