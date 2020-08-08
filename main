@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -eu
+set -euo pipefail
 
 export FLAGS=(
     -C "opt-level=0"
@@ -37,5 +37,5 @@ if [ -z "$1" ]; then
     "$WD/bin/test"
 else
     rustc -o "$WD/bin/main" "${FLAGS[@]}" "$WD/src/main.rs"
-    "$WD/bin/main" < "$1"
+    "$WD/bin/main" < "$1" 2>&1 | less
 fi
