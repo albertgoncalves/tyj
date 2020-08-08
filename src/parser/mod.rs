@@ -266,7 +266,7 @@ fn get_expr<'a, 'b>(
             Some(TknPlus { token: Tkn::Op(x), .. }) if *x != "=" => {
                 set_postfix_or_infix!(token, *x)
             }
-            Some(TknPlus { token: Tkn::LParen, .. }) if precedence < 19 => {
+            Some(TknPlus { token: Tkn::LParen, .. }) if precedence < 20 => {
                 while let Some(TknPlus { token: Tkn::LParen, .. }) =
                     tokens.peek()
                 {

@@ -1200,7 +1200,7 @@ fn new() {
 }
 
 #[test]
-fn operator_chain() {
+fn add_nested_functions() {
     assert_ast!(
         "f(g()) + g(f());",
         vec![StmtPlus {
@@ -1221,6 +1221,87 @@ fn operator_chain() {
                     }],
                 }),
             }),
+            line: 0,
+        }],
+    )
+}
+
+#[test]
+fn call_method_chain() {
+    assert_ast!(
+        "f().x().y(g().z);",
+        vec![StmtPlus {
+            statement: Stmt::Effect(Expr::Call {
+                expr: Box::new(Expr::Infix {
+                    op: ".",
+                    left: Box::new(Expr::Call {
+                        expr: Box::new(Expr::Infix {
+                            op: ".",
+                            left: Box::new(Expr::Call {
+                                expr: Box::new(Expr::Ref("f")),
+                                args: Vec::new(),
+                            }),
+                            right: Box::new(Expr::Ref("x")),
+                        }),
+                        args: Vec::new(),
+                    }),
+                    right: Box::new(Expr::Ref("y")),
+                }),
+                args: vec![Expr::Infix {
+                    op: ".",
+                    left: Box::new(Expr::Call {
+                        expr: Box::new(Expr::Ref("g")),
+                        args: Vec::new(),
+                    }),
+                    right: Box::new(Expr::Ref("z")),
+                }],
+            }),
+            line: 0,
+        }],
+    )
+}
+
+#[test]
+fn promise() {
+    assert_ast!(
+        "window.onload = function() {
+             module.init(fetch(\"./source\")).then(function(object) {});
+         };",
+        vec![StmtPlus {
+            statement: Stmt::Assign {
+                r#ref: Expr::Infix {
+                    op: ".",
+                    left: Box::new(Expr::Ref("window")),
+                    right: Box::new(Expr::Ref("onload")),
+                },
+                expr: Expr::Fn {
+                    args: Vec::new(),
+                    body: vec![StmtPlus {
+                        statement: Stmt::Effect(Expr::Call {
+                            expr: Box::new(Expr::Infix {
+                                op: ".",
+                                left: Box::new(Expr::Call {
+                                    expr: Box::new(Expr::Infix {
+                                        op: ".",
+                                        left: Box::new(Expr::Ref("module")),
+                                        right: Box::new(Expr::Ref("init")),
+                                    }),
+                                    args: vec![Expr::Call {
+                                        expr: Box::new(Expr::Ref("fetch")),
+                                        args: vec![Expr::Str("./source")],
+                                    }],
+                                }),
+                                right: Box::new(Expr::Ref("then")),
+                            }),
+                            args: vec![Expr::Fn {
+                                args: vec!["object"],
+                                body: Vec::new(),
+                            }],
+                        }),
+                        line: 1,
+                    }],
+                },
+            },
             line: 0,
         }],
     )
