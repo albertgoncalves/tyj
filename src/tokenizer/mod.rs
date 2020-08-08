@@ -6,7 +6,8 @@ use std::str::CharIndices;
 
 pub(crate) type Count = u8;
 
-const OPS: [char; 9] = ['=', '.', '+', '-', '*', '/', '<', '>', '!'];
+const OPS: [char; 12] =
+    ['=', '.', '+', '-', '*', '%', '<', '>', '!', '&', '|', '/'];
 const DECIMAL: u32 = 10;
 
 #[derive(Copy, Clone, Debug, PartialEq)]

@@ -1118,3 +1118,45 @@ fn ternary_operator() {
         }],
     )
 }
+
+#[test]
+fn modulo_operator() {
+    assert_ast!(
+        "10 % 9;",
+        vec![StmtPlus {
+            statement: Stmt::Effect(Expr::Infix {
+                op: "%",
+                left: Box::new(Expr::Num("10")),
+                right: Box::new(Expr::Num("9")),
+            }),
+            line: 0,
+        }],
+    )
+}
+
+#[test]
+fn boolean_operators() {
+    assert_ast!(
+        "10 % 9 === 1 || true && false;",
+        vec![StmtPlus {
+            statement: Stmt::Effect(Expr::Infix {
+                op: "||",
+                left: Box::new(Expr::Infix {
+                    op: "===",
+                    left: Box::new(Expr::Infix {
+                        op: "%",
+                        left: Box::new(Expr::Num("10")),
+                        right: Box::new(Expr::Num("9")),
+                    }),
+                    right: Box::new(Expr::Num("1")),
+                }),
+                right: Box::new(Expr::Infix {
+                    op: "&&",
+                    left: Box::new(Expr::Bool("true")),
+                    right: Box::new(Expr::Bool("false")),
+                }),
+            }),
+            line: 0,
+        }],
+    )
+}

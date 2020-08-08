@@ -176,7 +176,7 @@ fn get_expr<'a, 'b>(
     macro_rules! set_prefix {
         ($op:expr $(,)?) => {{
             let power: u8 = match $op {
-                "-" | "!" | "++" | "--" => 9,
+                "-" | "!" | "++" | "--" => 13,
                 _ => panic!(format!("{:?}", lex)),
             };
             Expr::Prefix { op: $op, expr: Box::new(get_expr(tokens, power)) }
@@ -227,7 +227,7 @@ fn get_expr<'a, 'b>(
     macro_rules! set_postfix_or_infix {
         ($lex:expr, $op:expr $(,)?) => {{
             let power: Option<u8> = match $op {
-                "++" | "--" => Some(9),
+                "++" | "--" => Some(13),
                 _ => None,
             };
             if let Some(power) = power {
@@ -238,11 +238,13 @@ fn get_expr<'a, 'b>(
                 expr = Expr::Postfix { op: $op, expr: Box::new(expr) };
             } else {
                 let (l_power, r_power): (u8, u8) = match $op {
-                    "." => (11, 12),
-                    "*" | "/" => (7, 8),
-                    "+" | "-" => (5, 6),
-                    "<" | ">" | "<=" | ">=" => (3, 4),
-                    "===" | "!==" => (1, 2),
+                    "." => (15, 16),
+                    "*" | "/" | "%" => (11, 12),
+                    "+" | "-" => (9, 10),
+                    "<" | ">" | "<=" | ">=" => (7, 8),
+                    "===" | "!==" => (5, 6),
+                    "&&" => (3, 4),
+                    "||" => (1, 2),
                     _ => panic!(format!("{:?}", $lex)),
                 };
                 if l_power < precedence {
