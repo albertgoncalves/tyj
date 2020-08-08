@@ -26,7 +26,7 @@ export FLAGS=(
     -W "unused-qualifications"
     -W "unused-results"
 )
-export RUST_BACKTRACE=0
+export RUST_BACKTRACE=1
 
 rustfmt --verbose "$WD/src/main.rs"
 rustc -o "$WD/bin/test" "${FLAGS[@]}" --test "$WD/src/main.rs"
