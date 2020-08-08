@@ -669,7 +669,7 @@ fn small_function() {
             },
             line: 1,
         }],
-    );
+    )
 }
 
 #[test]
@@ -779,7 +779,7 @@ fn operator_precedence() {
                 line: 12,
             },
         ],
-    );
+    )
 }
 
 #[test]
@@ -815,7 +815,7 @@ fn return_function() {
             },
             line: 0,
         }],
-    );
+    )
 }
 
 #[test]
@@ -884,7 +884,7 @@ fn parse_if_else_chain() {
                 line: 2,
             },
         ],
-    );
+    )
 }
 
 #[test]
@@ -1061,7 +1061,7 @@ fn switch() {
                 line: 17,
             },
         ],
-    );
+    )
 }
 
 #[test]
@@ -1079,7 +1079,7 @@ fn console_log() {
             }),
             line: 0,
         }],
-    );
+    )
 }
 
 #[test]
