@@ -100,6 +100,7 @@ pub(crate) enum Stmt<'a> {
         default: Vec<StmtPlus<'a>>,
     },
     Break,
+    Scope(Vec<StmtPlus<'a>>),
     Effect(Expr<'a>),
 }
 
@@ -531,11 +532,8 @@ fn get_stmt<'a, 'b>(
             eat_or_panic!(tokens, Tkn::Semicolon);
             StmtPlus { statement: Stmt::Break, line: *line }
         }
-        Some(TknPlus { token: Tkn::LBrace, .. }) => {
-            eat!(tokens);
-            let statement: StmtPlus = get_stmt(tokens);
-            eat_or_panic!(tokens, Tkn::RBrace);
-            statement
+        Some(TknPlus { token: Tkn::LBrace, line }) => {
+            StmtPlus { statement: Stmt::Scope(get_body(tokens)), line: *line }
         }
         Some(TknPlus { line, .. }) => {
             let a: Expr = get_expr(tokens, 0);

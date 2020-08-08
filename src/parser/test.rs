@@ -1101,8 +1101,14 @@ fn scopes() {
              }
          }",
         vec![StmtPlus {
-            statement: Stmt::Decl { ident: "x", expr: Expr::Null },
-            line: 2,
+            statement: Stmt::Scope(vec![StmtPlus {
+                statement: Stmt::Scope(vec![StmtPlus {
+                    statement: Stmt::Decl { ident: "x", expr: Expr::Null },
+                    line: 2,
+                }]),
+                line: 1,
+            }]),
+            line: 0,
         }],
     )
 }
@@ -1639,5 +1645,43 @@ fn array_literal() {
             ])),
             line: 0,
         }],
+    )
+}
+
+#[test]
+fn scoped_array_access() {
+    assert_ast!(
+        "// ...
+         {
+             x[2] = 1;
+             x[3] = 2;
+         }",
+        vec![StmtPlus {
+            statement: Stmt::Scope(vec![
+                StmtPlus {
+                    statement: Stmt::Assign {
+                        op: "=",
+                        r#ref: Expr::Access {
+                            expr: Box::new(Expr::Ref("x")),
+                            index: Box::new(Expr::Num("2")),
+                        },
+                        expr: Expr::Num("1"),
+                    },
+                    line: 2,
+                },
+                StmtPlus {
+                    statement: Stmt::Assign {
+                        op: "=",
+                        r#ref: Expr::Access {
+                            expr: Box::new(Expr::Ref("x")),
+                            index: Box::new(Expr::Num("3")),
+                        },
+                        expr: Expr::Num("2"),
+                    },
+                    line: 3,
+                },
+            ]),
+            line: 1,
+        },],
     )
 }
