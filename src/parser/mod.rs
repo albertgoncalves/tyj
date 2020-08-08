@@ -131,12 +131,11 @@ fn get_body<'a, 'b>(
     eat_or_panic!(tokens, Tkn::LBrace);
     let mut body: Vec<StmtPlus> = Vec::new();
     while let Some(lex) = tokens.peek() {
-        match lex {
-            TknPlus { token: Tkn::RBrace, .. } => {
-                eat!(tokens);
-                break;
-            }
-            _ => body.push(get_stmt(tokens)),
+        if let TknPlus { token: Tkn::RBrace, .. } = lex {
+            eat!(tokens);
+            break;
+        } else {
+            body.push(get_stmt(tokens))
         }
     }
     body
@@ -371,12 +370,13 @@ fn get_stmt<'a, 'b>(
         }
         Some(TknPlus { token: Tkn::Ret, line }) => {
             eat!(tokens);
-            let expr: Expr = match tokens.peek() {
-                Some(TknPlus { token: Tkn::Semicolon, .. }) => {
+            let expr: Expr = {
+                if let Some(TknPlus { token: Tkn::Semicolon, .. }) =
+                    tokens.peek()
+                {
                     eat!(tokens);
                     Expr::Undef
-                }
-                _ => {
+                } else {
                     let expr: Expr = get_expr(tokens, 0);
                     eat_or_panic!(tokens, Tkn::Semicolon);
                     expr
@@ -421,9 +421,10 @@ pub(crate) fn get_ast<'a>(tokens: &[TknPlus<'a>]) -> Vec<StmtPlus<'a>> {
     let mut ast_tokens: Vec<TknPlus> = Vec::new();
     let mut comments: Vec<&str> = Vec::new();
     for token in tokens {
-        match token {
-            TknPlus { token: Tkn::Comment(x), .. } => comments.push(x),
-            _ => ast_tokens.push(*token),
+        if let TknPlus { token: Tkn::Comment(x), .. } = token {
+            comments.push(x)
+        } else {
+            ast_tokens.push(*token)
         }
     }
     let mut ast: Vec<StmtPlus> = Vec::new();

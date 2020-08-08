@@ -133,16 +133,13 @@ pub(crate) fn get_tokens(source: &str) -> Vec<TknPlus> {
             '/' if chars.peek() == Some(&(i + 1, '/')) => {
                 eat!();
                 while let Some((j, c)) = chars.next() {
-                    match c {
-                        '\n' => {
-                            tokens.push(TknPlus {
-                                token: Tkn::Comment(&source[i..j]),
-                                line,
-                            });
-                            line += 1;
-                            break;
-                        }
-                        _ => (),
+                    if c == '\n' {
+                        tokens.push(TknPlus {
+                            token: Tkn::Comment(&source[i..j]),
+                            line,
+                        });
+                        line += 1;
+                        break;
                     }
                 }
             }
