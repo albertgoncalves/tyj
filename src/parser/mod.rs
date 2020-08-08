@@ -19,6 +19,7 @@ pub(crate) enum Expr<'a> {
     Str(&'a str),
     Bool(&'a str),
     Obj(Vec<Prop<'a>>),
+    Array(Vec<Expr<'a>>),
     Ref(&'a str),
     Prefix {
         op: &'a str,
@@ -203,6 +204,18 @@ fn get_expr<'a, 'b>(
             let expr: Expr = get_expr(tokens, 0);
             eat_or_panic!(tokens, Tkn::RParen);
             expr
+        }
+        Some(TknPlus { token: Tkn::LBracket, .. }) => {
+            let mut exprs = Vec::new();
+            while let Some(token) = tokens.peek() {
+                match token {
+                    TknPlus { token: Tkn::Comma, .. } => eat!(tokens),
+                    TknPlus { token: Tkn::RBracket, .. } => break,
+                    _ => exprs.push(get_expr(tokens, 0)),
+                }
+            }
+            eat_or_panic!(tokens, Tkn::RBracket);
+            Expr::Array(exprs)
         }
         Some(TknPlus { token: Tkn::Op(x), .. }) if !is_assign_op(*x) => {
             let power: u8 = match *x {

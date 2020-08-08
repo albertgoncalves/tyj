@@ -1615,3 +1615,29 @@ fn for_update() {
         ],
     )
 }
+
+#[test]
+fn array_literal_empty() {
+    assert_ast!(
+        "[];",
+        vec![StmtPlus {
+            statement: Stmt::Effect(Expr::Array(Vec::new())),
+            line: 0,
+        }],
+    )
+}
+
+#[test]
+fn array_literal() {
+    assert_ast!(
+        "[1, 2, 3];",
+        vec![StmtPlus {
+            statement: Stmt::Effect(Expr::Array(vec![
+                Expr::Num("1"),
+                Expr::Num("2"),
+                Expr::Num("3"),
+            ])),
+            line: 0,
+        }],
+    )
+}
