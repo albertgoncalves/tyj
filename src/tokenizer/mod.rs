@@ -115,6 +115,7 @@ pub(crate) fn get_tokens(source: &str) -> Vec<TknPlus> {
                     "return" => Tkn::Ret,
                     "null" => Tkn::Null,
                     "undefined" => Tkn::Undef,
+                    "new" => Tkn::Op(ident),
                     "true" | "false" => Tkn::Bool(ident),
                     _ => Tkn::Ident(ident),
                 };

@@ -714,3 +714,22 @@ fn ternary_operator() {
         ],
     )
 }
+
+#[test]
+fn new() {
+    assert_tokens!(
+        "new Uint8Array(buffer, 0, 13);",
+        vec![
+            TknPlus { token: Tkn::Op("new"), line: 0 },
+            TknPlus { token: Tkn::Ident("Uint8Array"), line: 0 },
+            TknPlus { token: Tkn::LParen, line: 0 },
+            TknPlus { token: Tkn::Ident("buffer"), line: 0 },
+            TknPlus { token: Tkn::Comma, line: 0 },
+            TknPlus { token: Tkn::Num("0"), line: 0 },
+            TknPlus { token: Tkn::Comma, line: 0 },
+            TknPlus { token: Tkn::Num("13"), line: 0 },
+            TknPlus { token: Tkn::RParen, line: 0 },
+            TknPlus { token: Tkn::Semicolon, line: 0 },
+        ],
+    )
+}

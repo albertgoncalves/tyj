@@ -1177,3 +1177,24 @@ fn negate_call() {
         }],
     )
 }
+
+#[test]
+fn new() {
+    assert_ast!(
+        "new Uint8Array(buffer, 0, 13);",
+        vec![StmtPlus {
+            statement: Stmt::Effect(Expr::Prefix {
+                op: "new",
+                expr: Box::new(Expr::Call {
+                    expr: Box::new(Expr::Ref("Uint8Array")),
+                    args: vec![
+                        Expr::Ref("buffer"),
+                        Expr::Num("0"),
+                        Expr::Num("13"),
+                    ],
+                }),
+            }),
+            line: 0,
+        }],
+    )
+}
