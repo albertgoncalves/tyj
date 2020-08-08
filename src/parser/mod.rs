@@ -268,7 +268,7 @@ fn get_expr<'a, 'b>(
             _ => break,
         }
     }
-    if precedence == 0 {
+    if precedence < 19 {
         while let Some(TknPlus { token: Tkn::LParen, .. }) = tokens.peek() {
             eat!(tokens);
             let mut args: Vec<Expr> = Vec::new();
@@ -284,6 +284,8 @@ fn get_expr<'a, 'b>(
             }
             expr = Expr::Call { expr: Box::new(expr), args }
         }
+    }
+    if precedence == 0 {
         if let Some(TknPlus { token: Tkn::Ternary, .. }) = tokens.peek() {
             eat!(tokens);
             let r#if: Expr = get_expr(tokens, 0);

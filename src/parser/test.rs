@@ -1160,3 +1160,20 @@ fn boolean_operators() {
         }],
     )
 }
+
+#[test]
+fn negate_call() {
+    assert_ast!(
+        "!f();",
+        vec![StmtPlus {
+            statement: Stmt::Effect(Expr::Prefix {
+                op: "!",
+                expr: Box::new(Expr::Call {
+                    expr: Box::new(Expr::Ref("f")),
+                    args: Vec::new(),
+                }),
+            }),
+            line: 0,
+        }],
+    )
+}
