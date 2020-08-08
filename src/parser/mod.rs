@@ -5,6 +5,8 @@ use crate::tokenizer::{Count, Tkn, TknPlus};
 use std::iter::Peekable;
 use std::slice::Iter;
 
+const ASSIGN_OPS: [&str; 5] = ["=", "+=", "-=", "*=", "/="];
+
 #[derive(Debug, PartialEq)]
 pub(crate) struct Prop<'a> {
     pub(crate) key: &'a str,
@@ -66,6 +68,7 @@ pub(crate) enum Stmt<'a> {
         expr: Expr<'a>,
     },
     Assign {
+        op: &'a str,
         r#ref: Expr<'a>,
         expr: Expr<'a>,
     },
@@ -171,6 +174,15 @@ fn get_fn<'a, 'b>(tokens: &mut Peekable<Iter<'b, TknPlus<'a>>>) -> Expr<'a> {
     Expr::Fn { args, body: get_body(tokens) }
 }
 
+fn is_assign_op(x: &str) -> bool {
+    for op in &ASSIGN_OPS {
+        if x == *op {
+            return true;
+        }
+    }
+    false
+}
+
 fn get_expr<'a, 'b>(
     tokens: &mut Peekable<Iter<'b, TknPlus<'a>>>,
     precedence: u8,
@@ -182,10 +194,10 @@ fn get_expr<'a, 'b>(
             eat_or_panic!(tokens, Tkn::RParen);
             expr
         }
-        Some(TknPlus { token: Tkn::Op(x), .. }) if *x != "=" => {
+        Some(TknPlus { token: Tkn::Op(x), .. }) if !is_assign_op(*x) => {
             let power: u8 = match *x {
-                "new" => 17,
-                "-" | "!" | "++" | "--" => 13,
+                "new" => 25,
+                "-" | "~" | "!" | "++" | "--" => 21,
                 _ => panic!(format!("{:?}", token)),
             };
             Expr::Prefix { op: x, expr: Box::new(get_expr(tokens, power)) }
@@ -223,9 +235,9 @@ fn get_expr<'a, 'b>(
     };
     loop {
         match tokens.peek() {
-            Some(TknPlus { token: Tkn::Op(x), .. }) if *x != "=" => {
+            Some(TknPlus { token: Tkn::Op(x), .. }) if !is_assign_op(*x) => {
                 let power: Option<u8> = match *x {
-                    "++" | "--" => Some(15),
+                    "++" | "--" => Some(23),
                     _ => None,
                 };
                 if let Some(power) = power {
@@ -236,11 +248,15 @@ fn get_expr<'a, 'b>(
                     expr = Expr::Postfix { op: x, expr: Box::new(expr) };
                 } else {
                     let (l_power, r_power): (u8, u8) = match *x {
-                        "." => (19, 20),
-                        "*" | "/" | "%" => (11, 12),
-                        "+" | "-" => (9, 10),
-                        "<" | ">" | "<=" | ">=" => (7, 8),
-                        "===" | "!==" => (5, 6),
+                        "." => (25, 26),
+                        "*" | "/" | "%" => (19, 20),
+                        "+" | "-" => (17, 18),
+                        "<<" | ">>" | ">>>" => (15, 16),
+                        "<" | ">" | "<=" | ">=" => (13, 14),
+                        "===" | "!==" => (11, 12),
+                        "&" => (9, 10),
+                        "^" => (7, 8),
+                        "|" => (5, 6),
                         "&&" => (3, 4),
                         "||" => (1, 2),
                         _ => panic!(format!("{:?}", token)),
@@ -256,7 +272,7 @@ fn get_expr<'a, 'b>(
                     };
                 }
             }
-            Some(TknPlus { token: Tkn::LParen, .. }) if precedence < 20 => {
+            Some(TknPlus { token: Tkn::LParen, .. }) if precedence < 26 => {
                 eat!(tokens);
                 let mut args: Vec<Expr> = Vec::new();
                 while let Some(token) = tokens.peek() {
@@ -271,7 +287,7 @@ fn get_expr<'a, 'b>(
                 }
                 expr = Expr::Call { expr: Box::new(expr), args };
             }
-            Some(TknPlus { token: Tkn::LBracket, .. }) if precedence < 20 => {
+            Some(TknPlus { token: Tkn::LBracket, .. }) if precedence < 26 => {
                 eat!(tokens);
                 let index: Expr = get_expr(tokens, 0);
                 eat_or_panic!(tokens, Tkn::RBracket);
@@ -435,11 +451,13 @@ fn get_stmt<'a, 'b>(
             let a: Expr = get_expr(tokens, 0);
             let token: Option<&TknPlus> = tokens.next();
             match token {
-                Some(TknPlus { token: Tkn::Op("="), .. }) => {
+                Some(TknPlus { token: Tkn::Op(x), .. })
+                    if is_assign_op(*x) =>
+                {
                     let b: Expr = get_expr(tokens, 0);
                     eat_or_panic!(tokens, Tkn::Semicolon);
                     StmtPlus {
-                        statement: Stmt::Assign { r#ref: a, expr: b },
+                        statement: Stmt::Assign { op: x, r#ref: a, expr: b },
                         line: *line,
                     }
                 }

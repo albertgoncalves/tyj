@@ -129,6 +129,7 @@ fn declare_assign() {
             },
             StmtPlus {
                 statement: Stmt::Assign {
+                    op: "=",
                     r#ref: Expr::Ref("x"),
                     expr: Expr::Null,
                 },
@@ -368,6 +369,7 @@ fn tiny_program() {
          };",
         vec![StmtPlus {
             statement: Stmt::Assign {
+                op: "=",
                 r#ref: Expr::Infix {
                     op: ".",
                     left: Box::new(Expr::Ref("window")),
@@ -553,6 +555,7 @@ fn if_else() {
                     condition: Expr::Bool("true"),
                     r#if: vec![StmtPlus {
                         statement: Stmt::Assign {
+                            op: "=",
                             r#ref: Expr::Ref("a"),
                             expr: Expr::Num("0"),
                         },
@@ -560,6 +563,7 @@ fn if_else() {
                     }],
                     r#else: vec![StmtPlus {
                         statement: Stmt::Assign {
+                            op: "=",
                             r#ref: Expr::Ref("a"),
                             expr: Expr::Num("1"),
                         },
@@ -848,6 +852,7 @@ fn parse_if_else_chain() {
                     },
                     r#if: vec![StmtPlus {
                         statement: Stmt::Assign {
+                            op: "=",
                             r#ref: Expr::Ref("y"),
                             expr: Expr::Num("0"),
                         },
@@ -865,6 +870,7 @@ fn parse_if_else_chain() {
                             },
                             r#if: vec![StmtPlus {
                                 statement: Stmt::Assign {
+                                    op: "=",
                                     r#ref: Expr::Ref("y"),
                                     expr: Expr::Num("1"),
                                 },
@@ -872,6 +878,7 @@ fn parse_if_else_chain() {
                             }],
                             r#else: vec![StmtPlus {
                                 statement: Stmt::Assign {
+                                    op: "=",
                                     r#ref: Expr::Ref("y"),
                                     expr: Expr::Num("2"),
                                 },
@@ -1017,6 +1024,7 @@ fn switch() {
                             body: vec![
                                 StmtPlus {
                                     statement: Stmt::Assign {
+                                        op: "=",
                                         r#ref: Expr::Ref("y"),
                                         expr: Expr::Str("0"),
                                     },
@@ -1030,6 +1038,7 @@ fn switch() {
                             body: vec![
                                 StmtPlus {
                                     statement: Stmt::Assign {
+                                        op: "=",
                                         r#ref: Expr::Ref("y"),
                                         expr: Expr::Str("1"),
                                     },
@@ -1041,6 +1050,7 @@ fn switch() {
                     ],
                     default: vec![StmtPlus {
                         statement: Stmt::Assign {
+                            op: "=",
                             r#ref: Expr::Ref("y"),
                             expr: Expr::Undef,
                         },
@@ -1269,6 +1279,7 @@ fn promise() {
          };",
         vec![StmtPlus {
             statement: Stmt::Assign {
+                op: "=",
                 r#ref: Expr::Infix {
                     op: ".",
                     left: Box::new(Expr::Ref("window")),
@@ -1313,6 +1324,7 @@ fn brackets() {
         "array[0].x = null;",
         vec![StmtPlus {
             statement: Stmt::Assign {
+                op: "=",
                 r#ref: Expr::Infix {
                     op: ".",
                     left: Box::new(Expr::Access {
@@ -1325,5 +1337,119 @@ fn brackets() {
             },
             line: 0,
         }],
+    )
+}
+
+#[test]
+fn bit_operators() {
+    assert_ast!(
+        "~0;
+         1 & 1;
+         2 | 2;
+         3 ^ 3;
+         4 << 4;
+         5 >> 5;
+         6 >>> 6;",
+        vec![
+            StmtPlus {
+                statement: Stmt::Effect(Expr::Prefix {
+                    op: "~",
+                    expr: Box::new(Expr::Num("0")),
+                }),
+                line: 0,
+            },
+            StmtPlus {
+                statement: Stmt::Effect(Expr::Infix {
+                    op: "&",
+                    left: Box::new(Expr::Num("1")),
+                    right: Box::new(Expr::Num("1")),
+                }),
+                line: 1,
+            },
+            StmtPlus {
+                statement: Stmt::Effect(Expr::Infix {
+                    op: "|",
+                    left: Box::new(Expr::Num("2")),
+                    right: Box::new(Expr::Num("2")),
+                }),
+                line: 2,
+            },
+            StmtPlus {
+                statement: Stmt::Effect(Expr::Infix {
+                    op: "^",
+                    left: Box::new(Expr::Num("3")),
+                    right: Box::new(Expr::Num("3")),
+                }),
+                line: 3,
+            },
+            StmtPlus {
+                statement: Stmt::Effect(Expr::Infix {
+                    op: "<<",
+                    left: Box::new(Expr::Num("4")),
+                    right: Box::new(Expr::Num("4")),
+                }),
+                line: 4,
+            },
+            StmtPlus {
+                statement: Stmt::Effect(Expr::Infix {
+                    op: ">>",
+                    left: Box::new(Expr::Num("5")),
+                    right: Box::new(Expr::Num("5")),
+                }),
+                line: 5,
+            },
+            StmtPlus {
+                statement: Stmt::Effect(Expr::Infix {
+                    op: ">>>",
+                    left: Box::new(Expr::Num("6")),
+                    right: Box::new(Expr::Num("6")),
+                }),
+                line: 6,
+            },
+        ],
+    )
+}
+
+#[test]
+fn update_assign() {
+    assert_ast!(
+        "a += 1;
+         b -= 1;
+         c *= 2;
+         d /= 2;",
+        vec![
+            StmtPlus {
+                statement: Stmt::Assign {
+                    op: "+=",
+                    r#ref: Expr::Ref("a"),
+                    expr: Expr::Num("1"),
+                },
+                line: 0,
+            },
+            StmtPlus {
+                statement: Stmt::Assign {
+                    op: "-=",
+                    r#ref: Expr::Ref("b"),
+                    expr: Expr::Num("1"),
+                },
+                line: 1,
+            },
+            StmtPlus {
+                statement: Stmt::Assign {
+                    op: "*=",
+                    r#ref: Expr::Ref("c"),
+                    expr: Expr::Num("2"),
+                },
+                line: 2,
+            },
+            StmtPlus {
+                statement: Stmt::Assign {
+                    op: "/=",
+                    r#ref: Expr::Ref("d"),
+                    expr: Expr::Num("2"),
+                },
+                line: 3,
+            },
+        ],
     )
 }

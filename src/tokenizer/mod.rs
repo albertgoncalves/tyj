@@ -6,8 +6,8 @@ use std::str::CharIndices;
 
 pub(crate) type Count = u8;
 
-const OPS: [char; 12] =
-    ['=', '.', '+', '-', '*', '%', '<', '>', '!', '&', '|', '/'];
+const OPS: [char; 14] =
+    ['=', '.', '+', '-', '*', '%', '<', '>', '!', '~', '&', '^', '|', '/'];
 const DECIMAL: u32 = 10;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -50,13 +50,13 @@ pub(crate) struct TknPlus<'a> {
     pub(crate) line: Count,
 }
 
-fn is_numeric(c: char) -> bool {
-    c.is_digit(DECIMAL) || (c == '.')
+fn is_numeric(x: char) -> bool {
+    x.is_digit(DECIMAL) || (x == '.')
 }
 
-fn is_op(c: char) -> bool {
+fn is_op(x: char) -> bool {
     for op in &OPS {
-        if c == *op {
+        if x == *op {
             return true;
         }
     }

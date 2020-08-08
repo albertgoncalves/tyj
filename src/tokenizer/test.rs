@@ -749,3 +749,73 @@ fn brackets() {
         ],
     )
 }
+
+#[test]
+fn bit_operators() {
+    assert_tokens!(
+        "~0;
+         1 & 1;
+         2 | 2;
+         3 ^ 3;
+         4 << 4;
+         5 >> 5;
+         6 >>> 6;",
+        vec![
+            TknPlus { token: Tkn::Op("~"), line: 0 },
+            TknPlus { token: Tkn::Num("0"), line: 0 },
+            TknPlus { token: Tkn::Semicolon, line: 0 },
+            TknPlus { token: Tkn::Num("1"), line: 1 },
+            TknPlus { token: Tkn::Op("&"), line: 1 },
+            TknPlus { token: Tkn::Num("1"), line: 1 },
+            TknPlus { token: Tkn::Semicolon, line: 1 },
+            TknPlus { token: Tkn::Num("2"), line: 2 },
+            TknPlus { token: Tkn::Op("|"), line: 2 },
+            TknPlus { token: Tkn::Num("2"), line: 2 },
+            TknPlus { token: Tkn::Semicolon, line: 2 },
+            TknPlus { token: Tkn::Num("3"), line: 3 },
+            TknPlus { token: Tkn::Op("^"), line: 3 },
+            TknPlus { token: Tkn::Num("3"), line: 3 },
+            TknPlus { token: Tkn::Semicolon, line: 3 },
+            TknPlus { token: Tkn::Num("4"), line: 4 },
+            TknPlus { token: Tkn::Op("<<"), line: 4 },
+            TknPlus { token: Tkn::Num("4"), line: 4 },
+            TknPlus { token: Tkn::Semicolon, line: 4 },
+            TknPlus { token: Tkn::Num("5"), line: 5 },
+            TknPlus { token: Tkn::Op(">>"), line: 5 },
+            TknPlus { token: Tkn::Num("5"), line: 5 },
+            TknPlus { token: Tkn::Semicolon, line: 5 },
+            TknPlus { token: Tkn::Num("6"), line: 6 },
+            TknPlus { token: Tkn::Op(">>>"), line: 6 },
+            TknPlus { token: Tkn::Num("6"), line: 6 },
+            TknPlus { token: Tkn::Semicolon, line: 6 },
+        ],
+    )
+}
+
+#[test]
+fn update_assign() {
+    assert_tokens!(
+        "a += 1;
+         b -= 1;
+         c *= 2;
+         d /= 2;",
+        vec![
+            TknPlus { token: Tkn::Ident("a"), line: 0 },
+            TknPlus { token: Tkn::Op("+="), line: 0 },
+            TknPlus { token: Tkn::Num("1"), line: 0 },
+            TknPlus { token: Tkn::Semicolon, line: 0 },
+            TknPlus { token: Tkn::Ident("b"), line: 1 },
+            TknPlus { token: Tkn::Op("-="), line: 1 },
+            TknPlus { token: Tkn::Num("1"), line: 1 },
+            TknPlus { token: Tkn::Semicolon, line: 1 },
+            TknPlus { token: Tkn::Ident("c"), line: 2 },
+            TknPlus { token: Tkn::Op("*="), line: 2 },
+            TknPlus { token: Tkn::Num("2"), line: 2 },
+            TknPlus { token: Tkn::Semicolon, line: 2 },
+            TknPlus { token: Tkn::Ident("d"), line: 3 },
+            TknPlus { token: Tkn::Op("/="), line: 3 },
+            TknPlus { token: Tkn::Num("2"), line: 3 },
+            TknPlus { token: Tkn::Semicolon, line: 3 },
+        ],
+    )
+}
