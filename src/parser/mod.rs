@@ -99,21 +99,21 @@ macro_rules! eat {
 
 macro_rules! eat_or_panic {
     ($tokens:expr, $x:path $(,)?) => {
-        let lex: Option<&TknPlus> = $tokens.next();
-        let _: () = if let Some(TknPlus { token: $x, .. }) = lex {
+        let token: Option<&TknPlus> = $tokens.next();
+        let _: () = if let Some(TknPlus { token: $x, .. }) = token {
             ()
         } else {
-            panic!(format!("{:?}", lex))
+            panic!(format!("{:?}", token))
         };
     };
 }
 
 fn get_ident<'a, 'b>(tokens: &mut Peekable<Iter<'b, TknPlus<'a>>>) -> &'a str {
-    let lex: Option<&TknPlus> = tokens.next();
-    if let Some(TknPlus { token: Tkn::Ident(x), .. }) = lex {
+    let token: Option<&TknPlus> = tokens.next();
+    if let Some(TknPlus { token: Tkn::Ident(x), .. }) = token {
         x
     } else {
-        panic!(format!("{:?}", lex))
+        panic!(format!("{:?}", token))
     }
 }
 
@@ -128,19 +128,19 @@ fn get_args<'a, 'b>(
 ) -> Vec<&'a str> {
     eat_or_panic!(tokens, Tkn::LParen);
     let mut args: Vec<&str> = Vec::new();
-    while let Some(lex) = tokens.next() {
-        match lex {
+    while let Some(token) = tokens.next() {
+        match token {
             TknPlus { token: Tkn::Ident(x), .. } => {
                 args.push(x);
-                let lex: Option<&TknPlus> = tokens.next();
-                match lex {
+                let token: Option<&TknPlus> = tokens.next();
+                match token {
                     Some(TknPlus { token: Tkn::Comma, .. }) => (),
                     Some(TknPlus { token: Tkn::RParen, .. }) => break,
-                    _ => panic!(format!("{:?}", lex)),
+                    _ => panic!(format!("{:?}", token)),
                 }
             }
             TknPlus { token: Tkn::RParen, .. } => break,
-            _ => panic!(format!("{:?}", lex)),
+            _ => panic!(format!("{:?}", token)),
         }
     }
     args
@@ -151,8 +151,8 @@ fn get_body<'a, 'b>(
 ) -> Vec<StmtPlus<'a>> {
     eat_or_panic!(tokens, Tkn::LBrace);
     let mut body: Vec<StmtPlus> = Vec::new();
-    while let Some(lex) = tokens.peek() {
-        if let TknPlus { token: Tkn::RBrace, .. } = lex {
+    while let Some(token) = tokens.peek() {
+        if let TknPlus { token: Tkn::RBrace, .. } = token {
             eat!(tokens);
             break;
         } else {
@@ -171,20 +171,20 @@ fn get_expr<'a, 'b>(
     tokens: &mut Peekable<Iter<'b, TknPlus<'a>>>,
     precedence: u8,
 ) -> Expr<'a> {
-    let lex: Option<&TknPlus> = tokens.next();
+    let token: Option<&TknPlus> = tokens.next();
 
     macro_rules! set_prefix {
         ($op:expr $(,)?) => {{
             let power: u8 = match $op {
                 "new" => 17,
                 "-" | "!" | "++" | "--" => 13,
-                _ => panic!(format!("{:?}", lex)),
+                _ => panic!(format!("{:?}", token)),
             };
             Expr::Prefix { op: $op, expr: Box::new(get_expr(tokens, power)) }
         }};
     }
 
-    let mut expr: Expr = match lex {
+    let mut expr: Expr = match token {
         Some(TknPlus { token: Tkn::LParen, .. }) => {
             let expr: Expr = get_expr(tokens, 0);
             eat_or_panic!(tokens, Tkn::RParen);
@@ -202,31 +202,31 @@ fn get_expr<'a, 'b>(
         Some(TknPlus { token: Tkn::Undef, .. }) => Expr::Undef,
         Some(TknPlus { token: Tkn::LBrace, .. }) => {
             let mut props: Vec<Prop> = Vec::new();
-            while let Some(lex) = tokens.peek() {
-                match lex {
+            while let Some(token) = tokens.peek() {
+                match token {
                     TknPlus { token: Tkn::Ident(_), .. } => {
                         props.push(get_prop(tokens));
-                        let lex: Option<&TknPlus> = tokens.next();
-                        match lex {
+                        let token: Option<&TknPlus> = tokens.next();
+                        match token {
                             Some(TknPlus { token: Tkn::Comma, .. }) => (),
                             Some(TknPlus { token: Tkn::RBrace, .. }) => break,
-                            _ => panic!(format!("{:?}", lex)),
+                            _ => panic!(format!("{:?}", token)),
                         }
                     }
                     TknPlus { token: Tkn::RBrace, .. } => {
                         eat!(tokens);
                         break;
                     }
-                    _ => panic!(format!("{:?}", lex)),
+                    _ => panic!(format!("{:?}", token)),
                 }
             }
             Expr::Obj(props)
         }
-        _ => panic!(format!("{:?}", lex)),
+        _ => panic!(format!("{:?}", token)),
     };
 
     macro_rules! set_postfix_or_infix {
-        ($lex:expr, $op:expr $(,)?) => {{
+        ($token:expr, $op:expr $(,)?) => {{
             let power: Option<u8> = match $op {
                 "++" | "--" => Some(15),
                 _ => None,
@@ -246,7 +246,7 @@ fn get_expr<'a, 'b>(
                     "===" | "!==" => (5, 6),
                     "&&" => (3, 4),
                     "||" => (1, 2),
-                    _ => panic!(format!("{:?}", $lex)),
+                    _ => panic!(format!("{:?}", $token)),
                 };
                 if l_power < precedence {
                     break;
@@ -305,8 +305,8 @@ fn get_expr<'a, 'b>(
 fn get_stmt<'a, 'b>(
     tokens: &mut Peekable<Iter<'b, TknPlus<'a>>>,
 ) -> StmtPlus<'a> {
-    let lex: Option<&&TknPlus> = tokens.peek();
-    match lex {
+    let token: Option<&&TknPlus> = tokens.peek();
+    match token {
         Some(TknPlus { token: Tkn::Fn, line }) => {
             eat!(tokens);
             let ident: &str = get_ident(tokens);
@@ -385,8 +385,8 @@ fn get_stmt<'a, 'b>(
         Some(TknPlus { token: Tkn::Var, line }) => {
             eat!(tokens);
             let ident: &str = get_ident(tokens);
-            let lex: Option<&TknPlus> = tokens.next();
-            match lex {
+            let token: Option<&TknPlus> = tokens.next();
+            match token {
                 Some(TknPlus { token: Tkn::Semicolon, .. }) => StmtPlus {
                     statement: Stmt::Decl { ident, expr: Expr::Uninit },
                     line: *line,
@@ -402,7 +402,7 @@ fn get_stmt<'a, 'b>(
                     eat_or_panic!(tokens, Tkn::Semicolon);
                     var
                 }
-                _ => panic!(format!("{:?}", lex)),
+                _ => panic!(format!("{:?}", token)),
             }
         }
         Some(TknPlus { token: Tkn::Ret, line }) => {
@@ -434,8 +434,8 @@ fn get_stmt<'a, 'b>(
         }
         Some(TknPlus { line, .. }) => {
             let a: Expr = get_expr(tokens, 0);
-            let lex: Option<&TknPlus> = tokens.next();
-            match lex {
+            let token: Option<&TknPlus> = tokens.next();
+            match token {
                 Some(TknPlus { token: Tkn::Op("="), .. }) => {
                     let b: Expr = get_expr(tokens, 0);
                     eat_or_panic!(tokens, Tkn::Semicolon);
@@ -447,10 +447,10 @@ fn get_stmt<'a, 'b>(
                 Some(TknPlus { token: Tkn::Semicolon, .. }) => {
                     StmtPlus { statement: Stmt::Effect(a), line: *line }
                 }
-                _ => panic!(format!("{:?}", lex)),
+                _ => panic!(format!("{:?}", token)),
             }
         }
-        _ => panic!(format!("{:?}", lex)),
+        _ => panic!(format!("{:?}", token)),
     }
 }
 
