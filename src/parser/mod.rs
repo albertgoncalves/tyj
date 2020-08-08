@@ -176,18 +176,6 @@ fn get_expr<'a, 'b>(
     precedence: u8,
 ) -> Expr<'a> {
     let token: Option<&TknPlus> = tokens.next();
-
-    macro_rules! set_prefix {
-        ($op:expr $(,)?) => {{
-            let power: u8 = match $op {
-                "new" => 17,
-                "-" | "!" | "++" | "--" => 13,
-                _ => panic!(format!("{:?}", token)),
-            };
-            Expr::Prefix { op: $op, expr: Box::new(get_expr(tokens, power)) }
-        }};
-    }
-
     let mut expr: Expr = match token {
         Some(TknPlus { token: Tkn::LParen, .. }) => {
             let expr: Expr = get_expr(tokens, 0);
@@ -195,7 +183,12 @@ fn get_expr<'a, 'b>(
             expr
         }
         Some(TknPlus { token: Tkn::Op(x), .. }) if *x != "=" => {
-            set_prefix!(*x)
+            let power: u8 = match *x {
+                "new" => 17,
+                "-" | "!" | "++" | "--" => 13,
+                _ => panic!(format!("{:?}", token)),
+            };
+            Expr::Prefix { op: x, expr: Box::new(get_expr(tokens, power)) }
         }
         Some(TknPlus { token: Tkn::Num(x), .. }) => Expr::Num(x),
         Some(TknPlus { token: Tkn::Str(x), .. }) => Expr::Str(x),
@@ -228,47 +221,40 @@ fn get_expr<'a, 'b>(
         }
         _ => panic!(format!("{:?}", token)),
     };
-
-    macro_rules! set_postfix_or_infix {
-        ($token:expr, $op:expr $(,)?) => {{
-            let power: Option<u8> = match $op {
-                "++" | "--" => Some(15),
-                _ => None,
-            };
-            if let Some(power) = power {
-                if power < precedence {
-                    break;
-                }
-                eat!(tokens);
-                expr = Expr::Postfix { op: $op, expr: Box::new(expr) };
-            } else {
-                let (l_power, r_power): (u8, u8) = match $op {
-                    "." => (19, 20),
-                    "*" | "/" | "%" => (11, 12),
-                    "+" | "-" => (9, 10),
-                    "<" | ">" | "<=" | ">=" => (7, 8),
-                    "===" | "!==" => (5, 6),
-                    "&&" => (3, 4),
-                    "||" => (1, 2),
-                    _ => panic!(format!("{:?}", $token)),
-                };
-                if l_power < precedence {
-                    break;
-                }
-                eat!(tokens);
-                expr = Expr::Infix {
-                    op: $op,
-                    left: Box::new(expr),
-                    right: Box::new(get_expr(tokens, r_power)),
-                };
-            }
-        }};
-    }
-
     loop {
         match tokens.peek() {
             Some(TknPlus { token: Tkn::Op(x), .. }) if *x != "=" => {
-                set_postfix_or_infix!(token, *x)
+                let power: Option<u8> = match *x {
+                    "++" | "--" => Some(15),
+                    _ => None,
+                };
+                if let Some(power) = power {
+                    if power < precedence {
+                        break;
+                    }
+                    eat!(tokens);
+                    expr = Expr::Postfix { op: x, expr: Box::new(expr) };
+                } else {
+                    let (l_power, r_power): (u8, u8) = match *x {
+                        "." => (19, 20),
+                        "*" | "/" | "%" => (11, 12),
+                        "+" | "-" => (9, 10),
+                        "<" | ">" | "<=" | ">=" => (7, 8),
+                        "===" | "!==" => (5, 6),
+                        "&&" => (3, 4),
+                        "||" => (1, 2),
+                        _ => panic!(format!("{:?}", token)),
+                    };
+                    if l_power < precedence {
+                        break;
+                    }
+                    eat!(tokens);
+                    expr = Expr::Infix {
+                        op: x,
+                        left: Box::new(expr),
+                        right: Box::new(get_expr(tokens, r_power)),
+                    };
+                }
             }
             Some(TknPlus { token: Tkn::LParen, .. }) if precedence < 20 => {
                 eat!(tokens);
