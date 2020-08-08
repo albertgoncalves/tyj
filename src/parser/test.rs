@@ -1682,6 +1682,6 @@ fn scoped_array_access() {
                 },
             ]),
             line: 1,
-        },],
+        }],
     )
 }
