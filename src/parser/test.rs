@@ -1306,3 +1306,24 @@ fn promise() {
         }],
     )
 }
+
+#[test]
+fn brackets() {
+    assert_ast!(
+        "array[0].x = null;",
+        vec![StmtPlus {
+            statement: Stmt::Assign {
+                r#ref: Expr::Infix {
+                    op: ".",
+                    left: Box::new(Expr::Access {
+                        expr: Box::new(Expr::Ref("array")),
+                        index: Box::new(Expr::Num("0")),
+                    }),
+                    right: Box::new(Expr::Ref("x")),
+                },
+                expr: Expr::Null,
+            },
+            line: 0,
+        }],
+    )
+}

@@ -44,6 +44,10 @@ pub(crate) enum Expr<'a> {
         expr: Box<Expr<'a>>,
         args: Vec<Expr<'a>>,
     },
+    Access {
+        expr: Box<Expr<'a>>,
+        index: Box<Expr<'a>>,
+    },
     Null,
     Undef,
     Uninit,
@@ -267,23 +271,28 @@ fn get_expr<'a, 'b>(
                 set_postfix_or_infix!(token, *x)
             }
             Some(TknPlus { token: Tkn::LParen, .. }) if precedence < 20 => {
-                while let Some(TknPlus { token: Tkn::LParen, .. }) =
-                    tokens.peek()
-                {
-                    eat!(tokens);
-                    let mut args: Vec<Expr> = Vec::new();
-                    while let Some(token) = tokens.peek() {
-                        match token {
-                            TknPlus { token: Tkn::Comma, .. } => eat!(tokens),
-                            TknPlus { token: Tkn::RParen, .. } => {
-                                eat!(tokens);
-                                break;
-                            }
-                            _ => args.push(get_expr(tokens, 0)),
+                eat!(tokens);
+                let mut args: Vec<Expr> = Vec::new();
+                while let Some(token) = tokens.peek() {
+                    match token {
+                        TknPlus { token: Tkn::Comma, .. } => eat!(tokens),
+                        TknPlus { token: Tkn::RParen, .. } => {
+                            eat!(tokens);
+                            break;
                         }
+                        _ => args.push(get_expr(tokens, 0)),
                     }
-                    expr = Expr::Call { expr: Box::new(expr), args };
                 }
+                expr = Expr::Call { expr: Box::new(expr), args };
+            }
+            Some(TknPlus { token: Tkn::LBracket, .. }) if precedence < 20 => {
+                eat!(tokens);
+                let index: Expr = get_expr(tokens, 0);
+                eat_or_panic!(tokens, Tkn::RBracket);
+                expr = Expr::Access {
+                    expr: Box::new(expr),
+                    index: Box::new(index),
+                };
             }
             Some(TknPlus { token: Tkn::Ternary, .. }) if precedence == 0 => {
                 if let Some(TknPlus { token: Tkn::Ternary, .. }) =

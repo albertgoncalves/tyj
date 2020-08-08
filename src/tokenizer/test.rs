@@ -733,3 +733,19 @@ fn new() {
         ],
     )
 }
+
+#[test]
+fn brackets() {
+    assert_tokens!(
+        "array[0] = null;",
+        vec![
+            TknPlus { token: Tkn::Ident("array"), line: 0 },
+            TknPlus { token: Tkn::LBracket, line: 0 },
+            TknPlus { token: Tkn::Num("0"), line: 0 },
+            TknPlus { token: Tkn::RBracket, line: 0 },
+            TknPlus { token: Tkn::Op("="), line: 0 },
+            TknPlus { token: Tkn::Null, line: 0 },
+            TknPlus { token: Tkn::Semicolon, line: 0 },
+        ],
+    )
+}
