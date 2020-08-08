@@ -261,42 +261,46 @@ fn get_expr<'a, 'b>(
         }};
     }
 
-    while let Some(lex) = tokens.peek() {
-        match lex {
-            TknPlus { token: Tkn::Op(x), .. } if *x != "=" => {
-                set_postfix_or_infix!(lex, *x)
+    loop {
+        match tokens.peek() {
+            Some(TknPlus { token: Tkn::Op(x), .. }) if *x != "=" => {
+                set_postfix_or_infix!(token, *x)
             }
-            _ => break,
-        }
-    }
-    if precedence < 19 {
-        while let Some(TknPlus { token: Tkn::LParen, .. }) = tokens.peek() {
-            eat!(tokens);
-            let mut args: Vec<Expr> = Vec::new();
-            while let Some(lex) = tokens.peek() {
-                match lex {
-                    TknPlus { token: Tkn::Comma, .. } => eat!(tokens),
-                    TknPlus { token: Tkn::RParen, .. } => {
-                        eat!(tokens);
-                        break;
+            Some(TknPlus { token: Tkn::LParen, .. }) if precedence < 19 => {
+                while let Some(TknPlus { token: Tkn::LParen, .. }) =
+                    tokens.peek()
+                {
+                    eat!(tokens);
+                    let mut args: Vec<Expr> = Vec::new();
+                    while let Some(token) = tokens.peek() {
+                        match token {
+                            TknPlus { token: Tkn::Comma, .. } => eat!(tokens),
+                            TknPlus { token: Tkn::RParen, .. } => {
+                                eat!(tokens);
+                                break;
+                            }
+                            _ => args.push(get_expr(tokens, 0)),
+                        }
                     }
-                    _ => args.push(get_expr(tokens, 0)),
+                    expr = Expr::Call { expr: Box::new(expr), args };
                 }
             }
-            expr = Expr::Call { expr: Box::new(expr), args }
-        }
-    }
-    if precedence == 0 {
-        if let Some(TknPlus { token: Tkn::Ternary, .. }) = tokens.peek() {
-            eat!(tokens);
-            let r#if: Expr = get_expr(tokens, 0);
-            eat_or_panic!(tokens, Tkn::Colon);
-            let r#else: Expr = get_expr(tokens, 0);
-            expr = Expr::Ternary {
-                condition: Box::new(expr),
-                r#if: Box::new(r#if),
-                r#else: Box::new(r#else),
+            Some(TknPlus { token: Tkn::Ternary, .. }) if precedence == 0 => {
+                if let Some(TknPlus { token: Tkn::Ternary, .. }) =
+                    tokens.peek()
+                {
+                    eat!(tokens);
+                    let r#if: Expr = get_expr(tokens, 0);
+                    eat_or_panic!(tokens, Tkn::Colon);
+                    let r#else: Expr = get_expr(tokens, 0);
+                    expr = Expr::Ternary {
+                        condition: Box::new(expr),
+                        r#if: Box::new(r#if),
+                        r#else: Box::new(r#else),
+                    }
+                }
             }
+            _ => break,
         }
     }
     expr

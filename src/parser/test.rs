@@ -1198,3 +1198,30 @@ fn new() {
         }],
     )
 }
+
+#[test]
+fn operator_chain() {
+    assert_ast!(
+        "f(g()) + g(f());",
+        vec![StmtPlus {
+            statement: Stmt::Effect(Expr::Infix {
+                op: "+",
+                left: Box::new(Expr::Call {
+                    expr: Box::new(Expr::Ref("f")),
+                    args: vec![Expr::Call {
+                        expr: Box::new(Expr::Ref("g")),
+                        args: Vec::new(),
+                    }],
+                }),
+                right: Box::new(Expr::Call {
+                    expr: Box::new(Expr::Ref("g")),
+                    args: vec![Expr::Call {
+                        expr: Box::new(Expr::Ref("f")),
+                        args: Vec::new(),
+                    }],
+                }),
+            }),
+            line: 0,
+        }],
+    )
+}
