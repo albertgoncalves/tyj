@@ -98,7 +98,7 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
         match x {
             '\n' => line += 1,
             _ if x.is_whitespace() => (),
-            _ if x.is_alphabetic() => {
+            _ if x.is_alphabetic() || x == '_' => {
                 let ident: &str = get_substring!(
                     |x: char| x.is_alphabetic()
                         || x.is_digit(DECIMAL)
