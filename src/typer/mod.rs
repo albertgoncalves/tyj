@@ -45,6 +45,8 @@ fn get_array<'a>(exprs: &'a [Expr]) -> Option<Type<'a>> {
     for expr in exprs {
         if let Some(r#type) = get_expr(expr) {
             types.push(r#type)
+        } else {
+            return None;
         }
     }
     types.sort_unstable();
