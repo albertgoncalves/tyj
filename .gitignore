@@ -6,6 +6,7 @@
 !src/
 !parser/
 !tokenizer/
+!typer/
 !*.rs
 !main
 !profile
