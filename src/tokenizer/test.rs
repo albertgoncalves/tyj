@@ -816,3 +816,17 @@ fn update_assign() {
         ],
     )
 }
+
+#[test]
+fn empty_string() {
+    assert_tokens!(
+        "var x = \"\";",
+        vec![
+            Lex { token: Tkn::Var, line: 0 },
+            Lex { token: Tkn::Ident("x"), line: 0 },
+            Lex { token: Tkn::Op("="), line: 0 },
+            Lex { token: Tkn::Str(""), line: 0 },
+            Lex { token: Tkn::Semicolon, line: 0 },
+        ],
+    )
+}

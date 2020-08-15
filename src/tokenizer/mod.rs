@@ -184,24 +184,23 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
                 tokens.push(Lex { token: Tkn::Op(op), line });
             }
             '"' => {
-                if let Some((i, _)) = chars.next() {
-                    let mut k: usize = i;
-                    let mut n: Count = 0;
-                    while let Some((j, c)) = chars.peek() {
-                        k = *j;
-                        match c {
-                            '"' => break,
-                            '\n' => {
-                                eat!();
-                                n += 1;
-                            }
-                            _ => eat!(),
+                let i: usize = i + 1;
+                let mut k: usize = i;
+                let mut n: Count = 0;
+                while let Some((j, c)) = chars.peek() {
+                    k = *j;
+                    match c {
+                        '"' => break,
+                        '\n' => {
+                            eat!();
+                            n += 1;
                         }
+                        _ => eat!(),
                     }
-                    tokens.push(Lex { token: Tkn::Str(&source[i..k]), line });
-                    line += n;
-                    eat!();
                 }
+                tokens.push(Lex { token: Tkn::Str(&source[i..k]), line });
+                line += n;
+                eat!();
             }
             _ => tokens
                 .push(Lex { token: Tkn::Illegal(&source[i..(i + 1)]), line }),
