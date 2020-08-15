@@ -56,6 +56,23 @@ fn get_array<'a>(exprs: &'a [Expr]) -> Option<Type<'a>> {
     Some(Type::Array(types))
 }
 
+fn get_ref<'a>(r#ref: &'a Expr<'a>) -> Option<Vec<&'a str>> {
+    match r#ref {
+        Expr::Ref(ident) => Some(vec![ident]),
+        Expr::Infix { op: ".", left, right } => {
+            if let (Some(mut left), Some(mut right)) =
+                (get_ref(left), get_ref(right))
+            {
+                left.append(&mut right);
+                Some(left)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
 fn get_expr<'a>(expr: &'a Expr<'a>) -> Option<Type<'a>> {
     match expr {
         Expr::Num(_) => Some(Type::Num),
@@ -68,23 +85,6 @@ fn get_expr<'a>(expr: &'a Expr<'a>) -> Option<Type<'a>> {
         Expr::Ref(_) | Expr::Infix { .. } => {
             if let Some(ident) = get_ref(expr) {
                 Some(Type::Ref(ident))
-            } else {
-                None
-            }
-        }
-        _ => None,
-    }
-}
-
-fn get_ref<'a>(r#ref: &'a Expr<'a>) -> Option<Vec<&'a str>> {
-    match r#ref {
-        Expr::Ref(ident) => Some(vec![ident]),
-        Expr::Infix { op: ".", left, right } => {
-            if let (Some(mut left), Some(mut right)) =
-                (get_ref(left), get_ref(right))
-            {
-                left.append(&mut right);
-                Some(left)
             } else {
                 None
             }
