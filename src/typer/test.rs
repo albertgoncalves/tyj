@@ -33,13 +33,44 @@ fn declares() {
          var l = [null, null];
          var m = [undefined, undefined];",
         vec![
-            Label { ident: vec!["a"], r#type: Type::Num, line: 0 },
-            Label { ident: vec!["b"], r#type: Type::Str, line: 1 },
-            Label { ident: vec!["c"], r#type: Type::Bool, line: 2 },
-            Label { ident: vec!["d"], r#type: Type::Null, line: 3 },
-            Label { ident: vec!["e"], r#type: Type::Undef, line: 4 },
-            Label { ident: vec!["f"], r#type: Type::Obj(Vec::new()), line: 5 },
             Label {
+                scope: Vec::new(),
+                ident: vec!["a"],
+                r#type: Type::Num,
+                line: 0,
+            },
+            Label {
+                scope: Vec::new(),
+                ident: vec!["b"],
+                r#type: Type::Str,
+                line: 1,
+            },
+            Label {
+                scope: Vec::new(),
+                ident: vec!["c"],
+                r#type: Type::Bool,
+                line: 2,
+            },
+            Label {
+                scope: Vec::new(),
+                ident: vec!["d"],
+                r#type: Type::Null,
+                line: 3,
+            },
+            Label {
+                scope: Vec::new(),
+                ident: vec!["e"],
+                r#type: Type::Undef,
+                line: 4,
+            },
+            Label {
+                scope: Vec::new(),
+                ident: vec!["f"],
+                r#type: Type::Obj(Vec::new()),
+                line: 5,
+            },
+            Label {
+                scope: Vec::new(),
                 ident: vec!["g"],
                 r#type: Type::Obj(vec![
                     Prop { key: "_a", value: Type::Num },
@@ -59,31 +90,37 @@ fn declares() {
                 line: 6,
             },
             Label {
+                scope: Vec::new(),
                 ident: vec!["h"],
                 r#type: Type::Array(Vec::new()),
                 line: 15,
             },
             Label {
+                scope: Vec::new(),
                 ident: vec!["i"],
                 r#type: Type::Array(vec![Type::Num]),
                 line: 16,
             },
             Label {
+                scope: Vec::new(),
                 ident: vec!["j"],
                 r#type: Type::Array(vec![Type::Str]),
                 line: 17,
             },
             Label {
+                scope: Vec::new(),
                 ident: vec!["k"],
                 r#type: Type::Array(vec![Type::Bool]),
                 line: 18,
             },
             Label {
+                scope: Vec::new(),
                 ident: vec!["l"],
                 r#type: Type::Array(vec![Type::Null]),
                 line: 19,
             },
             Label {
+                scope: Vec::new(),
                 ident: vec!["m"],
                 r#type: Type::Array(vec![Type::Undef]),
                 line: 20,
@@ -99,9 +136,24 @@ fn declare_assign() {
          x = 1;
          x = \"?\";",
         vec![
-            Label { ident: vec!["x"], r#type: Type::Num, line: 0 },
-            Label { ident: vec!["x"], r#type: Type::Num, line: 1 },
-            Label { ident: vec!["x"], r#type: Type::Str, line: 2 },
+            Label {
+                scope: Vec::new(),
+                ident: vec!["x"],
+                r#type: Type::Num,
+                line: 0,
+            },
+            Label {
+                scope: Vec::new(),
+                ident: vec!["x"],
+                r#type: Type::Num,
+                line: 1,
+            },
+            Label {
+                scope: Vec::new(),
+                ident: vec!["x"],
+                r#type: Type::Str,
+                line: 2,
+            },
         ],
     )
 }
@@ -117,6 +169,7 @@ fn declare_assign_object() {
          x.b = \"?\";",
         vec![
             Label {
+                scope: Vec::new(),
                 ident: vec!["x"],
                 r#type: Type::Obj(vec![
                     Prop { key: "a", value: Type::Num },
@@ -124,8 +177,18 @@ fn declare_assign_object() {
                 ]),
                 line: 0,
             },
-            Label { ident: vec!["x", "a"], r#type: Type::Num, line: 4 },
-            Label { ident: vec!["x", "b"], r#type: Type::Str, line: 5 },
+            Label {
+                scope: Vec::new(),
+                ident: vec!["x", "a"],
+                r#type: Type::Num,
+                line: 4,
+            },
+            Label {
+                scope: Vec::new(),
+                ident: vec!["x", "b"],
+                r#type: Type::Str,
+                line: 5,
+            },
         ],
     )
 }

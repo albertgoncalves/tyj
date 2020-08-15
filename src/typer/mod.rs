@@ -23,6 +23,7 @@ pub(crate) enum Type<'a> {
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct Label<'a> {
+    scope: Vec<&'a str>,
     ident: Vec<&'a str>,
     r#type: Type<'a>,
     line: Count,
@@ -91,6 +92,7 @@ pub(crate) fn get_types<'a>(ast: &'a [Syntax]) -> Vec<Label<'a>> {
             Stmt::Decl { ident, expr } => {
                 if let Some(r#type) = get_expr(expr) {
                     labels.push(Label {
+                        scope: Vec::new(),
                         ident: vec![ident],
                         r#type,
                         line: syntax.line,
@@ -103,7 +105,12 @@ pub(crate) fn get_types<'a>(ast: &'a [Syntax]) -> Vec<Label<'a>> {
                 if let (Some(r#type), Some(ident)) =
                     (get_expr(expr), get_ref(r#ref))
                 {
-                    labels.push(Label { ident, r#type, line: syntax.line });
+                    labels.push(Label {
+                        scope: Vec::new(),
+                        ident,
+                        r#type,
+                        line: syntax.line,
+                    });
                 } else {
                     panic!("{:?}", syntax);
                 }
