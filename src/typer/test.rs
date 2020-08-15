@@ -33,14 +33,14 @@ fn declares() {
          var l = [null, null];
          var m = [undefined, undefined];",
         vec![
-            Label { ident: "a", r#type: Type::Num, line: 0 },
-            Label { ident: "b", r#type: Type::Str, line: 1 },
-            Label { ident: "c", r#type: Type::Bool, line: 2 },
-            Label { ident: "d", r#type: Type::Null, line: 3 },
-            Label { ident: "e", r#type: Type::Undef, line: 4 },
-            Label { ident: "f", r#type: Type::Obj(Vec::new()), line: 5 },
+            Label { ident: vec!["a"], r#type: Type::Num, line: 0 },
+            Label { ident: vec!["b"], r#type: Type::Str, line: 1 },
+            Label { ident: vec!["c"], r#type: Type::Bool, line: 2 },
+            Label { ident: vec!["d"], r#type: Type::Null, line: 3 },
+            Label { ident: vec!["e"], r#type: Type::Undef, line: 4 },
+            Label { ident: vec!["f"], r#type: Type::Obj(Vec::new()), line: 5 },
             Label {
-                ident: "g",
+                ident: vec!["g"],
                 r#type: Type::Obj(vec![
                     Prop { key: "_a", value: Type::Num },
                     Prop { key: "_b", value: Type::Str },
@@ -58,32 +58,74 @@ fn declares() {
                 ]),
                 line: 6,
             },
-            Label { ident: "h", r#type: Type::Array(Vec::new()), line: 15 },
             Label {
-                ident: "i",
+                ident: vec!["h"],
+                r#type: Type::Array(Vec::new()),
+                line: 15,
+            },
+            Label {
+                ident: vec!["i"],
                 r#type: Type::Array(vec![Type::Num]),
                 line: 16,
             },
             Label {
-                ident: "j",
+                ident: vec!["j"],
                 r#type: Type::Array(vec![Type::Str]),
                 line: 17,
             },
             Label {
-                ident: "k",
+                ident: vec!["k"],
                 r#type: Type::Array(vec![Type::Bool]),
                 line: 18,
             },
             Label {
-                ident: "l",
+                ident: vec!["l"],
                 r#type: Type::Array(vec![Type::Null]),
                 line: 19,
             },
             Label {
-                ident: "m",
+                ident: vec!["m"],
                 r#type: Type::Array(vec![Type::Undef]),
                 line: 20,
             },
+        ],
+    )
+}
+
+#[test]
+fn declare_assign() {
+    assert_types!(
+        "var x = 0;
+         x = 1;
+         x = \"?\";",
+        vec![
+            Label { ident: vec!["x"], r#type: Type::Num, line: 0 },
+            Label { ident: vec!["x"], r#type: Type::Num, line: 1 },
+            Label { ident: vec!["x"], r#type: Type::Str, line: 2 },
+        ],
+    )
+}
+
+#[test]
+fn declare_assign_object() {
+    assert_types!(
+        "var x = {
+             a: 0,
+             b: \"\",
+         };
+         x.a = 1;
+         x.b = \"?\";",
+        vec![
+            Label {
+                ident: vec!["x"],
+                r#type: Type::Obj(vec![
+                    Prop { key: "a", value: Type::Num },
+                    Prop { key: "b", value: Type::Str },
+                ]),
+                line: 0,
+            },
+            Label { ident: vec!["x", "a"], r#type: Type::Num, line: 4 },
+            Label { ident: vec!["x", "b"], r#type: Type::Str, line: 5 },
         ],
     )
 }

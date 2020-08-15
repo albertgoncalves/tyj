@@ -23,7 +23,7 @@ pub(crate) enum Type<'a> {
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct Label<'a> {
-    ident: &'a str,
+    ident: Vec<&'a str>,
     r#type: Type<'a>,
     line: Count,
 }
@@ -67,12 +67,42 @@ fn get_expr<'a>(expr: &'a Expr<'a>) -> Option<Type<'a>> {
     }
 }
 
+fn get_ref<'a>(r#ref: &'a Expr<'a>) -> Option<Vec<&'a str>> {
+    match r#ref {
+        Expr::Ref(ident) => Some(vec![ident]),
+        Expr::Infix { op: ".", left, right } => {
+            if let (Some(mut left), Some(mut right)) =
+                (get_ref(left), get_ref(right))
+            {
+                left.append(&mut right);
+                Some(left)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
 pub(crate) fn get_types<'a>(ast: &'a [Syntax]) -> Vec<Label<'a>> {
     let mut labels: Vec<Label> = Vec::new();
     for syntax in ast {
         match &syntax.statement {
             Stmt::Decl { ident, expr } => {
                 if let Some(r#type) = get_expr(expr) {
+                    labels.push(Label {
+                        ident: vec![ident],
+                        r#type,
+                        line: syntax.line,
+                    });
+                } else {
+                    panic!("{:?}", syntax);
+                }
+            }
+            Stmt::Assign { op: "=", r#ref, expr } => {
+                if let (Some(r#type), Some(ident)) =
+                    (get_expr(expr), get_ref(r#ref))
+                {
                     labels.push(Label { ident, r#type, line: syntax.line });
                 } else {
                     panic!("{:?}", syntax);
