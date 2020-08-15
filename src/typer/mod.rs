@@ -19,6 +19,7 @@ pub(crate) enum Type<'a> {
     Undef,
     Obj(Vec<Prop<'a>>),
     Array(Vec<Type<'a>>),
+    Ref(Vec<&'a str>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -64,6 +65,13 @@ fn get_expr<'a>(expr: &'a Expr<'a>) -> Option<Type<'a>> {
         Expr::Undef => Some(Type::Undef),
         Expr::Obj(x) => get_props(x),
         Expr::Array(x) => get_array(x),
+        Expr::Ref(_) | Expr::Infix { .. } => {
+            if let Some(ident) = get_ref(expr) {
+                Some(Type::Ref(ident))
+            } else {
+                None
+            }
+        }
         _ => None,
     }
 }

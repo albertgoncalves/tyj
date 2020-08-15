@@ -192,3 +192,65 @@ fn declare_assign_object() {
         ],
     )
 }
+
+#[test]
+fn declare_assign_ref() {
+    assert_types!(
+        "var x = {
+             a: 0,
+         };
+         var y = 1;
+         x.a = y;",
+        vec![
+            Label {
+                scope: Vec::new(),
+                ident: vec!["x"],
+                r#type: Type::Obj(vec![Prop { key: "a", value: Type::Num }]),
+                line: 0,
+            },
+            Label {
+                scope: Vec::new(),
+                ident: vec!["y"],
+                r#type: Type::Num,
+                line: 3,
+            },
+            Label {
+                scope: Vec::new(),
+                ident: vec!["x", "a"],
+                r#type: Type::Ref(vec!["y"]),
+                line: 4,
+            },
+        ],
+    )
+}
+
+#[test]
+fn declare_assign_object_ref() {
+    assert_types!(
+        "var x = 0;
+         var y = {
+             a: 1,
+         };
+         x = y.a;",
+        vec![
+            Label {
+                scope: Vec::new(),
+                ident: vec!["x"],
+                r#type: Type::Num,
+                line: 0,
+            },
+            Label {
+                scope: Vec::new(),
+                ident: vec!["y"],
+                r#type: Type::Obj(vec![Prop { key: "a", value: Type::Num }]),
+                line: 1,
+            },
+            Label {
+                scope: Vec::new(),
+                ident: vec!["x"],
+                r#type: Type::Ref(vec!["y", "a"]),
+                line: 4,
+            },
+        ],
+    )
+}
