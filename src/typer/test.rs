@@ -1,11 +1,27 @@
-use super::{get_types, Label, Prop, Type};
+use super::{get_types, Key, Type, Value};
 use crate::parser::get_ast;
 use crate::tokenizer::get_tokens;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+
+macro_rules! array {
+    ($items:expr $(,)?) => {
+        Type::Array($items.into_iter().collect())
+    };
+}
+
+macro_rules! obj {
+    ($pairs:expr $(,)?) => {
+        Type::Obj($pairs.into_iter().collect())
+    };
+}
 
 macro_rules! assert_types {
-    ($a:expr, $b:expr $(,)?) => {
-        assert_eq!(get_types(&get_ast(&get_tokens($a))), $b)
-    };
+    ($a:expr, $b:expr $(,)?) => {{
+        assert_eq!(
+            get_types(&get_ast(&get_tokens($a))),
+            $b.into_iter().collect(),
+        );
+    }};
 }
 
 #[test]
@@ -33,128 +49,146 @@ fn declares() {
          var l = [null, null];
          var m = [undefined, undefined];",
         vec![
-            Label {
-                scope: Vec::new(),
-                ident: vec!["a"],
-                r#type: Type::Num,
-                line: 0,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["b"],
-                r#type: Type::Str,
-                line: 1,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["c"],
-                r#type: Type::Bool,
-                line: 2,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["d"],
-                r#type: Type::Null,
-                line: 3,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["e"],
-                r#type: Type::Undef,
-                line: 4,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["f"],
-                r#type: Type::Obj(Vec::new()),
-                line: 5,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["g"],
-                r#type: Type::Obj(vec![
-                    Prop { key: "_a", value: Type::Num },
-                    Prop { key: "_b", value: Type::Str },
-                    Prop { key: "_c", value: Type::Bool },
-                    Prop { key: "_d", value: Type::Null },
-                    Prop { key: "_e", value: Type::Undef },
-                    Prop { key: "_f", value: Type::Obj(Vec::new()) },
-                    Prop {
-                        key: "_g",
-                        value: Type::Obj(vec![Prop {
-                            key: "__a",
-                            value: Type::Num,
-                        }]),
-                    },
-                ]),
-                line: 6,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["h"],
-                r#type: Type::Array(Vec::new()),
-                line: 15,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["i"],
-                r#type: Type::Array(vec![Type::Num]),
-                line: 16,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["j"],
-                r#type: Type::Array(vec![Type::Str]),
-                line: 17,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["k"],
-                r#type: Type::Array(vec![Type::Bool]),
-                line: 18,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["l"],
-                r#type: Type::Array(vec![Type::Null]),
-                line: 19,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["m"],
-                r#type: Type::Array(vec![Type::Undef]),
-                line: 20,
-            },
+            (
+                Key::Var("a"),
+                Value { scope: Vec::new(), r#type: Type::Num, line: 0 },
+            ),
+            (
+                Key::Var("b"),
+                Value { scope: Vec::new(), r#type: Type::Str, line: 1 },
+            ),
+            (
+                Key::Var("c"),
+                Value { scope: Vec::new(), r#type: Type::Bool, line: 2 },
+            ),
+            (
+                Key::Var("d"),
+                Value { scope: Vec::new(), r#type: Type::Null, line: 3 },
+            ),
+            (
+                Key::Var("e"),
+                Value { scope: Vec::new(), r#type: Type::Undef, line: 4 },
+            ),
+            (
+                Key::Var("f"),
+                Value {
+                    scope: Vec::new(),
+                    r#type: Type::Obj(BTreeMap::new()),
+                    line: 5,
+                },
+            ),
+            (
+                Key::Var("g"),
+                Value {
+                    scope: Vec::new(),
+                    r#type: obj!(vec![
+                        ("_a", Type::Num),
+                        ("_b", Type::Str),
+                        ("_c", Type::Bool),
+                        ("_d", Type::Null),
+                        ("_e", Type::Undef),
+                        ("_f", Type::Obj(BTreeMap::new())),
+                        ("_g", obj!(vec![("__a", Type::Num)])),
+                    ]),
+                    line: 6,
+                },
+            ),
+            (
+                Key::Var("h"),
+                Value {
+                    scope: Vec::new(),
+                    r#type: Type::Array(BTreeSet::new()),
+                    line: 15,
+                },
+            ),
+            (
+                Key::Var("i"),
+                Value {
+                    scope: Vec::new(),
+                    r#type: array!(vec![Type::Num]),
+                    line: 16,
+                },
+            ),
+            (
+                Key::Var("j"),
+                Value {
+                    scope: Vec::new(),
+                    r#type: array!(vec![Type::Str]),
+                    line: 17,
+                },
+            ),
+            (
+                Key::Var("k"),
+                Value {
+                    scope: Vec::new(),
+                    r#type: array!(vec![Type::Bool]),
+                    line: 18,
+                },
+            ),
+            (
+                Key::Var("l"),
+                Value {
+                    scope: Vec::new(),
+                    r#type: array!(vec![Type::Null]),
+                    line: 19,
+                },
+            ),
+            (
+                Key::Var("m"),
+                Value {
+                    scope: Vec::new(),
+                    r#type: array!(vec![Type::Undef]),
+                    line: 20,
+                },
+            ),
         ],
     )
 }
 
 #[test]
+#[should_panic]
+fn assign_without_declare() {
+    let _: HashMap<Key, Value> =
+        get_types(&get_ast(&get_tokens("x = \"?\";")));
+}
+
+#[test]
+#[should_panic]
+fn declare_assign_unmatched_type() {
+    let _: HashMap<Key, Value> = get_types(&get_ast(&get_tokens(
+        "var x = 0;
+         x = \"?\";",
+    )));
+}
+
+#[test]
+#[should_panic]
+fn declare_assign_undeclared_key() {
+    let _: HashMap<Key, Value> = get_types(&get_ast(&get_tokens(
+        "var x = {};
+         x = {
+             a: 0,
+         };",
+    )));
+}
+
+#[test]
 fn declare_assign() {
     assert_types!(
-        "var x = 0;
-         x = 1;
-         x = \"?\";",
-        vec![
-            Label {
+        "var x = {
+             a: 0,
+         };
+         x = {
+             a: 1,
+         };",
+        vec![(
+            Key::Var("x"),
+            Value {
                 scope: Vec::new(),
-                ident: vec!["x"],
-                r#type: Type::Num,
+                r#type: obj!(vec![("a", Type::Num)]),
                 line: 0,
             },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["x"],
-                r#type: Type::Num,
-                line: 1,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["x"],
-                r#type: Type::Str,
-                line: 2,
-            },
-        ],
+        )],
     )
 }
 
@@ -167,30 +201,50 @@ fn declare_assign_object() {
          };
          x.a = 1;
          x.b = \"?\";",
-        vec![
-            Label {
+        vec![(
+            Key::Var("x"),
+            Value {
                 scope: Vec::new(),
-                ident: vec!["x"],
-                r#type: Type::Obj(vec![
-                    Prop { key: "a", value: Type::Num },
-                    Prop { key: "b", value: Type::Str },
-                ]),
+                r#type: obj!(vec![("a", Type::Num), ("b", Type::Str)]),
                 line: 0,
             },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["x", "a"],
-                r#type: Type::Num,
-                line: 4,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["x", "b"],
-                r#type: Type::Str,
-                line: 5,
-            },
-        ],
+        )],
     )
+}
+
+#[test]
+fn declare_assign_nested_objects() {
+    assert_types!(
+        "var x = {
+             a: {
+                 b: true,
+             },
+         };
+         x.a = {
+             b: false,
+         };",
+        vec![(
+            Key::Var("x"),
+            Value {
+                scope: Vec::new(),
+                r#type: obj!(vec![("a", obj!(vec![("b", Type::Bool)]))]),
+                line: 0,
+            },
+        )],
+    )
+}
+
+#[test]
+#[should_panic]
+fn declare_assign_object_unmatched_type() {
+    let _: HashMap<Key, Value> = get_types(&get_ast(&get_tokens(
+        "var x = {
+             a: 0,
+             b: \"\",
+         };
+         x.a = 1;
+         x.b = 2;",
+    )));
 }
 
 #[test]
@@ -202,24 +256,18 @@ fn declare_assign_ref() {
          var y = 1;
          x.a = y;",
         vec![
-            Label {
-                scope: Vec::new(),
-                ident: vec!["x"],
-                r#type: Type::Obj(vec![Prop { key: "a", value: Type::Num }]),
-                line: 0,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["y"],
-                r#type: Type::Num,
-                line: 3,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["x", "a"],
-                r#type: Type::Ref(vec!["y"]),
-                line: 4,
-            },
+            (
+                Key::Var("x"),
+                Value {
+                    scope: Vec::new(),
+                    r#type: obj!(vec![("a", Type::Num)]),
+                    line: 0,
+                },
+            ),
+            (
+                Key::Var("y"),
+                Value { scope: Vec::new(), r#type: Type::Num, line: 3 },
+            ),
         ],
     )
 }
@@ -233,24 +281,49 @@ fn declare_assign_object_ref() {
          };
          x = y.a;",
         vec![
-            Label {
-                scope: Vec::new(),
-                ident: vec!["x"],
-                r#type: Type::Num,
-                line: 0,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["y"],
-                r#type: Type::Obj(vec![Prop { key: "a", value: Type::Num }]),
-                line: 1,
-            },
-            Label {
-                scope: Vec::new(),
-                ident: vec!["x"],
-                r#type: Type::Ref(vec!["y", "a"]),
-                line: 4,
-            },
+            (
+                Key::Var("x"),
+                Value { scope: Vec::new(), r#type: Type::Num, line: 0 },
+            ),
+            (
+                Key::Var("y"),
+                Value {
+                    scope: Vec::new(),
+                    r#type: obj!(vec![("a", Type::Num)]),
+                    line: 1,
+                },
+            ),
+        ],
+    )
+}
+
+#[test]
+fn declare_assign_prop_to_prop() {
+    assert_types!(
+        "var x = {
+             a: true,
+         };
+         var y = {
+             a: false,
+         };
+         x.a = y.a;",
+        vec![
+            (
+                Key::Var("x"),
+                Value {
+                    scope: Vec::new(),
+                    r#type: obj!(vec![("a", Type::Bool)]),
+                    line: 0,
+                },
+            ),
+            (
+                Key::Var("y"),
+                Value {
+                    scope: Vec::new(),
+                    r#type: obj!(vec![("a", Type::Bool)]),
+                    line: 3,
+                },
+            ),
         ],
     )
 }
