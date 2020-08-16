@@ -14,7 +14,7 @@ pub(crate) enum Key<'a> {
 #[derive(Debug, PartialEq)]
 pub(crate) struct Value<'a> {
     scope: Vec<&'a str>,
-    r#type: Type<'a>,
+    type_: Type<'a>,
     line: Count,
 }
 
@@ -27,26 +27,26 @@ pub(crate) enum Type<'a> {
     Undef,
     Obj(BTreeMap<&'a str, Type<'a>>),
     Array(BTreeSet<Type<'a>>),
-    Ref(Key<'a>),
+    Ident(Key<'a>),
 }
 
-fn get_props<'a>(props: &'a [Prop]) -> Option<Type<'a>> {
-    let mut obj: BTreeMap<&str, Type> = BTreeMap::new();
-    for prop in props {
-        if let Some(r#type) = get_type(&prop.value) {
-            let _: Option<Type> = obj.insert(prop.key, r#type);
+fn get_props<'a>(parse_props: &'a [Prop]) -> Option<Type<'a>> {
+    let mut type_props: BTreeMap<&str, Type> = BTreeMap::new();
+    for prop in parse_props {
+        if let Some(type_) = get_type(&prop.value) {
+            let _: Option<Type> = type_props.insert(prop.key, type_);
         } else {
             return None;
         }
     }
-    Some(Type::Obj(obj))
+    Some(Type::Obj(type_props))
 }
 
 fn get_array<'a>(exprs: &'a [Expr]) -> Option<Type<'a>> {
     let mut types: BTreeSet<Type> = BTreeSet::new();
     for expr in exprs {
-        if let Some(r#type) = get_type(expr) {
-            let _: bool = types.insert(r#type);
+        if let Some(type_) = get_type(expr) {
+            let _: bool = types.insert(type_);
         } else {
             return None;
         }
@@ -54,11 +54,11 @@ fn get_array<'a>(exprs: &'a [Expr]) -> Option<Type<'a>> {
     Some(Type::Array(types))
 }
 
-fn get_ref<'a>(r#ref: &'a Expr<'a>) -> Option<Key<'a>> {
-    match r#ref {
-        Expr::Ref(ident) => Some(Key::Var(ident)),
+fn get_ident<'a>(ident: &'a Expr<'a>) -> Option<Key<'a>> {
+    match ident {
+        Expr::Ident(ident) => Some(Key::Var(ident)),
         Expr::Infix { op: ".", left, right } => {
-            match (get_ref(left), get_ref(right)) {
+            match (get_ident(left), get_ident(right)) {
                 (Some(Key::Prop(mut left)), Some(Key::Prop(mut right))) => {
                     left.append(&mut right);
                     Some(Key::Prop(left))
@@ -93,9 +93,9 @@ fn get_type<'a>(expr: &'a Expr<'a>) -> Option<Type<'a>> {
         Expr::Undef => Some(Type::Undef),
         Expr::Obj(x) => get_props(x),
         Expr::Array(x) => get_array(x),
-        Expr::Ref(_) | Expr::Infix { .. } => {
-            if let Some(key) = get_ref(expr) {
-                Some(Type::Ref(key))
+        Expr::Ident(_) | Expr::Infix { .. } => {
+            if let Some(x) = get_ident(expr) {
+                Some(Type::Ident(x))
             } else {
                 None
             }
@@ -105,12 +105,12 @@ fn get_type<'a>(expr: &'a Expr<'a>) -> Option<Type<'a>> {
 }
 
 macro_rules! deref_obj {
-    ($obj:expr, $keys:expr $(,)?) => {{
+    ($props:expr, $idents:expr $(,)?) => {{
         let mut value: Option<&Type> = None;
-        while !$keys.is_empty() {
-            value = $obj.get(&$keys.remove(0));
-            if let Some(Type::Obj(next_obj)) = value {
-                $obj = next_obj;
+        while !$idents.is_empty() {
+            value = $props.get(&$idents.remove(0));
+            if let Some(Type::Obj(next_props)) = value {
+                $props = next_props;
             } else {
                 break;
             }
@@ -121,18 +121,18 @@ macro_rules! deref_obj {
 
 fn match_obj<'a>(
     types: &HashMap<Key<'a>, Value<'a>>,
-    mut obj: &BTreeMap<&'a str, Type<'a>>,
+    type_: &Type<'a>,
+    mut props: &BTreeMap<&'a str, Type<'a>>,
     idents: &mut Vec<&'a str>,
-    r#type: &Type<'a>,
 ) -> bool {
-    let obj_type: Option<&Type> = deref_obj!(obj, idents);
+    let obj_type: Option<&Type> = deref_obj!(props, idents);
     if let Some(obj_type) = obj_type {
-        if let Type::Ref(key) = r#type {
+        if let Type::Ident(key) = type_ {
             if let Some(value) = types.get(key) {
-                return &value.r#type == obj_type;
+                return &value.type_ == obj_type;
             }
         } else {
-            return r#type == obj_type;
+            return type_ == obj_type;
         }
     }
     false
@@ -140,17 +140,20 @@ fn match_obj<'a>(
 
 fn set_assign<'a>(
     types: &mut HashMap<Key<'a>, Value<'a>>,
-    r#ref: &Expr<'a>,
+    ident: &Expr<'a>,
     expr: &Expr<'a>,
 ) -> bool {
-    match (get_ref(r#ref), get_type(expr)) {
-        (Some(key @ Key::Var(_)), Some(Type::Ref(Key::Prop(mut idents)))) => {
+    match (get_ident(ident), get_type(expr)) {
+        (
+            Some(key @ Key::Var(_)),
+            Some(Type::Ident(Key::Prop(mut idents))),
+        ) => {
             if let Some(value) = types.get(&key) {
                 let ident: &str = idents.remove(0);
-                if let Some(Value { r#type: Type::Obj(obj), .. }) =
+                if let Some(Value { type_: Type::Obj(props), .. }) =
                     types.get(&Key::Var(ident))
                 {
-                    if match_obj(&types, obj, &mut idents, &value.r#type) {
+                    if match_obj(&types, &value.type_, props, &mut idents) {
                         return true;
                     }
                 }
@@ -158,39 +161,39 @@ fn set_assign<'a>(
         }
         (
             Some(Key::Prop(mut left_idents)),
-            Some(Type::Ref(Key::Prop(mut right_idents))),
+            Some(Type::Ident(Key::Prop(mut right_idents))),
         ) => {
             let left_ident: &str = left_idents.remove(0);
             let right_ident: &str = right_idents.remove(0);
             if let (
-                Some(Value { r#type: Type::Obj(left_obj), .. }),
-                Some(Value { r#type: Type::Obj(right_obj), .. }),
+                Some(Value { type_: Type::Obj(left_props), .. }),
+                Some(Value { type_: Type::Obj(right_props), .. }),
             ) = (
                 types.get(&Key::Var(left_ident)),
                 types.get(&Key::Var(right_ident)),
             ) {
-                let mut iter_left_obj = left_obj;
-                let mut iter_right_obj = right_obj;
-                if deref_obj!(iter_left_obj, left_idents)
-                    == deref_obj!(iter_right_obj, right_idents)
+                let mut iter_left_props = left_props;
+                let mut iter_right_props = right_props;
+                if deref_obj!(iter_left_props, left_idents)
+                    == deref_obj!(iter_right_props, right_idents)
                 {
                     return true;
                 }
             }
         }
-        (Some(key @ Key::Var(_)), Some(r#type)) => {
+        (Some(key @ Key::Var(_)), Some(type_)) => {
             if let Some(value) = types.get(&key) {
-                if r#type == value.r#type {
+                if type_ == value.type_ {
                     return true;
                 }
             }
         }
-        (Some(Key::Prop(mut idents)), Some(r#type)) => {
+        (Some(Key::Prop(mut idents)), Some(type_)) => {
             let ident: &str = idents.remove(0);
-            if let Some(Value { r#type: Type::Obj(obj), .. }) =
+            if let Some(Value { type_: Type::Obj(props), .. }) =
                 types.get(&Key::Var(ident))
             {
-                if match_obj(&types, obj, &mut idents, &r#type) {
+                if match_obj(&types, &type_, props, &mut idents) {
                     return true;
                 }
             }
@@ -205,14 +208,14 @@ pub(crate) fn get_types<'a>(ast: &'a [Syntax]) -> HashMap<Key<'a>, Value<'a>> {
     for syntax in ast {
         match &syntax.statement {
             Stmt::Decl { ident, expr } => {
-                if let Some(r#type) = get_type(expr) {
+                if let Some(type_) = get_type(expr) {
                     let key: Key = Key::Var(ident);
                     if !types.contains_key(&key) {
                         let _: Option<Value> = types.insert(
                             key,
                             Value {
                                 scope: Vec::new(),
-                                r#type,
+                                type_,
                                 line: syntax.line,
                             },
                         );
@@ -220,8 +223,8 @@ pub(crate) fn get_types<'a>(ast: &'a [Syntax]) -> HashMap<Key<'a>, Value<'a>> {
                     }
                 }
             }
-            Stmt::Assign { op: "=", r#ref, expr }
-                if set_assign(&mut types, r#ref, expr) =>
+            Stmt::Assign { op: "=", ident, expr }
+                if set_assign(&mut types, ident, expr) =>
             {
                 continue;
             }

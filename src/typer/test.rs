@@ -51,29 +51,29 @@ fn declares() {
         vec![
             (
                 Key::Var("a"),
-                Value { scope: Vec::new(), r#type: Type::Num, line: 0 },
+                Value { scope: Vec::new(), type_: Type::Num, line: 0 },
             ),
             (
                 Key::Var("b"),
-                Value { scope: Vec::new(), r#type: Type::Str, line: 1 },
+                Value { scope: Vec::new(), type_: Type::Str, line: 1 },
             ),
             (
                 Key::Var("c"),
-                Value { scope: Vec::new(), r#type: Type::Bool, line: 2 },
+                Value { scope: Vec::new(), type_: Type::Bool, line: 2 },
             ),
             (
                 Key::Var("d"),
-                Value { scope: Vec::new(), r#type: Type::Null, line: 3 },
+                Value { scope: Vec::new(), type_: Type::Null, line: 3 },
             ),
             (
                 Key::Var("e"),
-                Value { scope: Vec::new(), r#type: Type::Undef, line: 4 },
+                Value { scope: Vec::new(), type_: Type::Undef, line: 4 },
             ),
             (
                 Key::Var("f"),
                 Value {
                     scope: Vec::new(),
-                    r#type: Type::Obj(BTreeMap::new()),
+                    type_: Type::Obj(BTreeMap::new()),
                     line: 5,
                 },
             ),
@@ -81,7 +81,7 @@ fn declares() {
                 Key::Var("g"),
                 Value {
                     scope: Vec::new(),
-                    r#type: obj!(vec![
+                    type_: obj!(vec![
                         ("_a", Type::Num),
                         ("_b", Type::Str),
                         ("_c", Type::Bool),
@@ -97,7 +97,7 @@ fn declares() {
                 Key::Var("h"),
                 Value {
                     scope: Vec::new(),
-                    r#type: Type::Array(BTreeSet::new()),
+                    type_: Type::Array(BTreeSet::new()),
                     line: 15,
                 },
             ),
@@ -105,7 +105,7 @@ fn declares() {
                 Key::Var("i"),
                 Value {
                     scope: Vec::new(),
-                    r#type: array!(vec![Type::Num]),
+                    type_: array!(vec![Type::Num]),
                     line: 16,
                 },
             ),
@@ -113,7 +113,7 @@ fn declares() {
                 Key::Var("j"),
                 Value {
                     scope: Vec::new(),
-                    r#type: array!(vec![Type::Str]),
+                    type_: array!(vec![Type::Str]),
                     line: 17,
                 },
             ),
@@ -121,7 +121,7 @@ fn declares() {
                 Key::Var("k"),
                 Value {
                     scope: Vec::new(),
-                    r#type: array!(vec![Type::Bool]),
+                    type_: array!(vec![Type::Bool]),
                     line: 18,
                 },
             ),
@@ -129,7 +129,7 @@ fn declares() {
                 Key::Var("l"),
                 Value {
                     scope: Vec::new(),
-                    r#type: array!(vec![Type::Null]),
+                    type_: array!(vec![Type::Null]),
                     line: 19,
                 },
             ),
@@ -137,7 +137,7 @@ fn declares() {
                 Key::Var("m"),
                 Value {
                     scope: Vec::new(),
-                    r#type: array!(vec![Type::Undef]),
+                    type_: array!(vec![Type::Undef]),
                     line: 20,
                 },
             ),
@@ -185,7 +185,7 @@ fn declare_assign() {
             Key::Var("x"),
             Value {
                 scope: Vec::new(),
-                r#type: obj!(vec![("a", Type::Num)]),
+                type_: obj!(vec![("a", Type::Num)]),
                 line: 0,
             },
         )],
@@ -205,7 +205,7 @@ fn declare_assign_object() {
             Key::Var("x"),
             Value {
                 scope: Vec::new(),
-                r#type: obj!(vec![("a", Type::Num), ("b", Type::Str)]),
+                type_: obj!(vec![("a", Type::Num), ("b", Type::Str)]),
                 line: 0,
             },
         )],
@@ -227,7 +227,7 @@ fn declare_assign_nested_objects() {
             Key::Var("x"),
             Value {
                 scope: Vec::new(),
-                r#type: obj!(vec![("a", obj!(vec![("b", Type::Bool)]))]),
+                type_: obj!(vec![("a", obj!(vec![("b", Type::Bool)]))]),
                 line: 0,
             },
         )],
@@ -260,13 +260,13 @@ fn declare_assign_ref() {
                 Key::Var("x"),
                 Value {
                     scope: Vec::new(),
-                    r#type: obj!(vec![("a", Type::Num)]),
+                    type_: obj!(vec![("a", Type::Num)]),
                     line: 0,
                 },
             ),
             (
                 Key::Var("y"),
-                Value { scope: Vec::new(), r#type: Type::Num, line: 3 },
+                Value { scope: Vec::new(), type_: Type::Num, line: 3 },
             ),
         ],
     )
@@ -283,13 +283,13 @@ fn declare_assign_object_ref() {
         vec![
             (
                 Key::Var("x"),
-                Value { scope: Vec::new(), r#type: Type::Num, line: 0 },
+                Value { scope: Vec::new(), type_: Type::Num, line: 0 },
             ),
             (
                 Key::Var("y"),
                 Value {
                     scope: Vec::new(),
-                    r#type: obj!(vec![("a", Type::Num)]),
+                    type_: obj!(vec![("a", Type::Num)]),
                     line: 1,
                 },
             ),
@@ -312,7 +312,7 @@ fn declare_assign_prop_to_prop() {
                 Key::Var("x"),
                 Value {
                     scope: Vec::new(),
-                    r#type: obj!(vec![("a", Type::Bool)]),
+                    type_: obj!(vec![("a", Type::Bool)]),
                     line: 0,
                 },
             ),
@@ -320,7 +320,7 @@ fn declare_assign_prop_to_prop() {
                 Key::Var("y"),
                 Value {
                     scope: Vec::new(),
-                    r#type: obj!(vec![("a", Type::Bool)]),
+                    type_: obj!(vec![("a", Type::Bool)]),
                     line: 3,
                 },
             ),

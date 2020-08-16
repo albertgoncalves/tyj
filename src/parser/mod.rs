@@ -20,7 +20,7 @@ pub(crate) enum Expr<'a> {
     Bool(&'a str),
     Obj(Vec<Prop<'a>>),
     Array(Vec<Expr<'a>>),
-    Ref(&'a str),
+    Ident(&'a str),
     Prefix {
         op: &'a str,
         expr: Box<Expr<'a>>,
@@ -36,8 +36,8 @@ pub(crate) enum Expr<'a> {
     },
     Ternary {
         condition: Box<Expr<'a>>,
-        r#if: Box<Expr<'a>>,
-        r#else: Box<Expr<'a>>,
+        if_: Box<Expr<'a>>,
+        else_: Box<Expr<'a>>,
     },
     Fn {
         args: Vec<&'a str>,
@@ -71,7 +71,7 @@ pub(crate) enum Stmt<'a> {
     Decls(Vec<&'a str>),
     Assign {
         op: &'a str,
-        r#ref: Expr<'a>,
+        ident: Expr<'a>,
         expr: Expr<'a>,
     },
     Ret(Expr<'a>),
@@ -82,8 +82,8 @@ pub(crate) enum Stmt<'a> {
     },
     Cond {
         condition: Expr<'a>,
-        r#if: Vec<Syntax<'a>>,
-        r#else: Vec<Syntax<'a>>,
+        if_: Vec<Syntax<'a>>,
+        else_: Vec<Syntax<'a>>,
     },
     While {
         condition: Expr<'a>,
@@ -228,7 +228,7 @@ fn get_expr<'a, 'b>(
         Some(Lex { token: Tkn::Num(x), .. }) => Expr::Num(x),
         Some(Lex { token: Tkn::Str(x), .. }) => Expr::Str(x),
         Some(Lex { token: Tkn::Bool(x), .. }) => Expr::Bool(x),
-        Some(Lex { token: Tkn::Ident(x), .. }) => Expr::Ref(x),
+        Some(Lex { token: Tkn::Ident(x), .. }) => Expr::Ident(x),
         Some(Lex { token: Tkn::Fn, .. }) => get_fn(tokens),
         Some(Lex { token: Tkn::Null, .. }) => Expr::Null,
         Some(Lex { token: Tkn::Undef, .. }) => Expr::Undef,
@@ -322,13 +322,13 @@ fn get_expr<'a, 'b>(
             Some(Lex { token: Tkn::Ternary, .. }) if precedence == 0 => {
                 if let Some(Lex { token: Tkn::Ternary, .. }) = tokens.peek() {
                     eat!(tokens);
-                    let r#if: Expr = get_expr(tokens, 0);
+                    let if_: Expr = get_expr(tokens, 0);
                     eat_or_panic!(tokens, Tkn::Colon);
-                    let r#else: Expr = get_expr(tokens, 0);
+                    let else_: Expr = get_expr(tokens, 0);
                     expr = Expr::Ternary {
                         condition: Box::new(expr),
-                        r#if: Box::new(r#if),
-                        r#else: Box::new(r#else),
+                        if_: Box::new(if_),
+                        else_: Box::new(else_),
                     }
                 }
             }
@@ -355,7 +355,7 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Syntax<'a> {
             eat_or_panic!(tokens, Tkn::LParen);
             let condition: Expr = get_expr(tokens, 0);
             eat_or_panic!(tokens, Tkn::RParen);
-            let r#if: Vec<Syntax> = get_body(tokens);
+            let if_: Vec<Syntax> = get_body(tokens);
             if let Some(Lex { token: Tkn::Else, .. }) = tokens.peek() {
                 eat!(tokens);
                 match tokens.peek() {
@@ -363,8 +363,8 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Syntax<'a> {
                         return Syntax {
                             statement: Stmt::Cond {
                                 condition,
-                                r#if,
-                                r#else: vec![get_stmt(tokens)],
+                                if_,
+                                else_: vec![get_stmt(tokens)],
                             },
                             line: *line,
                         };
@@ -373,8 +373,8 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Syntax<'a> {
                         return Syntax {
                             statement: Stmt::Cond {
                                 condition,
-                                r#if,
-                                r#else: get_body(tokens),
+                                if_,
+                                else_: get_body(tokens),
                             },
                             line: *line,
                         };
@@ -383,7 +383,7 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Syntax<'a> {
                 }
             }
             Syntax {
-                statement: Stmt::Cond { condition, r#if, r#else: Vec::new() },
+                statement: Stmt::Cond { condition, if_, else_: Vec::new() },
                 line: *line,
             }
         }
@@ -426,7 +426,7 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Syntax<'a> {
                                 Some(Box::new(Syntax {
                                     statement: Stmt::Assign {
                                         op: x,
-                                        r#ref: a,
+                                        ident: a,
                                         expr: b,
                                     },
                                     line: *line,
@@ -544,7 +544,7 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Syntax<'a> {
                     let b: Expr = get_expr(tokens, 0);
                     eat_or_panic!(tokens, Tkn::Semicolon);
                     Syntax {
-                        statement: Stmt::Assign { op: x, r#ref: a, expr: b },
+                        statement: Stmt::Assign { op: x, ident: a, expr: b },
                         line: *line,
                     }
                 }
