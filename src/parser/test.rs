@@ -1694,3 +1694,14 @@ fn multiple_declares() {
         vec![Syntax { statement: Stmt::Decls(vec!["x", "y", "z"]), line: 0 }],
     )
 }
+
+#[test]
+#[should_panic]
+fn obj_duplicate_keys() {
+    let _: Vec<Syntax> = get_ast(&get_tokens(
+        "var x = {
+             a: 0,
+             a: true,
+         };",
+    ));
+}
