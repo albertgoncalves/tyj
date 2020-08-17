@@ -9,6 +9,12 @@ use std::slice::Iter;
 const ASSIGN_OPS: [&str; 5] = ["=", "+=", "-=", "*=", "/="];
 
 #[derive(Debug, PartialEq)]
+pub(crate) enum Error<'a> {
+    Token(Lex<'a>),
+    EOF,
+}
+
+#[derive(Debug, PartialEq)]
 pub(crate) struct Prop<'a> {
     pub(crate) key: &'a str,
     pub(crate) value: Expr<'a>,
@@ -114,38 +120,46 @@ pub(crate) struct Syntax<'a> {
 
 macro_rules! eat {
     ($tokens:expr $(,)?) => {{
-        let _: Option<&Lex> = $tokens.next();
+        if let Some(_) = $tokens.next() {
+            ()
+        } else {
+            return Err(Error::EOF);
+        }
     }};
 }
 
-macro_rules! eat_or_panic {
+macro_rules! eat_or_error {
     ($tokens:expr, $x:path $(,)?) => {
-        let token: Option<&Lex> = $tokens.next();
-        let _: () = if let Some(Lex { token: $x, .. }) = token {
-            ()
-        } else {
-            panic!(format!("{:?}", token))
+        match $tokens.next() {
+            Some(Lex { token: $x, .. }) => (),
+            Some(token) => return Err(Error::Token(*token)),
+            None => return Err(Error::EOF),
         };
     };
 }
 
-fn get_ident<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> &'a str {
-    let token: Option<&Lex> = tokens.next();
-    if let Some(Lex { token: Tkn::Ident(x), .. }) = token {
-        x
-    } else {
-        panic!(format!("{:?}", token))
+fn get_ident<'a, 'b>(
+    tokens: &mut Peekable<Iter<'b, Lex<'a>>>,
+) -> Result<&'a str, Error<'a>> {
+    match tokens.next() {
+        Some(Lex { token: Tkn::Ident(x), .. }) => Ok(x),
+        Some(token) => Err(Error::Token(*token)),
+        None => Err(Error::EOF),
     }
 }
 
-fn get_prop<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Prop<'a> {
-    let key: &str = get_ident(tokens);
-    eat_or_panic!(tokens, Tkn::Colon);
-    Prop { key, value: get_expr(tokens, 0) }
+fn get_prop<'a, 'b>(
+    tokens: &mut Peekable<Iter<'b, Lex<'a>>>,
+) -> Result<Prop<'a>, Error<'a>> {
+    let key: &str = get_ident(tokens)?;
+    eat_or_error!(tokens, Tkn::Colon);
+    Ok(Prop { key, value: get_expr(tokens, 0)? })
 }
 
-fn get_args<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Vec<&'a str> {
-    eat_or_panic!(tokens, Tkn::LParen);
+fn get_args<'a, 'b>(
+    tokens: &mut Peekable<Iter<'b, Lex<'a>>>,
+) -> Result<Vec<&'a str>, Error<'a>> {
+    eat_or_error!(tokens, Tkn::LParen);
     let mut args: Vec<&str> = Vec::new();
     while let Some(token) = tokens.next() {
         match token {
@@ -155,35 +169,38 @@ fn get_args<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Vec<&'a str> {
                 match token {
                     Some(Lex { token: Tkn::Comma, .. }) => (),
                     Some(Lex { token: Tkn::RParen, .. }) => break,
-                    _ => panic!(format!("{:?}", token)),
+                    Some(token) => return Err(Error::Token(*token)),
+                    None => return Err(Error::EOF),
                 }
             }
             Lex { token: Tkn::RParen, .. } => break,
-            _ => panic!(format!("{:?}", token)),
+            _ => return Err(Error::Token(*token)),
         }
     }
-    args
+    Ok(args)
 }
 
 fn get_body<'a, 'b>(
     tokens: &mut Peekable<Iter<'b, Lex<'a>>>,
-) -> Vec<Syntax<'a>> {
-    eat_or_panic!(tokens, Tkn::LBrace);
+) -> Result<Vec<Syntax<'a>>, Error<'a>> {
+    eat_or_error!(tokens, Tkn::LBrace);
     let mut body: Vec<Syntax> = Vec::new();
     while let Some(token) = tokens.peek() {
         if let Lex { token: Tkn::RBrace, .. } = token {
             eat!(tokens);
             break;
         } else {
-            body.push(get_stmt(tokens))
+            body.push(get_stmt(tokens)?)
         }
     }
-    body
+    Ok(body)
 }
 
-fn get_fn<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Expr<'a> {
-    let args: Vec<&str> = get_args(tokens);
-    Expr::Fn { args, body: get_body(tokens) }
+fn get_fn<'a, 'b>(
+    tokens: &mut Peekable<Iter<'b, Lex<'a>>>,
+) -> Result<Expr<'a>, Error<'a>> {
+    let args: Vec<&str> = get_args(tokens)?;
+    Ok(Expr::Fn { args, body: get_body(tokens)? })
 }
 
 fn is_assign_op(x: &str) -> bool {
@@ -198,195 +215,211 @@ fn is_assign_op(x: &str) -> bool {
 fn get_expr<'a, 'b>(
     tokens: &mut Peekable<Iter<'b, Lex<'a>>>,
     precedence: u8,
-) -> Expr<'a> {
-    let token: Option<&Lex> = tokens.next();
-    let mut expr: Expr = match token {
-        Some(Lex { token: Tkn::LParen, .. }) => {
-            let expr: Expr = get_expr(tokens, 0);
-            eat_or_panic!(tokens, Tkn::RParen);
-            expr
-        }
-        Some(Lex { token: Tkn::LBracket, .. }) => {
-            let mut exprs = Vec::new();
-            while let Some(token) = tokens.peek() {
-                match token {
-                    Lex { token: Tkn::Comma, .. } => eat!(tokens),
-                    Lex { token: Tkn::RBracket, .. } => break,
-                    _ => exprs.push(get_expr(tokens, 0)),
-                }
+) -> Result<Expr<'a>, Error<'a>> {
+    let mut expr: Expr = if let Some(token) = tokens.next() {
+        match token {
+            Lex { token: Tkn::LParen, .. } => {
+                let expr: Expr = get_expr(tokens, 0)?;
+                eat_or_error!(tokens, Tkn::RParen);
+                expr
             }
-            eat_or_panic!(tokens, Tkn::RBracket);
-            Expr::Array(exprs)
-        }
-        Some(Lex { token: Tkn::Op(x), .. }) if !is_assign_op(*x) => {
-            let power: u8 = match *x {
-                "new" => 25,
-                "-" | "~" | "!" | "++" | "--" => 21,
-                _ => panic!(format!("{:?}", token)),
-            };
-            Expr::Prefix { op: x, expr: Box::new(get_expr(tokens, power)) }
-        }
-        Some(Lex { token: Tkn::Num(x), .. }) => Expr::Num(x),
-        Some(Lex { token: Tkn::Str(x), .. }) => Expr::Str(x),
-        Some(Lex { token: Tkn::Bool(x), .. }) => Expr::Bool(x),
-        Some(Lex { token: Tkn::Ident(x), .. }) => Expr::Ident(x),
-        Some(Lex { token: Tkn::Fn, .. }) => get_fn(tokens),
-        Some(Lex { token: Tkn::Null, .. }) => Expr::Null,
-        Some(Lex { token: Tkn::Undef, .. }) => Expr::Undef,
-        Some(Lex { token: Tkn::LBrace, .. }) => {
-            let mut props: Vec<Prop> = Vec::new();
-            while let Some(token) = tokens.peek() {
-                match token {
-                    Lex { token: Tkn::Ident(_), .. } => {
-                        props.push(get_prop(tokens));
-                        let token: Option<&Lex> = tokens.next();
-                        match token {
-                            Some(Lex { token: Tkn::Comma, .. }) => (),
-                            Some(Lex { token: Tkn::RBrace, .. }) => break,
-                            _ => panic!(format!("{:?}", token)),
-                        }
-                    }
-                    Lex { token: Tkn::RBrace, .. } => {
-                        eat!(tokens);
-                        break;
-                    }
-                    _ => panic!(format!("{:?}", token)),
-                }
-            }
-            let mut keys: BTreeSet<&str> = BTreeSet::new();
-            for Prop { key, .. } in &props {
-                if !keys.insert(key) {
-                    panic!(format!("{:?}", token));
-                }
-            }
-            Expr::Obj(props)
-        }
-        _ => panic!(format!("{:?}", token)),
-    };
-    loop {
-        match tokens.peek() {
-            Some(Lex { token: Tkn::Op(x), .. }) if !is_assign_op(*x) => {
-                let power: Option<u8> = match *x {
-                    "++" | "--" => Some(23),
-                    _ => None,
-                };
-                if let Some(power) = power {
-                    if power < precedence {
-                        break;
-                    }
-                    eat!(tokens);
-                    expr = Expr::Postfix { op: x, expr: Box::new(expr) };
-                } else {
-                    let (l_power, r_power): (u8, u8) = match *x {
-                        "." => (25, 26),
-                        "*" | "/" | "%" => (19, 20),
-                        "+" | "-" => (17, 18),
-                        "<<" | ">>" | ">>>" => (15, 16),
-                        "<" | ">" | "<=" | ">=" => (13, 14),
-                        "===" | "!==" => (11, 12),
-                        "&" => (9, 10),
-                        "^" => (7, 8),
-                        "|" => (5, 6),
-                        "&&" => (3, 4),
-                        "||" => (1, 2),
-                        _ => panic!(format!("{:?}", token)),
-                    };
-                    if l_power < precedence {
-                        break;
-                    }
-                    eat!(tokens);
-                    expr = Expr::Infix {
-                        op: x,
-                        left: Box::new(expr),
-                        right: Box::new(get_expr(tokens, r_power)),
-                    };
-                }
-            }
-            Some(Lex { token: Tkn::LParen, .. }) if precedence < 26 => {
-                eat!(tokens);
-                let mut args: Vec<Expr> = Vec::new();
+            Lex { token: Tkn::LBracket, .. } => {
+                let mut exprs = Vec::new();
                 while let Some(token) = tokens.peek() {
                     match token {
                         Lex { token: Tkn::Comma, .. } => eat!(tokens),
-                        Lex { token: Tkn::RParen, .. } => {
+                        Lex { token: Tkn::RBracket, .. } => break,
+                        _ => exprs.push(get_expr(tokens, 0)?),
+                    }
+                }
+                eat_or_error!(tokens, Tkn::RBracket);
+                Expr::Array(exprs)
+            }
+            Lex { token: Tkn::Op(x), .. } if !is_assign_op(*x) => {
+                let power: u8 = match *x {
+                    "new" => 25,
+                    "-" | "~" | "!" | "++" | "--" => 21,
+                    _ => return Err(Error::Token(*token)),
+                };
+                Expr::Prefix {
+                    op: x,
+                    expr: Box::new(get_expr(tokens, power)?),
+                }
+            }
+            Lex { token: Tkn::Num(x), .. } => Expr::Num(x),
+            Lex { token: Tkn::Str(x), .. } => Expr::Str(x),
+            Lex { token: Tkn::Bool(x), .. } => Expr::Bool(x),
+            Lex { token: Tkn::Ident(x), .. } => Expr::Ident(x),
+            Lex { token: Tkn::Fn, .. } => get_fn(tokens)?,
+            Lex { token: Tkn::Null, .. } => Expr::Null,
+            Lex { token: Tkn::Undef, .. } => Expr::Undef,
+            Lex { token: Tkn::LBrace, .. } => {
+                let mut props: Vec<Prop> = Vec::new();
+                while let Some(token) = tokens.peek() {
+                    match token {
+                        Lex { token: Tkn::Ident(_), .. } => {
+                            props.push(get_prop(tokens)?);
+                            match tokens.next() {
+                                Some(Lex { token: Tkn::Comma, .. }) => (),
+                                Some(Lex { token: Tkn::RBrace, .. }) => break,
+                                Some(token) => {
+                                    return Err(Error::Token(*token))
+                                }
+                                None => return Err(Error::EOF),
+                            }
+                        }
+                        Lex { token: Tkn::RBrace, .. } => {
                             eat!(tokens);
                             break;
                         }
-                        _ => args.push(get_expr(tokens, 0)),
+                        token => return Err(Error::Token(**token)),
                     }
                 }
-                expr = Expr::Call { expr: Box::new(expr), args };
+                let mut keys: BTreeSet<&str> = BTreeSet::new();
+                for Prop { key, .. } in &props {
+                    if !keys.insert(key) {
+                        return Err(Error::Token(*token));
+                    }
+                }
+                Expr::Obj(props)
             }
-            Some(Lex { token: Tkn::LBracket, .. }) if precedence < 26 => {
-                eat!(tokens);
-                let index: Expr = get_expr(tokens, 0);
-                eat_or_panic!(tokens, Tkn::RBracket);
-                expr = Expr::Access {
-                    expr: Box::new(expr),
-                    index: Box::new(index),
-                };
-            }
-            Some(Lex { token: Tkn::Ternary, .. }) if precedence == 0 => {
-                if let Some(Lex { token: Tkn::Ternary, .. }) = tokens.peek() {
+            token => return Err(Error::Token(*token)),
+        }
+    } else {
+        return Err(Error::EOF);
+    };
+    loop {
+        if let Some(token) = tokens.peek() {
+            match token {
+                Lex { token: Tkn::Op(x), .. } if !is_assign_op(*x) => {
+                    let power: Option<u8> = match *x {
+                        "++" | "--" => Some(23),
+                        _ => None,
+                    };
+                    if let Some(power) = power {
+                        if power < precedence {
+                            break;
+                        }
+                        eat!(tokens);
+                        expr = Expr::Postfix { op: x, expr: Box::new(expr) };
+                    } else {
+                        let (l_power, r_power): (u8, u8) = match *x {
+                            "." => (25, 26),
+                            "*" | "/" | "%" => (19, 20),
+                            "+" | "-" => (17, 18),
+                            "<<" | ">>" | ">>>" => (15, 16),
+                            "<" | ">" | "<=" | ">=" => (13, 14),
+                            "===" | "!==" => (11, 12),
+                            "&" => (9, 10),
+                            "^" => (7, 8),
+                            "|" => (5, 6),
+                            "&&" => (3, 4),
+                            "||" => (1, 2),
+                            _ => return Err(Error::Token(**token)),
+                        };
+                        if l_power < precedence {
+                            break;
+                        }
+                        eat!(tokens);
+                        expr = Expr::Infix {
+                            op: x,
+                            left: Box::new(expr),
+                            right: Box::new(get_expr(tokens, r_power)?),
+                        };
+                    }
+                }
+                Lex { token: Tkn::LParen, .. } if precedence < 26 => {
                     eat!(tokens);
-                    let if_: Expr = get_expr(tokens, 0);
-                    eat_or_panic!(tokens, Tkn::Colon);
-                    let else_: Expr = get_expr(tokens, 0);
-                    expr = Expr::Ternary {
-                        condition: Box::new(expr),
-                        if_: Box::new(if_),
-                        else_: Box::new(else_),
+                    let mut args: Vec<Expr> = Vec::new();
+                    while let Some(token) = tokens.peek() {
+                        match token {
+                            Lex { token: Tkn::Comma, .. } => eat!(tokens),
+                            Lex { token: Tkn::RParen, .. } => {
+                                eat!(tokens);
+                                break;
+                            }
+                            _ => args.push(get_expr(tokens, 0)?),
+                        }
+                    }
+                    expr = Expr::Call { expr: Box::new(expr), args };
+                }
+                Lex { token: Tkn::LBracket, .. } if precedence < 26 => {
+                    eat!(tokens);
+                    let index: Expr = get_expr(tokens, 0)?;
+                    eat_or_error!(tokens, Tkn::RBracket);
+                    expr = Expr::Access {
+                        expr: Box::new(expr),
+                        index: Box::new(index),
+                    };
+                }
+                Lex { token: Tkn::Ternary, .. } if precedence == 0 => {
+                    if let Some(Lex { token: Tkn::Ternary, .. }) =
+                        tokens.peek()
+                    {
+                        eat!(tokens);
+                        let if_: Expr = get_expr(tokens, 0)?;
+                        eat_or_error!(tokens, Tkn::Colon);
+                        let else_: Expr = get_expr(tokens, 0)?;
+                        expr = Expr::Ternary {
+                            condition: Box::new(expr),
+                            if_: Box::new(if_),
+                            else_: Box::new(else_),
+                        }
                     }
                 }
+                _ => break,
             }
-            _ => break,
+        } else {
+            return Err(Error::EOF);
         }
     }
-    expr
+    Ok(expr)
 }
 
-fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Syntax<'a> {
-    let token: Option<&&Lex> = tokens.peek();
-    match token {
+fn get_stmt<'a, 'b>(
+    tokens: &mut Peekable<Iter<'b, Lex<'a>>>,
+) -> Result<Syntax<'a>, Error<'a>> {
+    Ok(match tokens.peek() {
         Some(Lex { token: Tkn::Fn, line }) => {
             eat!(tokens);
-            let ident: &str = get_ident(tokens);
-            let args: Vec<&str> = get_args(tokens);
+            let ident: &str = get_ident(tokens)?;
+            let args: Vec<&str> = get_args(tokens)?;
             Syntax {
-                statement: Stmt::Fn { ident, args, body: get_body(tokens) },
+                statement: Stmt::Fn { ident, args, body: get_body(tokens)? },
                 line: *line,
             }
         }
         Some(Lex { token: Tkn::If, line }) => {
             eat!(tokens);
-            eat_or_panic!(tokens, Tkn::LParen);
-            let condition: Expr = get_expr(tokens, 0);
-            eat_or_panic!(tokens, Tkn::RParen);
-            let if_: Vec<Syntax> = get_body(tokens);
+            eat_or_error!(tokens, Tkn::LParen);
+            let condition: Expr = get_expr(tokens, 0)?;
+            eat_or_error!(tokens, Tkn::RParen);
+            let if_: Vec<Syntax> = get_body(tokens)?;
             if let Some(Lex { token: Tkn::Else, .. }) = tokens.peek() {
                 eat!(tokens);
                 match tokens.peek() {
                     Some(Lex { token: Tkn::If, .. }) => {
-                        return Syntax {
+                        return Ok(Syntax {
                             statement: Stmt::Cond {
                                 condition,
                                 if_,
-                                else_: vec![get_stmt(tokens)],
+                                else_: vec![get_stmt(tokens)?],
                             },
                             line: *line,
-                        };
+                        });
                     }
                     Some(Lex { token: Tkn::LBrace, .. }) => {
-                        return Syntax {
+                        return Ok(Syntax {
                             statement: Stmt::Cond {
                                 condition,
                                 if_,
-                                else_: get_body(tokens),
+                                else_: get_body(tokens)?,
                             },
                             line: *line,
-                        };
+                        });
                     }
-                    _ => panic!(format!("{:?}", tokens.peek())),
+                    Some(token) => return Err(Error::Token(**token)),
+                    None => return Err(Error::EOF),
                 }
             }
             Syntax {
@@ -396,40 +429,39 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Syntax<'a> {
         }
         Some(Lex { token: Tkn::While, line }) => {
             eat!(tokens);
-            eat_or_panic!(tokens, Tkn::LParen);
-            let condition: Expr = get_expr(tokens, 0);
-            eat_or_panic!(tokens, Tkn::RParen);
-            let body: Vec<Syntax> = get_body(tokens);
+            eat_or_error!(tokens, Tkn::LParen);
+            let condition: Expr = get_expr(tokens, 0)?;
+            eat_or_error!(tokens, Tkn::RParen);
+            let body: Vec<Syntax> = get_body(tokens)?;
             Syntax { statement: Stmt::While { condition, body }, line: *line }
         }
         Some(Lex { token: Tkn::For, line }) => {
             eat!(tokens);
-            eat_or_panic!(tokens, Tkn::LParen);
+            eat_or_error!(tokens, Tkn::LParen);
             let init: Option<Box<Syntax>> = match tokens.peek() {
                 Some(Lex { token: Tkn::Semicolon, .. }) => {
                     eat!(tokens);
                     None
                 }
-                _ => Some(Box::new(get_stmt(tokens))),
+                _ => Some(Box::new(get_stmt(tokens)?)),
             };
             let condition: Option<Expr> = match tokens.peek() {
                 Some(Lex { token: Tkn::Semicolon, .. }) => None,
-                _ => Some(get_expr(tokens, 0)),
+                _ => Some(get_expr(tokens, 0)?),
             };
-            eat_or_panic!(tokens, Tkn::Semicolon);
+            eat_or_error!(tokens, Tkn::Semicolon);
             let update: Option<Box<Syntax>> = {
-                let token: Option<&&Lex> = tokens.peek();
-                match token {
+                match tokens.peek() {
                     Some(Lex { token: Tkn::RParen, .. }) => None,
                     Some(Lex { line, .. }) => {
-                        let a: Expr = get_expr(tokens, 0);
+                        let a: Expr = get_expr(tokens, 0)?;
                         let token: Option<&&Lex> = tokens.peek();
                         match token {
                             Some(Lex { token: Tkn::Op(x), .. })
                                 if is_assign_op(*x) =>
                             {
                                 eat!(tokens);
-                                let b: Expr = get_expr(tokens, 0);
+                                let b: Expr = get_expr(tokens, 0)?;
                                 Some(Box::new(Syntax {
                                     statement: Stmt::Assign {
                                         op: x,
@@ -445,14 +477,15 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Syntax<'a> {
                                     line: *line,
                                 }))
                             }
-                            _ => panic!(format!("{:?}", token)),
+                            Some(token) => return Err(Error::Token(**token)),
+                            None => return Err(Error::EOF),
                         }
                     }
-                    _ => panic!(format!("{:?}", token)),
+                    None => return Err(Error::EOF),
                 }
             };
-            eat_or_panic!(tokens, Tkn::RParen);
-            let body: Vec<Syntax> = get_body(tokens);
+            eat_or_error!(tokens, Tkn::RParen);
+            let body: Vec<Syntax> = get_body(tokens)?;
             Syntax {
                 statement: Stmt::For { init, condition, update, body },
                 line: *line,
@@ -460,26 +493,26 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Syntax<'a> {
         }
         Some(Lex { token: Tkn::Switch, line }) => {
             eat!(tokens);
-            eat_or_panic!(tokens, Tkn::LParen);
-            let expr: Expr = get_expr(tokens, 0);
-            eat_or_panic!(tokens, Tkn::RParen);
-            eat_or_panic!(tokens, Tkn::LBrace);
+            eat_or_error!(tokens, Tkn::LParen);
+            let expr: Expr = get_expr(tokens, 0)?;
+            eat_or_error!(tokens, Tkn::RParen);
+            eat_or_error!(tokens, Tkn::LBrace);
             let mut cases: Vec<Case> = Vec::new();
             while let Some(Lex { token: Tkn::Case, .. }) = tokens.peek() {
                 eat!(tokens);
-                let expr: Expr = get_expr(tokens, 0);
-                eat_or_panic!(tokens, Tkn::Colon);
-                cases.push(Case { expr, body: get_body(tokens) });
+                let expr: Expr = get_expr(tokens, 0)?;
+                eat_or_error!(tokens, Tkn::Colon);
+                cases.push(Case { expr, body: get_body(tokens)? });
             }
             let default: Vec<Syntax> =
                 if let Some(Lex { token: Tkn::Default, .. }) = tokens.peek() {
                     eat!(tokens);
-                    eat_or_panic!(tokens, Tkn::Colon);
-                    get_body(tokens)
+                    eat_or_error!(tokens, Tkn::Colon);
+                    get_body(tokens)?
                 } else {
                     Vec::new()
                 };
-            eat_or_panic!(tokens, Tkn::RBrace);
+            eat_or_error!(tokens, Tkn::RBrace);
             Syntax {
                 statement: Stmt::Switch { expr, cases, default },
                 line: *line,
@@ -487,19 +520,18 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Syntax<'a> {
         }
         Some(Lex { token: Tkn::Var, line }) => {
             eat!(tokens);
-            let ident: &str = get_ident(tokens);
-            let token: Option<&Lex> = tokens.next();
-            match token {
+            let ident: &str = get_ident(tokens)?;
+            match tokens.next() {
                 Some(Lex { token: Tkn::Comma, .. }) => {
                     let mut idents: Vec<&str> = vec![ident];
                     while let Some(token) = tokens.peek() {
                         match token {
                             Lex { token: Tkn::Comma, .. } => eat!(tokens),
                             Lex { token: Tkn::Semicolon, .. } => break,
-                            _ => idents.push(get_ident(tokens)),
+                            _ => idents.push(get_ident(tokens)?),
                         }
                     }
-                    eat_or_panic!(tokens, Tkn::Semicolon);
+                    eat_or_error!(tokens, Tkn::Semicolon);
                     Syntax { statement: Stmt::Decls(idents), line: *line }
                 }
                 Some(Lex { token: Tkn::Semicolon, .. }) => Syntax {
@@ -510,14 +542,15 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Syntax<'a> {
                     let var: Syntax = Syntax {
                         statement: Stmt::Decl {
                             ident,
-                            expr: get_expr(tokens, 0),
+                            expr: get_expr(tokens, 0)?,
                         },
                         line: *line,
                     };
-                    eat_or_panic!(tokens, Tkn::Semicolon);
+                    eat_or_error!(tokens, Tkn::Semicolon);
                     var
                 }
-                _ => panic!(format!("{:?}", token)),
+                Some(token) => return Err(Error::Token(*token)),
+                None => return Err(Error::EOF),
             }
         }
         Some(Lex { token: Tkn::Ret, line }) => {
@@ -528,8 +561,8 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Syntax<'a> {
                     eat!(tokens);
                     Expr::Undef
                 } else {
-                    let expr: Expr = get_expr(tokens, 0);
-                    eat_or_panic!(tokens, Tkn::Semicolon);
+                    let expr: Expr = get_expr(tokens, 0)?;
+                    eat_or_error!(tokens, Tkn::Semicolon);
                     expr
                 }
             };
@@ -537,19 +570,19 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Syntax<'a> {
         }
         Some(Lex { token: Tkn::Break, line }) => {
             eat!(tokens);
-            eat_or_panic!(tokens, Tkn::Semicolon);
+            eat_or_error!(tokens, Tkn::Semicolon);
             Syntax { statement: Stmt::Break, line: *line }
         }
         Some(Lex { token: Tkn::LBrace, line }) => {
-            Syntax { statement: Stmt::Scope(get_body(tokens)), line: *line }
+            Syntax { statement: Stmt::Scope(get_body(tokens)?), line: *line }
         }
         Some(Lex { line, .. }) => {
-            let a: Expr = get_expr(tokens, 0);
+            let a: Expr = get_expr(tokens, 0)?;
             let token: Option<&Lex> = tokens.next();
             match token {
                 Some(Lex { token: Tkn::Op(x), .. }) if is_assign_op(*x) => {
-                    let b: Expr = get_expr(tokens, 0);
-                    eat_or_panic!(tokens, Tkn::Semicolon);
+                    let b: Expr = get_expr(tokens, 0)?;
+                    eat_or_error!(tokens, Tkn::Semicolon);
                     Syntax {
                         statement: Stmt::Assign { op: x, ident: a, expr: b },
                         line: *line,
@@ -558,14 +591,17 @@ fn get_stmt<'a, 'b>(tokens: &mut Peekable<Iter<'b, Lex<'a>>>) -> Syntax<'a> {
                 Some(Lex { token: Tkn::Semicolon, .. }) => {
                     Syntax { statement: Stmt::Effect(a), line: *line }
                 }
-                _ => panic!(format!("{:?}", token)),
+                Some(token) => return Err(Error::Token(*token)),
+                None => return Err(Error::EOF),
             }
         }
-        _ => panic!(format!("{:?}", token)),
-    }
+        None => return Err(Error::EOF),
+    })
 }
 
-pub(crate) fn get_ast<'a>(tokens: &[Lex<'a>]) -> Vec<Syntax<'a>> {
+pub(crate) fn get_ast<'a>(
+    tokens: &[Lex<'a>],
+) -> Result<Vec<Syntax<'a>>, Error<'a>> {
     let mut ast_tokens: Vec<Lex> = Vec::new();
     let mut comments: Vec<&str> = Vec::new();
     for token in tokens {
@@ -578,7 +614,7 @@ pub(crate) fn get_ast<'a>(tokens: &[Lex<'a>]) -> Vec<Syntax<'a>> {
     let mut ast: Vec<Syntax> = Vec::new();
     let mut ast_tokens: Peekable<Iter<Lex>> = ast_tokens.iter().peekable();
     while let Some(_) = ast_tokens.peek() {
-        ast.push(get_stmt(&mut ast_tokens));
+        ast.push(get_stmt(&mut ast_tokens)?);
     }
-    ast
+    Ok(ast)
 }

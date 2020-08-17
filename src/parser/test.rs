@@ -1,15 +1,21 @@
-use super::{get_ast, Case, Expr, Prop, Stmt, Syntax};
-use crate::tokenizer::get_tokens;
+use super::{get_ast, Case, Error, Expr, Prop, Stmt, Syntax};
+use crate::tokenizer::{get_tokens, Lex, Tkn};
 
-macro_rules! assert_ast {
+macro_rules! assert_ast_ok {
     ($a:expr, $b:expr $(,)?) => {
-        assert_eq!(get_ast(&get_tokens($a)), $b)
+        assert_eq!(get_ast(&get_tokens($a)), Ok($b))
+    };
+}
+
+macro_rules! assert_ast_err {
+    ($a:expr, $b:expr $(,)?) => {
+        assert_eq!(get_ast(&get_tokens($a)), Err($b))
     };
 }
 
 #[test]
 fn declare_number() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x = .1;",
         vec![Syntax {
             statement: Stmt::Decl { ident: "x", expr: Expr::Num(".1") },
@@ -20,7 +26,7 @@ fn declare_number() {
 
 #[test]
 fn declare_string() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x = \"blah blah\";",
         vec![Syntax {
             statement: Stmt::Decl { ident: "x", expr: Expr::Str("blah blah") },
@@ -31,7 +37,7 @@ fn declare_string() {
 
 #[test]
 fn declare_bool() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x = true;",
         vec![Syntax {
             statement: Stmt::Decl { ident: "x", expr: Expr::Bool("true") },
@@ -42,7 +48,7 @@ fn declare_bool() {
 
 #[test]
 fn declare_null() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x = null;",
         vec![Syntax {
             statement: Stmt::Decl { ident: "x", expr: Expr::Null },
@@ -53,7 +59,7 @@ fn declare_null() {
 
 #[test]
 fn declare_undefined() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x = undefined;",
         vec![Syntax {
             statement: Stmt::Decl { ident: "x", expr: Expr::Undef },
@@ -64,7 +70,7 @@ fn declare_undefined() {
 
 #[test]
 fn declare_object() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x = { a: null, bc: undefined };",
         vec![Syntax {
             statement: Stmt::Decl {
@@ -81,7 +87,7 @@ fn declare_object() {
 
 #[test]
 fn declare_empty_object() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x = {};",
         vec![Syntax {
             statement: Stmt::Decl { ident: "x", expr: Expr::Obj(Vec::new()) },
@@ -92,7 +98,7 @@ fn declare_empty_object() {
 
 #[test]
 fn declare_object_trailing_comma() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x = {
              a: null,
              bc: undefined,
@@ -111,15 +117,16 @@ fn declare_object_trailing_comma() {
 }
 
 #[test]
-#[should_panic]
 fn declare_object_missing_comma() {
-    let _: Vec<Syntax> =
-        get_ast(&get_tokens("var x = { a: null bc: undefined };"));
+    assert_ast_err!(
+        "var x = { a: null bc: undefined };",
+        Error::Token(Lex { token: Tkn::Ident("bc"), line: 0 }),
+    )
 }
 
 #[test]
 fn declare_assign() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x;
          x = null;",
         vec![
@@ -141,7 +148,7 @@ fn declare_assign() {
 
 #[test]
 fn mixed_declares() {
-    assert_ast!(
+    assert_ast_ok!(
         "var a = 1.;
          var b = \"blah\";
          var c = false;
@@ -190,7 +197,7 @@ fn mixed_declares() {
 
 #[test]
 fn return_nothing() {
-    assert_ast!(
+    assert_ast_ok!(
         "return;",
         vec![Syntax { statement: Stmt::Ret(Expr::Undef), line: 0 }],
     )
@@ -198,7 +205,7 @@ fn return_nothing() {
 
 #[test]
 fn return_object() {
-    assert_ast!(
+    assert_ast_ok!(
         "return {
              ab: null,
              cd: undefined
@@ -215,7 +222,7 @@ fn return_object() {
 
 #[test]
 fn return_empty_object() {
-    assert_ast!(
+    assert_ast_ok!(
         "return {};",
         vec![Syntax { statement: Stmt::Ret(Expr::Obj(Vec::new())), line: 0 }],
     )
@@ -223,7 +230,7 @@ fn return_empty_object() {
 
 #[test]
 fn function_nothing() {
-    assert_ast!(
+    assert_ast_ok!(
         "function f() {}",
         vec![Syntax {
             statement: Stmt::Fn {
@@ -238,7 +245,7 @@ fn function_nothing() {
 
 #[test]
 fn function_return_nothing() {
-    assert_ast!(
+    assert_ast_ok!(
         "function f(x, y) {
              return;
          }",
@@ -258,7 +265,7 @@ fn function_return_nothing() {
 
 #[test]
 fn function_multiple_lines() {
-    assert_ast!(
+    assert_ast_ok!(
         "function f(a, b, c) {
              var d = {
                  a: a,
@@ -293,7 +300,7 @@ fn function_multiple_lines() {
 
 #[test]
 fn object_fields() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x = {
              a: {
                  b: 0,
@@ -332,7 +339,7 @@ fn object_fields() {
 
 #[test]
 fn declare_anonymous_function() {
-    assert_ast!(
+    assert_ast_ok!(
         "var f = function(x) {
              return x + 0.1;
          };",
@@ -358,7 +365,7 @@ fn declare_anonymous_function() {
 
 #[test]
 fn tiny_program() {
-    assert_ast!(
+    assert_ast_ok!(
         "window.onload = function() {
              var a = 0.1;
              var b = 10;
@@ -407,7 +414,7 @@ fn tiny_program() {
 
 #[test]
 fn prefix_operators() {
-    assert_ast!(
+    assert_ast_ok!(
         "var a = !true;
          var b = -1.0;",
         vec![
@@ -437,7 +444,7 @@ fn prefix_operators() {
 
 #[test]
 fn nested_expression() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x = (a + b) + ((c + d) + e);",
         vec![Syntax {
             statement: Stmt::Decl {
@@ -467,7 +474,7 @@ fn nested_expression() {
 
 #[test]
 fn increment() {
-    assert_ast!(
+    assert_ast_ok!(
         "a++;
          ++b;",
         vec![
@@ -491,7 +498,7 @@ fn increment() {
 
 #[test]
 fn decrement() {
-    assert_ast!(
+    assert_ast_ok!(
         "a--;
          --b;",
         vec![
@@ -515,7 +522,7 @@ fn decrement() {
 
 #[test]
 fn if_() {
-    assert_ast!(
+    assert_ast_ok!(
         "if (true) {
              return 0;
          }",
@@ -535,7 +542,7 @@ fn if_() {
 
 #[test]
 fn if_else() {
-    assert_ast!(
+    assert_ast_ok!(
         "var a;
          if (true) {
              a = 0;
@@ -575,7 +582,7 @@ fn if_else() {
 
 #[test]
 fn function_calls() {
-    assert_ast!(
+    assert_ast_ok!(
         "f(a)(b);",
         vec![Syntax {
             statement: Stmt::Effect(Expr::Call {
@@ -592,7 +599,7 @@ fn function_calls() {
 
 #[test]
 fn function_calls_more_parens() {
-    assert_ast!(
+    assert_ast_ok!(
         "((f(a))(b));",
         vec![Syntax {
             statement: Stmt::Effect(Expr::Call {
@@ -609,7 +616,7 @@ fn function_calls_more_parens() {
 
 #[test]
 fn function_calls_nested() {
-    assert_ast!(
+    assert_ast_ok!(
         "f(a(x)(y))(b);",
         vec![Syntax {
             statement: Stmt::Effect(Expr::Call {
@@ -632,7 +639,7 @@ fn function_calls_nested() {
 
 #[test]
 fn small_function() {
-    assert_ast!(
+    assert_ast_ok!(
         "// ...
          function f(a, b, c) {
              var d = {
@@ -675,7 +682,7 @@ fn small_function() {
 
 #[test]
 fn operator_precedence() {
-    assert_ast!(
+    assert_ast_ok!(
         "/* ...
           */
          var x = {
@@ -785,7 +792,7 @@ fn operator_precedence() {
 
 #[test]
 fn return_function() {
-    assert_ast!(
+    assert_ast_ok!(
         "function f(a, b) {
              return function(c) {
                  return {
@@ -821,7 +828,7 @@ fn return_function() {
 
 #[test]
 fn parse_if_else_chain() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x = 0;
          var y;
          if (x === 0) {
@@ -893,7 +900,7 @@ fn parse_if_else_chain() {
 
 #[test]
 fn switch_simple() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x = true;
          switch (x) {
          case true: {
@@ -980,7 +987,7 @@ fn switch_simple() {
 
 #[test]
 fn switch() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x = 0;
          var y;
          var a = 0;
@@ -1077,7 +1084,7 @@ fn switch() {
 
 #[test]
 fn console_log() {
-    assert_ast!(
+    assert_ast_ok!(
         "console.log(\"Hello, world!\");",
         vec![Syntax {
             statement: Stmt::Effect(Expr::Call {
@@ -1095,7 +1102,7 @@ fn console_log() {
 
 #[test]
 fn scopes() {
-    assert_ast!(
+    assert_ast_ok!(
         "{
              {
                  var x = null;
@@ -1116,7 +1123,7 @@ fn scopes() {
 
 #[test]
 fn ternary_operator() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x = y === 0 ? 0 : 1;",
         vec![Syntax {
             statement: Stmt::Decl {
@@ -1138,7 +1145,7 @@ fn ternary_operator() {
 
 #[test]
 fn modulo_operator() {
-    assert_ast!(
+    assert_ast_ok!(
         "10 % 9;",
         vec![Syntax {
             statement: Stmt::Effect(Expr::Infix {
@@ -1153,7 +1160,7 @@ fn modulo_operator() {
 
 #[test]
 fn boolean_operators() {
-    assert_ast!(
+    assert_ast_ok!(
         "10 % 9 === 1 || true && false;",
         vec![Syntax {
             statement: Stmt::Effect(Expr::Infix {
@@ -1180,7 +1187,7 @@ fn boolean_operators() {
 
 #[test]
 fn negate_call() {
-    assert_ast!(
+    assert_ast_ok!(
         "!f();",
         vec![Syntax {
             statement: Stmt::Effect(Expr::Prefix {
@@ -1197,7 +1204,7 @@ fn negate_call() {
 
 #[test]
 fn new() {
-    assert_ast!(
+    assert_ast_ok!(
         "new Uint8Array(buffer, 0, 13);",
         vec![Syntax {
             statement: Stmt::Effect(Expr::Prefix {
@@ -1218,7 +1225,7 @@ fn new() {
 
 #[test]
 fn add_nested_functions() {
-    assert_ast!(
+    assert_ast_ok!(
         "f(g()) + g(f());",
         vec![Syntax {
             statement: Stmt::Effect(Expr::Infix {
@@ -1245,7 +1252,7 @@ fn add_nested_functions() {
 
 #[test]
 fn call_method_chain() {
-    assert_ast!(
+    assert_ast_ok!(
         "f().x().y(g().z);",
         vec![Syntax {
             statement: Stmt::Effect(Expr::Call {
@@ -1280,7 +1287,7 @@ fn call_method_chain() {
 
 #[test]
 fn promise() {
-    assert_ast!(
+    assert_ast_ok!(
         "window.onload = function() {
              module.init(fetch(\"./source\")).then(function(object) {});
          };",
@@ -1327,7 +1334,7 @@ fn promise() {
 
 #[test]
 fn brackets() {
-    assert_ast!(
+    assert_ast_ok!(
         "array[0].x = null;",
         vec![Syntax {
             statement: Stmt::Assign {
@@ -1349,7 +1356,7 @@ fn brackets() {
 
 #[test]
 fn bit_operators() {
-    assert_ast!(
+    assert_ast_ok!(
         "~0;
          1 & 1;
          2 | 2;
@@ -1419,7 +1426,7 @@ fn bit_operators() {
 
 #[test]
 fn update_assign() {
-    assert_ast!(
+    assert_ast_ok!(
         "a += 1;
          b -= 1;
          c *= 2;
@@ -1463,7 +1470,7 @@ fn update_assign() {
 
 #[test]
 fn r#while() {
-    assert_ast!(
+    assert_ast_ok!(
         "var i = 0;
          while (i < 10) {
              console.log(i++);
@@ -1503,7 +1510,7 @@ fn r#while() {
 
 #[test]
 fn r#for() {
-    assert_ast!(
+    assert_ast_ok!(
         "for (var i = 0; i < 10; ++i) {
              console.log(i);
          }",
@@ -1544,7 +1551,7 @@ fn r#for() {
 
 #[test]
 fn for_empty() {
-    assert_ast!(
+    assert_ast_ok!(
         "for (;;) {
              console.log(i);
          }",
@@ -1572,7 +1579,7 @@ fn for_empty() {
 
 #[test]
 fn for_update() {
-    assert_ast!(
+    assert_ast_ok!(
         "var i;
          for (i = 0; i < 10; i += 2) {
              console.log(i);
@@ -1625,7 +1632,7 @@ fn for_update() {
 
 #[test]
 fn array_literal_empty() {
-    assert_ast!(
+    assert_ast_ok!(
         "[];",
         vec![Syntax {
             statement: Stmt::Effect(Expr::Array(Vec::new())),
@@ -1636,7 +1643,7 @@ fn array_literal_empty() {
 
 #[test]
 fn array_literal() {
-    assert_ast!(
+    assert_ast_ok!(
         "[1, 2, 3];",
         vec![Syntax {
             statement: Stmt::Effect(Expr::Array(vec![
@@ -1651,7 +1658,7 @@ fn array_literal() {
 
 #[test]
 fn scoped_array_access() {
-    assert_ast!(
+    assert_ast_ok!(
         "// ...
          {
              x[2] = 1;
@@ -1689,19 +1696,19 @@ fn scoped_array_access() {
 
 #[test]
 fn multiple_declares() {
-    assert_ast!(
+    assert_ast_ok!(
         "var x, y, z;",
         vec![Syntax { statement: Stmt::Decls(vec!["x", "y", "z"]), line: 0 }],
     )
 }
 
 #[test]
-#[should_panic]
 fn obj_duplicate_keys() {
-    let _: Vec<Syntax> = get_ast(&get_tokens(
+    assert_ast_err!(
         "var x = {
              a: 0,
              a: true,
          };",
-    ));
+        Error::Token(Lex { token: Tkn::LBrace, line: 0 }),
+    )
 }
