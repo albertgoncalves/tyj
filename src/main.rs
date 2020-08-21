@@ -20,7 +20,7 @@ macro_rules! PARSE_ERROR {
 macro_rules! EXIT {
     () => {
         exit(1)
-    }
+    };
 }
 
 fn main() {
