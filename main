@@ -29,7 +29,6 @@ export FLAGS=(
 export RUST_BACKTRACE=1
 
 rustfmt --verbose "$WD/src/main.rs"
-
 set +u
 
 if [ -z "$1" ]; then
@@ -37,5 +36,5 @@ if [ -z "$1" ]; then
     "$WD/bin/test"
 else
     rustc -o "$WD/bin/main" "${FLAGS[@]}" "$WD/src/main.rs"
-    "$WD/bin/main" < "$1" 2>&1 | less
+    "$WD/bin/main" "$1"
 fi
