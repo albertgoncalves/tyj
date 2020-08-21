@@ -165,8 +165,7 @@ fn get_args<'a, 'b>(
         match token {
             Lex { token: Tkn::Ident(x), .. } => {
                 args.push(x);
-                let token: Option<&Lex> = tokens.next();
-                match token {
+                match tokens.next() {
                     Some(Lex { token: Tkn::Comma, .. }) => (),
                     Some(Lex { token: Tkn::RParen, .. }) => break,
                     Some(token) => return Err(Error::Token(*token)),
@@ -455,8 +454,7 @@ fn get_stmt<'a, 'b>(
                     Some(Lex { token: Tkn::RParen, .. }) => None,
                     Some(Lex { line, .. }) => {
                         let a: Expr = get_expr(tokens, 0)?;
-                        let token: Option<&&Lex> = tokens.peek();
-                        match token {
+                        match tokens.peek() {
                             Some(Lex { token: Tkn::Op(x), .. })
                                 if is_assign_op(*x) =>
                             {
@@ -577,19 +575,22 @@ fn get_stmt<'a, 'b>(
             Syntax { statement: Stmt::Scope(get_body(tokens)?), line: *line }
         }
         Some(Lex { line, .. }) => {
-            let a: Expr = get_expr(tokens, 0)?;
-            let token: Option<&Lex> = tokens.next();
-            match token {
+            let expr_a: Expr = get_expr(tokens, 0)?;
+            match tokens.next() {
                 Some(Lex { token: Tkn::Op(x), .. }) if is_assign_op(*x) => {
-                    let b: Expr = get_expr(tokens, 0)?;
+                    let expr_b: Expr = get_expr(tokens, 0)?;
                     eat_or_error!(tokens, Tkn::Semicolon);
                     Syntax {
-                        statement: Stmt::Assign { op: x, ident: a, expr: b },
+                        statement: Stmt::Assign {
+                            op: x,
+                            ident: expr_a,
+                            expr: expr_b,
+                        },
                         line: *line,
                     }
                 }
                 Some(Lex { token: Tkn::Semicolon, .. }) => {
-                    Syntax { statement: Stmt::Effect(a), line: *line }
+                    Syntax { statement: Stmt::Effect(expr_a), line: *line }
                 }
                 Some(token) => return Err(Error::Token(*token)),
                 None => return Err(Error::EOF),
