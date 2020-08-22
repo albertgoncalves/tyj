@@ -27,25 +27,18 @@ pub(crate) enum Type<'a> {
     Obj(Rc<BTreeMap<&'a str, Type<'a>>>),
 }
 
-#[derive(Debug, PartialEq)]
-pub(crate) struct Table<'a> {
-    pub(crate) types: Vec<Type<'a>>,
-    pub(crate) indices: HashMap<Vec<&'a str>, TypeIndex>,
-}
-
-fn set_index_from_expr<'a, 'b, 'c>(
-    types: &'b mut Vec<Type<'a>>,
-    indices: &'b mut HashMap<Vec<&'a str>, TypeIndex>,
+fn set_expr<'a, 'b, 'c>(
+    types: &'b mut HashMap<Vec<&'a str>, Type<'a>>,
     keys: &'b [&'a str],
     expr: &'a Expr,
 ) -> Result<(), &'c str> {
     let type_: Type = match expr {
         Expr::Ident(ident) => {
-            let index: TypeIndex = match indices.get(&vec![*ident]) {
-                Some(index) => *index,
+            let type_: Type = match types.get(&vec![*ident]) {
+                Some(type_) => type_.clone(),
                 None => return Err(UNKNOWN_IDENT),
             };
-            let _: Option<_> = indices.insert(keys.to_vec(), index);
+            let _: Option<_> = types.insert(keys.to_vec(), type_);
             return Ok(());
         }
         Expr::Num(_) => Type::Num,
@@ -59,13 +52,13 @@ fn set_index_from_expr<'a, 'b, 'c>(
                 let mut key: Vec<&str> = Vec::with_capacity(keys.len() + 1);
                 key.extend_from_slice(keys);
                 key.push(prop.key);
-                set_index_from_expr(types, indices, &key, &prop.value)?;
-                let value: Type = if let Some(value) = types.last() {
-                    value.clone()
+                set_expr(types, &key, &prop.value)?;
+                let type_: Type = if let Some(type_) = types.get(&key) {
+                    type_.clone()
                 } else {
                     unreachable!();
                 };
-                if let Some(_) = type_props.insert(prop.key, value) {
+                if let Some(_) = type_props.insert(prop.key, type_) {
                     unreachable!();
                 }
             }
@@ -73,9 +66,7 @@ fn set_index_from_expr<'a, 'b, 'c>(
         }
         _ => panic!(format!("{:#?}", expr)),
     };
-    let index: TypeIndex = types.len();
-    types.push(type_);
-    match indices.insert(keys.to_vec(), index) {
+    match types.insert(keys.to_vec(), type_) {
         Some(_) => Err(DUPLICATE_KEYS),
         None => Ok(()),
     }
@@ -83,24 +74,21 @@ fn set_index_from_expr<'a, 'b, 'c>(
 
 pub(crate) fn get_types<'a, 'b>(
     ast: &'a [Syntax<'a>],
-) -> Result<Table<'a>, Error<'a, 'b>> {
-    let mut types: Vec<Type> = Vec::new();
-    let mut indices: HashMap<Vec<&str>, TypeIndex> = HashMap::new();
+) -> Result<HashMap<Vec<&'a str>, Type<'a>>, Error<'a, 'b>> {
+    let mut types: HashMap<Vec<&str>, Type> = HashMap::new();
     for syntax in ast {
         match &syntax.statement {
             Stmt::Decl { ident, expr } => {
                 let key: Vec<&str> = vec![ident];
-                if indices.contains_key(&key) {
+                if types.contains_key(&key) {
                     return Err(Error { syntax, message: SHADOW_IDENT });
                 }
-                if let Err(message) =
-                    set_index_from_expr(&mut types, &mut indices, &key, expr)
-                {
+                if let Err(message) = set_expr(&mut types, &key, expr) {
                     return Err(Error { syntax, message });
                 }
             }
             _ => panic!(format!("{:#?}", syntax)),
         }
     }
-    Ok(Table { types, indices })
+    Ok(types)
 }

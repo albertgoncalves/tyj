@@ -1,5 +1,5 @@
 use super::{
-    get_types, Error, Table, Type, DUPLICATE_KEYS, SHADOW_IDENT, UNKNOWN_IDENT,
+    get_types, Error, Type, DUPLICATE_KEYS, SHADOW_IDENT, UNKNOWN_IDENT,
 };
 use crate::parser::{get_ast, Expr, Prop, Stmt, Syntax};
 use crate::tokenizer::get_tokens;
@@ -20,24 +20,15 @@ fn declares() {
          var c = true;
          var d = null;
          var e = undefined;",
-        Ok(Table {
-            types: vec![
-                Type::Str,
-                Type::Num,
-                Type::Bool,
-                Type::Null,
-                Type::Undef,
-            ],
-            indices: vec![
-                (vec!["a"], 0),
-                (vec!["b"], 1),
-                (vec!["c"], 2),
-                (vec!["d"], 3),
-                (vec!["e"], 4),
-            ]
-            .into_iter()
-            .collect(),
-        }),
+        Ok(vec![
+            (vec!["a"], Type::Str),
+            (vec!["b"], Type::Num),
+            (vec!["c"], Type::Bool),
+            (vec!["d"], Type::Null),
+            (vec!["e"], Type::Undef),
+        ]
+        .into_iter()
+        .collect()),
     )
 }
 
@@ -78,12 +69,9 @@ fn declare_ident() {
     assert_types!(
         "var x = 0;
          var y = x;",
-        Ok(Table {
-            types: vec![Type::Num],
-            indices: vec![(vec!["x"], 0), (vec!["y"], 0)]
-                .into_iter()
-                .collect(),
-        }),
+        Ok(vec![(vec!["x"], Type::Num), (vec!["y"], Type::Num)]
+            .into_iter()
+            .collect()),
     )
 }
 
@@ -92,17 +80,18 @@ fn declare_object() {
     assert_types!(
         "var x = 0;
          var y = { a: x };",
-        Ok(Table {
-            types: vec![
-                Type::Num,
+        Ok(vec![
+            (vec!["x"], Type::Num),
+            (vec!["y", "a"], Type::Num),
+            (
+                vec!["y"],
                 Type::Obj(Rc::new(
                     vec![("a", Type::Num)].into_iter().collect()
                 )),
-            ],
-            indices: vec![(vec!["x"], 0), (vec!["y", "a"], 0), (vec!["y"], 1)]
-                .into_iter()
-                .collect(),
-        }),
+            ),
+        ]
+        .into_iter()
+        .collect()),
     )
 }
 
@@ -110,10 +99,9 @@ fn declare_object() {
 fn declare_empty_object() {
     assert_types!(
         "var x = {};",
-        Ok(Table {
-            types: vec![Type::Obj(Rc::new(BTreeMap::new()))],
-            indices: vec![(vec!["x"], 0)].into_iter().collect(),
-        }),
+        Ok(vec![(vec!["x"], Type::Obj(Rc::new(BTreeMap::new())))]
+            .into_iter()
+            .collect()),
     )
 }
 
@@ -132,15 +120,16 @@ fn declare_nested_object() {
                  a: 0,
              },
          };",
-        Ok(Table {
-            types: vec![
-                Type::Num,
-                Type::Str,
-                Type::Bool,
-                Type::Null,
-                Type::Undef,
-                Type::Num,
-                Type::Obj(props.clone()),
+        Ok(vec![
+            (vec!["x", "a"], Type::Num),
+            (vec!["x", "b"], Type::Str),
+            (vec!["x", "c"], Type::Bool),
+            (vec!["x", "d"], Type::Null),
+            (vec!["x", "e"], Type::Undef),
+            (vec!["x", "f", "a"], Type::Num),
+            (vec!["x", "f"], Type::Obj(props.clone())),
+            (
+                vec!["x"],
                 Type::Obj(Rc::new(
                     vec![
                         ("a", Type::Num),
@@ -153,20 +142,10 @@ fn declare_nested_object() {
                     .into_iter()
                     .collect(),
                 )),
-            ],
-            indices: vec![
-                (vec!["x", "a"], 0),
-                (vec!["x", "b"], 1),
-                (vec!["x", "c"], 2),
-                (vec!["x", "d"], 3),
-                (vec!["x", "e"], 4),
-                (vec!["x", "f", "a"], 5),
-                (vec!["x", "f"], 6),
-                (vec!["x"], 7),
-            ]
-            .into_iter()
-            .collect(),
-        }),
+            ),
+        ]
+        .into_iter()
+        .collect()),
     )
 }
 
