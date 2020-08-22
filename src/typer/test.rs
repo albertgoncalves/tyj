@@ -55,7 +55,7 @@ fn declare_shadow_ident() {
                 line: 1,
             },
             message: SHADOW_IDENT,
-        })
+        }),
     )
 }
 
@@ -69,7 +69,7 @@ fn declare_unknown_ident() {
                 line: 0,
             },
             message: UNKNOWN_IDENT,
-        })
+        }),
     )
 }
 
@@ -189,6 +189,6 @@ fn declare_object_duplicate_keys() {
                 line: 0,
             },
             message: DUPLICATE_KEYS,
-        })
+        }),
     )
 }
