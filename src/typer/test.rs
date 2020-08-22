@@ -1,6 +1,8 @@
 use super::{get_types, Error, Table, Type, SHADOW_IDENT, UNKNOWN_IDENT};
 use crate::parser::{get_ast, Expr, Stmt, Syntax};
 use crate::tokenizer::get_tokens;
+use std::collections::BTreeMap;
+use std::rc::Rc;
 
 macro_rules! assert_types {
     ($a:expr, $b:expr $(,)?) => {
@@ -79,6 +81,89 @@ fn declare_ident() {
             indices: vec![(vec!["x"], 0), (vec!["y"], 0)]
                 .into_iter()
                 .collect(),
+        }),
+    )
+}
+
+#[test]
+fn declare_object() {
+    assert_types!(
+        "var x = 0;
+         var y = { a: x };",
+        Ok(Table {
+            types: vec![
+                Type::Num,
+                Type::Obj(Rc::new(
+                    vec![("a", Type::Num)].into_iter().collect()
+                )),
+            ],
+            indices: vec![(vec!["x"], 0), (vec!["y", "a"], 0), (vec!["y"], 1)]
+                .into_iter()
+                .collect(),
+        }),
+    )
+}
+
+#[test]
+fn declare_empty_object() {
+    assert_types!(
+        "var x = {};",
+        Ok(Table {
+            types: vec![Type::Obj(Rc::new(BTreeMap::new()))],
+            indices: vec![(vec!["x"], 0)].into_iter().collect(),
+        }),
+    )
+}
+
+#[test]
+fn declare_nested_object() {
+    let props: Rc<BTreeMap<&str, Type>> =
+        Rc::new(vec![("a", Type::Num)].into_iter().collect());
+    assert_types!(
+        "var x = {
+             a: 0,
+             b: \"?\",
+             c: true,
+             d: null,
+             e: undefined,
+             f: {
+                 a: 0,
+             },
+         };",
+        Ok(Table {
+            types: vec![
+                Type::Num,
+                Type::Str,
+                Type::Bool,
+                Type::Null,
+                Type::Undef,
+                Type::Num,
+                Type::Obj(props.clone()),
+                Type::Obj(Rc::new(
+                    vec![
+                        ("a", Type::Num),
+                        ("b", Type::Str),
+                        ("c", Type::Bool),
+                        ("d", Type::Null),
+                        ("e", Type::Undef),
+                        ("f", Type::Obj(props)),
+                    ]
+                    .into_iter()
+                    .collect(),
+                )),
+            ],
+            indices: vec![
+                (vec!["x", "a"], 0),
+                (vec!["x", "b"], 1),
+                (vec!["x", "c"], 2),
+                (vec!["x", "d"], 3),
+                (vec!["x", "e"], 4),
+                (vec!["x", "f", "a"], 5),
+                (vec!["x", "f"], 6),
+                (vec!["x"], 7),
+            ]
+            .into_iter()
+            .collect(),
         }),
     )
 }
