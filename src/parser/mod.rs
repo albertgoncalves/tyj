@@ -2,7 +2,6 @@
 mod test;
 
 use crate::tokenizer::{Count, Lex, Tkn};
-use std::collections::BTreeSet;
 use std::iter::Peekable;
 use std::slice::Iter;
 
@@ -272,12 +271,6 @@ fn get_expr<'a, 'b>(
                             break;
                         }
                         token => return Err(Error::Token(**token)),
-                    }
-                }
-                let mut keys: BTreeSet<&str> = BTreeSet::new();
-                for Prop { key, .. } in &props {
-                    if !keys.insert(key) {
-                        return Err(Error::Token(*token));
                     }
                 }
                 Expr::Obj(props)

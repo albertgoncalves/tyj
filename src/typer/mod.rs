@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 const SHADOW_IDENT: &str = "Shadowed Identifier";
 const UNKNOWN_IDENT: &str = "Unknown Identifier";
+const DUPLICATE_KEYS: &str = "Duplicate Keys";
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct Error<'a, 'b> {

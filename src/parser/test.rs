@@ -1701,14 +1701,3 @@ fn multiple_declares() {
         }]),
     )
 }
-
-#[test]
-fn obj_duplicate_keys() {
-    assert_ast!(
-        "var x = {
-             a: 0,
-             a: true,
-         };",
-        Err(Error::Token(Lex { token: Tkn::LBrace, line: 0 })),
-    )
-}

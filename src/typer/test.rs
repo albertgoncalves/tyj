@@ -1,5 +1,7 @@
-use super::{get_types, Error, Table, Type, SHADOW_IDENT, UNKNOWN_IDENT};
-use crate::parser::{get_ast, Expr, Stmt, Syntax};
+use super::{
+    get_types, Error, Table, Type, DUPLICATE_KEYS, SHADOW_IDENT, UNKNOWN_IDENT,
+};
+use crate::parser::{get_ast, Expr, Prop, Stmt, Syntax};
 use crate::tokenizer::get_tokens;
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -165,5 +167,28 @@ fn declare_nested_object() {
             .into_iter()
             .collect(),
         }),
+    )
+}
+
+#[test]
+fn declare_object_duplicate_keys() {
+    assert_types!(
+        "var x = {
+             a: true,
+             a: false,
+         };",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Decl {
+                    ident: "x",
+                    expr: Expr::Obj(vec![
+                        Prop { key: "a", value: Expr::Bool("true") },
+                        Prop { key: "a", value: Expr::Bool("false") },
+                    ]),
+                },
+                line: 0,
+            },
+            message: DUPLICATE_KEYS,
+        })
     )
 }
