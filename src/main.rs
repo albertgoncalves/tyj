@@ -21,7 +21,7 @@ macro_rules! TYPE_ERROR {
     () => {
         "\x1b[1m{}\x1b[0m:\
          \x1b[1;4m{}\x1b[0m:\
-         \x1b[1;31mType Error\x1b[0m:{}"
+         \x1b[1;33mType Error\x1b[0m:{}"
     };
 }
 
@@ -60,27 +60,11 @@ fn main() {
             EXIT!()
         }
     };
-
-    macro_rules! exit_type_error {
-        ($syntax:expr, $error:expr $(,)?) => {{
-            eprintln!(TYPE_ERROR!(), filename, $syntax.line + 1, $error);
-            EXIT!()
-        }};
-    }
-
     match get_types(&ast) {
-        Ok((types, indices)) => println!("{:?}\n{:?}", types, indices),
-        Err(TypeError::ShadowIdent(syntax)) => {
-            exit_type_error!(syntax, "Shadowed Identifier")
-        }
-        Err(TypeError::UnknownIdent(syntax)) => {
-            exit_type_error!(syntax, "Unknown Identifier")
-        }
-        Err(TypeError::UnhandledExpr(syntax)) => {
-            exit_type_error!(syntax, "Unhandled Expression")
-        }
-        Err(TypeError::UnhandledSyntax(syntax)) => {
-            exit_type_error!(syntax, "Unhandled Syntax")
+        Ok(table) => println!("{:#?}", table),
+        Err(TypeError { syntax, message }) => {
+            eprintln!(TYPE_ERROR!(), filename, syntax.line + 1, message);
+            EXIT!()
         }
     }
 }
