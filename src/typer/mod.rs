@@ -15,8 +15,6 @@ pub(crate) struct Error<'a, 'b> {
     pub(crate) message: &'b str,
 }
 
-type TypeIndex = usize;
-
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Type<'a> {
     Num,
