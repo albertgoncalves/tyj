@@ -5,24 +5,18 @@ use crate::parser::{Expr, Stmt, Syntax};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 
-struct Message {
-    shadowed_ident: &'static str,
-    unknown_ident: &'static str,
-    duplicate_keys: &'static str,
-    multi_type_array: &'static str,
+#[derive(Debug, PartialEq)]
+pub(crate) enum Message {
+    ArrayMultiType,
+    IdentShadow,
+    IdentUnknown,
+    ObjDuplicateKeys,
 }
 
-const ERROR_MESSAGE: Message = Message {
-    shadowed_ident: "shadowed identifier",
-    unknown_ident: "unknown identifier",
-    duplicate_keys: "object contains duplicate keys",
-    multi_type_array: "array contains multiple types",
-};
-
 #[derive(Debug, PartialEq)]
-pub(crate) struct Error<'a, 'b> {
+pub(crate) struct Error<'a> {
     pub(crate) syntax: &'a Syntax<'a>,
-    pub(crate) message: &'b str,
+    pub(crate) message: Message,
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -37,14 +31,14 @@ pub(crate) enum Type<'a> {
     Array(Rc<Type<'a>>),
 }
 
-fn get_expr<'a, 'b, 'c>(
+fn get_expr<'a, 'b>(
     types: &'b HashMap<Vec<&'a str>, Type<'a>>,
     expr: &'a Expr<'a>,
-) -> Result<Type<'a>, &'c str> {
+) -> Result<Type<'a>, Message> {
     Ok(match expr {
         Expr::Ident(ident) => match types.get(&vec![*ident]) {
             Some(type_) => type_.clone(),
-            None => return Err(ERROR_MESSAGE.unknown_ident),
+            None => return Err(Message::IdentUnknown),
         },
         Expr::Num(_) => Type::Num,
         Expr::Str(_) => Type::Str,
@@ -57,7 +51,7 @@ fn get_expr<'a, 'b, 'c>(
                 if let Some(_) =
                     type_props.insert(prop.key, get_expr(types, &prop.value)?)
                 {
-                    return Err(ERROR_MESSAGE.duplicate_keys);
+                    return Err(Message::ObjDuplicateKeys);
                 }
             }
             Type::Obj(Rc::new(type_props))
@@ -73,7 +67,7 @@ fn get_expr<'a, 'b, 'c>(
                     Type::EmptyArray => {
                         type_ = Type::Array(Rc::new(elem.clone()))
                     }
-                    _ => return Err(ERROR_MESSAGE.multi_type_array),
+                    _ => return Err(Message::ArrayMultiType),
                 }
             }
             type_
@@ -82,11 +76,11 @@ fn get_expr<'a, 'b, 'c>(
     })
 }
 
-fn set_type<'a, 'b, 'c>(
+fn set_type<'a, 'b>(
     types: &'b mut HashMap<Vec<&'a str>, Type<'a>>,
     keys: &'b [&'a str],
     type_: &'b Type<'a>,
-) -> Result<(), &'c str> {
+) -> Result<(), Message> {
     if let Type::Obj(props) = type_ {
         for (prop_key, prop_value) in props.iter() {
             let mut key: Vec<&str> = Vec::with_capacity(keys.len() + 1);
@@ -96,14 +90,14 @@ fn set_type<'a, 'b, 'c>(
         }
     }
     match types.insert(keys.to_vec(), type_.clone()) {
-        Some(_) => Err(ERROR_MESSAGE.duplicate_keys),
+        Some(_) => Err(Message::ObjDuplicateKeys),
         None => Ok(()),
     }
 }
 
-pub(crate) fn get_types<'a, 'b>(
+pub(crate) fn get_types<'a>(
     ast: &'a [Syntax<'a>],
-) -> Result<HashMap<Vec<&'a str>, Type<'a>>, Error<'a, 'b>> {
+) -> Result<HashMap<Vec<&'a str>, Type<'a>>, Error<'a>> {
     let mut types: HashMap<Vec<&str>, Type> = HashMap::new();
     for syntax in ast {
         match &syntax.statement {
@@ -112,7 +106,7 @@ pub(crate) fn get_types<'a, 'b>(
                 if types.contains_key(&key) {
                     return Err(Error {
                         syntax,
-                        message: ERROR_MESSAGE.shadowed_ident,
+                        message: Message::IdentShadow,
                     });
                 }
                 match get_expr(&types, expr) {

@@ -4,14 +4,14 @@ mod typer;
 
 use crate::parser::{get_ast, Error as ParseError, Syntax};
 use crate::tokenizer::{get_tokens, Count};
-use crate::typer::{get_types, Error as TypeError};
+use crate::typer::{get_types, Error as TypeError, Message};
 use std::env::args;
 use std::fs::read_to_string;
 use std::process::exit;
 
 macro_rules! ERROR {
     () => {
-        "{}:\x1b[4m{}\x1b[0m:\x1b[1m{}\x1b[0m"
+        "{}:{}:\x1b[1m{}\x1b[0m"
     };
 }
 
@@ -19,6 +19,15 @@ macro_rules! EXIT {
     () => {
         exit(1)
     };
+}
+
+fn get_message(message: Message) -> &'static str {
+    match message {
+        Message::ArrayMultiType => "array contains multiple types",
+        Message::IdentShadow => "shadowed identifier",
+        Message::IdentUnknown => "unknown identifier",
+        Message::ObjDuplicateKeys => "object contains duplicate keys",
+    }
 }
 
 fn main() {
@@ -53,7 +62,12 @@ fn main() {
     match get_types(&ast) {
         Ok(table) => println!("{:#?}", table),
         Err(TypeError { syntax, message }) => {
-            eprintln!(ERROR!(), filename, syntax.line + 1, message);
+            eprintln!(
+                ERROR!(),
+                filename,
+                syntax.line + 1,
+                get_message(message)
+            );
             EXIT!()
         }
     }
