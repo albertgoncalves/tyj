@@ -2,12 +2,13 @@
 mod test;
 
 use crate::parser::{Expr, Stmt, Syntax};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 
-const SHADOW_IDENT: &str = "Shadowed Identifier";
-const UNKNOWN_IDENT: &str = "Unknown Identifier";
-const DUPLICATE_KEYS: &str = "Duplicate Keys";
+const SHADOW_IDENT: &str = "shadowed identifier";
+const UNKNOWN_IDENT: &str = "unknown identifier";
+const DUPLICATE_KEYS: &str = "duplicate keys";
+const MULTI_TYPE_ARRAY: &str = "array contains multiple types";
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct Error<'a, 'b> {
@@ -15,7 +16,7 @@ pub(crate) struct Error<'a, 'b> {
     pub(crate) message: &'b str,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) enum Type<'a> {
     Num,
     Str,
@@ -23,6 +24,8 @@ pub(crate) enum Type<'a> {
     Null,
     Undef,
     Obj(Rc<BTreeMap<&'a str, Type<'a>>>),
+    EmptyArray,
+    Array(Rc<Type<'a>>),
 }
 
 fn get_expr<'a, 'b, 'c>(
@@ -30,6 +33,10 @@ fn get_expr<'a, 'b, 'c>(
     expr: &'a Expr<'a>,
 ) -> Result<Type<'a>, &'c str> {
     Ok(match expr {
+        Expr::Ident(ident) => match types.get(&vec![*ident]) {
+            Some(type_) => type_.clone(),
+            None => return Err(UNKNOWN_IDENT),
+        },
         Expr::Num(_) => Type::Num,
         Expr::Str(_) => Type::Str,
         Expr::Bool(_) => Type::Bool,
@@ -46,10 +53,22 @@ fn get_expr<'a, 'b, 'c>(
             }
             Type::Obj(Rc::new(type_props))
         }
-        Expr::Ident(ident) => match types.get(&vec![*ident]) {
-            Some(type_) => type_.clone(),
-            None => return Err(UNKNOWN_IDENT),
-        },
+        Expr::Array(elems) => {
+            let mut type_elems: BTreeSet<Type> = BTreeSet::new();
+            for elem in elems {
+                let _: bool = type_elems.insert(get_expr(types, elem)?);
+            }
+            let mut type_: Type = Type::EmptyArray;
+            for elem in type_elems.iter() {
+                match type_ {
+                    Type::EmptyArray => {
+                        type_ = Type::Array(Rc::new(elem.clone()))
+                    }
+                    _ => return Err(MULTI_TYPE_ARRAY),
+                }
+            }
+            type_
+        }
         _ => panic!("{:#?}", expr),
     })
 }

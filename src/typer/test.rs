@@ -1,5 +1,6 @@
 use super::{
-    get_types, Error, Type, DUPLICATE_KEYS, SHADOW_IDENT, UNKNOWN_IDENT,
+    get_types, Error, Type, DUPLICATE_KEYS, MULTI_TYPE_ARRAY, SHADOW_IDENT,
+    UNKNOWN_IDENT,
 };
 use crate::parser::{get_ast, Expr, Prop, Stmt, Syntax};
 use crate::tokenizer::get_tokens;
@@ -168,6 +169,78 @@ fn declare_object_duplicate_keys() {
                 line: 0,
             },
             message: DUPLICATE_KEYS,
+        }),
+    )
+}
+
+#[test]
+fn declare_array() {
+    assert_types!(
+        "var x = [0, 1, 2, 3];",
+        Ok(vec![(vec!["x"], Type::Array(Rc::new(Type::Num)))]
+            .into_iter()
+            .collect()),
+    )
+}
+
+#[test]
+fn declare_array_empty() {
+    assert_types!(
+        "var x = [];",
+        Ok(vec![(vec!["x"], Type::EmptyArray)].into_iter().collect()),
+    )
+}
+
+#[test]
+fn declare_array_obj() {
+    assert_types!(
+        "var a = {
+             x: 0,
+         };
+         var b = {
+             x: 1,
+         };
+         var xs = [a, b];",
+        Ok(vec![
+            (vec!["a", "x"], Type::Num),
+            (
+                vec!["a"],
+                Type::Obj(Rc::new(
+                    vec![("x", Type::Num)].into_iter().collect()
+                )),
+            ),
+            (vec!["b", "x"], Type::Num),
+            (
+                vec!["b"],
+                Type::Obj(Rc::new(
+                    vec![("x", Type::Num)].into_iter().collect()
+                )),
+            ),
+            (
+                vec!["xs"],
+                Type::Array(Rc::new(Type::Obj(Rc::new(
+                    vec![("x", Type::Num)].into_iter().collect()
+                )))),
+            ),
+        ]
+        .into_iter()
+        .collect()),
+    )
+}
+
+#[test]
+fn declare_array_err() {
+    assert_types!(
+        "var x = [0, \"0\"];",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Decl {
+                    ident: "x",
+                    expr: Expr::Array(vec![Expr::Num("0"), Expr::Str("0")]),
+                },
+                line: 0,
+            },
+            message: MULTI_TYPE_ARRAY,
         }),
     )
 }
