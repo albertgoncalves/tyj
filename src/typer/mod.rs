@@ -50,7 +50,7 @@ fn get_expr<'a, 'b, 'c>(
             Some(type_) => type_.clone(),
             None => return Err(UNKNOWN_IDENT),
         },
-        _ => panic!(format!("{:#?}", expr)),
+        _ => panic!("{:#?}", expr),
     })
 }
 
@@ -95,7 +95,7 @@ pub(crate) fn get_types<'a, 'b>(
                     }
                 }
             }
-            _ => panic!(format!("{:#?}", syntax)),
+            _ => panic!("{:#?}", syntax),
         }
     }
     Ok(types)
