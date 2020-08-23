@@ -25,46 +25,49 @@ pub(crate) enum Type<'a> {
     Obj(Rc<BTreeMap<&'a str, Type<'a>>>),
 }
 
-fn set_expr<'a, 'b, 'c>(
-    types: &'b mut HashMap<Vec<&'a str>, Type<'a>>,
-    keys: &'b [&'a str],
-    expr: &'a Expr,
-) -> Result<(), &'c str> {
-    let type_: Type = match expr {
-        Expr::Ident(ident) => {
-            let type_: Type = match types.get(&vec![*ident]) {
-                Some(type_) => type_.clone(),
-                None => return Err(UNKNOWN_IDENT),
-            };
-            let _: Option<_> = types.insert(keys.to_vec(), type_);
-            return Ok(());
-        }
+fn get_expr<'a, 'b, 'c>(
+    types: &'b HashMap<Vec<&'a str>, Type<'a>>,
+    expr: &'a Expr<'a>,
+) -> Result<Type<'a>, &'c str> {
+    Ok(match expr {
         Expr::Num(_) => Type::Num,
         Expr::Str(_) => Type::Str,
         Expr::Bool(_) => Type::Bool,
         Expr::Null => Type::Null,
         Expr::Undef => Type::Undef,
-        Expr::Obj(props) => {
+        Expr::Obj(parse_props) => {
             let mut type_props: BTreeMap<&str, Type> = BTreeMap::new();
-            for prop in props {
-                let mut key: Vec<&str> = Vec::with_capacity(keys.len() + 1);
-                key.extend_from_slice(keys);
-                key.push(prop.key);
-                set_expr(types, &key, &prop.value)?;
-                let type_: Type = if let Some(type_) = types.get(&key) {
-                    type_.clone()
-                } else {
-                    unreachable!();
-                };
-                if let Some(_) = type_props.insert(prop.key, type_) {
-                    unreachable!();
+            for prop in parse_props {
+                if let Some(_) =
+                    type_props.insert(prop.key, get_expr(types, &prop.value)?)
+                {
+                    return Err(DUPLICATE_KEYS);
                 }
             }
             Type::Obj(Rc::new(type_props))
         }
+        Expr::Ident(ident) => match types.get(&vec![*ident]) {
+            Some(type_) => type_.clone(),
+            None => return Err(UNKNOWN_IDENT),
+        },
         _ => panic!(format!("{:#?}", expr)),
-    };
-    match types.insert(keys.to_vec(), type_) {
+    })
+}
+
+fn set_type<'a, 'b, 'c>(
+    types: &'b mut HashMap<Vec<&'a str>, Type<'a>>,
+    keys: &'b [&'a str],
+    type_: &'b Type<'a>,
+) -> Result<(), &'c str> {
+    if let Type::Obj(props) = type_ {
+        for (prop_key, prop_value) in props.iter() {
+            let mut key: Vec<&str> = Vec::with_capacity(keys.len() + 1);
+            key.extend_from_slice(keys);
+            key.push(prop_key);
+            set_type(types, &key, &prop_value)?;
+        }
+    }
+    match types.insert(keys.to_vec(), type_.clone()) {
         Some(_) => Err(DUPLICATE_KEYS),
         None => Ok(()),
     }
@@ -81,8 +84,15 @@ pub(crate) fn get_types<'a, 'b>(
                 if types.contains_key(&key) {
                     return Err(Error { syntax, message: SHADOW_IDENT });
                 }
-                if let Err(message) = set_expr(&mut types, &key, expr) {
-                    return Err(Error { syntax, message });
+                match get_expr(&types, expr) {
+                    Err(message) => return Err(Error { syntax, message }),
+                    Ok(type_) => {
+                        if let Err(message) =
+                            set_type(&mut types, &key, &type_)
+                        {
+                            return Err(Error { syntax, message });
+                        }
+                    }
                 }
             }
             _ => panic!(format!("{:#?}", syntax)),
