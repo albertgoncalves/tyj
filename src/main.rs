@@ -11,17 +11,18 @@ use std::process::exit;
 
 macro_rules! PARSE_ERROR {
     () => {
-        "\x1b[1m{}\x1b[0m:\
-         \x1b[1;4m{}\x1b[0m:\
-         \x1b[1;31mParse Error\x1b[0m"
+        "\x1b[40;1m{}\x1b[0m:\
+         \x1b[40;1;4m{}\x1b[0m:\
+         \x1b[40;1;31mParse Error\x1b[0m"
     };
 }
 
 macro_rules! TYPE_ERROR {
     () => {
-        "\x1b[1m{}\x1b[0m:\
-         \x1b[1;4m{}\x1b[0m:\
-         \x1b[1;33mType Error\x1b[0m:{}"
+        "\x1b[40;1m{}\x1b[0m:\
+         \x1b[40;1;4m{}\x1b[0m:\
+         \x1b[40;1;33mType Error\x1b[0m:\
+         \x1b[47;30m {} \x1b[0m"
     };
 }
 

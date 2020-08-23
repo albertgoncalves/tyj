@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-rustfmt --verbose "$WD/src/main.rs"
+rustfmt "$WD/src/main.rs"
 
 export FLAGS=(
     -C "opt-level=0"
