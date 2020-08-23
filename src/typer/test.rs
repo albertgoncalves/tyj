@@ -1,7 +1,4 @@
-use super::{
-    get_types, Error, Type, DUPLICATE_KEYS, MULTI_TYPE_ARRAY, SHADOW_IDENT,
-    UNKNOWN_IDENT,
-};
+use super::{get_types, Error, Type, ERROR_MESSAGE};
 use crate::parser::{get_ast, Expr, Prop, Stmt, Syntax};
 use crate::tokenizer::get_tokens;
 use std::collections::BTreeMap;
@@ -46,7 +43,7 @@ fn declare_shadow_ident() {
                 },
                 line: 1,
             },
-            message: SHADOW_IDENT,
+            message: ERROR_MESSAGE.shadowed_ident,
         }),
     )
 }
@@ -60,7 +57,7 @@ fn declare_unknown_ident() {
                 statement: Stmt::Decl { ident: "y", expr: Expr::Ident("x") },
                 line: 0,
             },
-            message: UNKNOWN_IDENT,
+            message: ERROR_MESSAGE.unknown_ident,
         }),
     )
 }
@@ -168,7 +165,7 @@ fn declare_object_duplicate_keys() {
                 },
                 line: 0,
             },
-            message: DUPLICATE_KEYS,
+            message: ERROR_MESSAGE.duplicate_keys,
         }),
     )
 }
@@ -240,7 +237,7 @@ fn declare_array_err() {
                 },
                 line: 0,
             },
-            message: MULTI_TYPE_ARRAY,
+            message: ERROR_MESSAGE.multi_type_array,
         }),
     )
 }

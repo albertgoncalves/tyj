@@ -9,20 +9,9 @@ use std::env::args;
 use std::fs::read_to_string;
 use std::process::exit;
 
-macro_rules! PARSE_ERROR {
+macro_rules! ERROR {
     () => {
-        "\x1b[40;1m{}\x1b[0m:\
-         \x1b[40;1;4m{}\x1b[0m:\
-         \x1b[40;1;31mParse Error\x1b[0m"
-    };
-}
-
-macro_rules! TYPE_ERROR {
-    () => {
-        "\x1b[40;1m{}\x1b[0m:\
-         \x1b[40;1;4m{}\x1b[0m:\
-         \x1b[40;1;33mType Error\x1b[0m:\
-         \x1b[47;30m {} \x1b[0m"
+        "{}:\x1b[4m{}\x1b[0m:\x1b[1m{}\x1b[0m"
     };
 }
 
@@ -57,14 +46,14 @@ fn main() {
                 }
                 ParseError::Token(token) => token.line + 1,
             };
-            eprintln!(PARSE_ERROR!(), filename, line);
+            eprintln!(ERROR!(), filename, line, "parse error");
             EXIT!()
         }
     };
     match get_types(&ast) {
         Ok(table) => println!("{:#?}", table),
         Err(TypeError { syntax, message }) => {
-            eprintln!(TYPE_ERROR!(), filename, syntax.line + 1, message);
+            eprintln!(ERROR!(), filename, syntax.line + 1, message);
             EXIT!()
         }
     }

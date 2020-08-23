@@ -5,10 +5,19 @@ use crate::parser::{Expr, Stmt, Syntax};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 
-const SHADOW_IDENT: &str = "shadowed identifier";
-const UNKNOWN_IDENT: &str = "unknown identifier";
-const DUPLICATE_KEYS: &str = "duplicate keys";
-const MULTI_TYPE_ARRAY: &str = "array contains multiple types";
+struct Message {
+    shadowed_ident: &'static str,
+    unknown_ident: &'static str,
+    duplicate_keys: &'static str,
+    multi_type_array: &'static str,
+}
+
+const ERROR_MESSAGE: Message = Message {
+    shadowed_ident: "shadowed identifier",
+    unknown_ident: "unknown identifier",
+    duplicate_keys: "object contains duplicate keys",
+    multi_type_array: "array contains multiple types",
+};
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct Error<'a, 'b> {
@@ -35,7 +44,7 @@ fn get_expr<'a, 'b, 'c>(
     Ok(match expr {
         Expr::Ident(ident) => match types.get(&vec![*ident]) {
             Some(type_) => type_.clone(),
-            None => return Err(UNKNOWN_IDENT),
+            None => return Err(ERROR_MESSAGE.unknown_ident),
         },
         Expr::Num(_) => Type::Num,
         Expr::Str(_) => Type::Str,
@@ -48,7 +57,7 @@ fn get_expr<'a, 'b, 'c>(
                 if let Some(_) =
                     type_props.insert(prop.key, get_expr(types, &prop.value)?)
                 {
-                    return Err(DUPLICATE_KEYS);
+                    return Err(ERROR_MESSAGE.duplicate_keys);
                 }
             }
             Type::Obj(Rc::new(type_props))
@@ -64,7 +73,7 @@ fn get_expr<'a, 'b, 'c>(
                     Type::EmptyArray => {
                         type_ = Type::Array(Rc::new(elem.clone()))
                     }
-                    _ => return Err(MULTI_TYPE_ARRAY),
+                    _ => return Err(ERROR_MESSAGE.multi_type_array),
                 }
             }
             type_
@@ -87,7 +96,7 @@ fn set_type<'a, 'b, 'c>(
         }
     }
     match types.insert(keys.to_vec(), type_.clone()) {
-        Some(_) => Err(DUPLICATE_KEYS),
+        Some(_) => Err(ERROR_MESSAGE.duplicate_keys),
         None => Ok(()),
     }
 }
@@ -101,7 +110,10 @@ pub(crate) fn get_types<'a, 'b>(
             Stmt::Decl { ident, expr } => {
                 let key: Vec<&str> = vec![ident];
                 if types.contains_key(&key) {
-                    return Err(Error { syntax, message: SHADOW_IDENT });
+                    return Err(Error {
+                        syntax,
+                        message: ERROR_MESSAGE.shadowed_ident,
+                    });
                 }
                 match get_expr(&types, expr) {
                     Err(message) => return Err(Error { syntax, message }),
