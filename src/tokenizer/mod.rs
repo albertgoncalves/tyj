@@ -6,9 +6,43 @@ use std::str::CharIndices;
 
 pub(crate) type Count = u16;
 
-const OPS: [char; 14] =
+const OP_CHARS: [char; 14] =
     ['=', '.', '+', '-', '*', '%', '<', '>', '!', '~', '&', '^', '|', '/'];
 const DECIMAL: u32 = 10;
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum Op {
+    Assign,
+    AssignAdd,
+    AssignSub,
+    AssignMul,
+    AssignDiv,
+    New,
+    Member,
+    Not,
+    BitwiseNot,
+    Increment,
+    Decrement,
+    Mul,
+    Div,
+    Mod,
+    Add,
+    Sub,
+    ShiftLeft,
+    ShiftRight,
+    UnsignedShiftRight,
+    LessThan,
+    GreaterThan,
+    LessThanEquals,
+    GreaterThanEquals,
+    Equality,
+    Inequality,
+    And,
+    Or,
+    BitwiseAnd,
+    BitwiseXor,
+    BitwiseOr,
+}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Tkn<'a> {
@@ -32,7 +66,7 @@ pub(crate) enum Tkn<'a> {
     For,
     While,
     Fn,
-    Op(&'a str),
+    Op(Op),
     Ret,
     Ident(&'a str),
     Null,
@@ -55,7 +89,7 @@ fn is_numeric(x: char) -> bool {
 }
 
 fn is_op(x: char) -> bool {
-    for op in &OPS {
+    for op in &OP_CHARS {
         if x == *op {
             return true;
         }
@@ -119,7 +153,7 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
                     "return" => Tkn::Ret,
                     "null" => Tkn::Null,
                     "undefined" => Tkn::Undef,
-                    "new" => Tkn::Op(ident),
+                    "new" => Tkn::Op(Op::New),
                     "true" | "false" => Tkn::Bool(ident),
                     _ => Tkn::Ident(ident),
                 };
@@ -128,7 +162,7 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
             _ if is_numeric(x) => {
                 let num: &str = get_substring!(is_numeric, i);
                 if num == "." {
-                    tokens.push(Lex { token: Tkn::Op("."), line });
+                    tokens.push(Lex { token: Tkn::Op(Op::Member), line });
                 } else if (num.matches('.').count() < 2)
                     && (0 < num.matches(|x: char| x.is_digit(DECIMAL)).count())
                 {
@@ -180,8 +214,42 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
             ']' => tokens.push(Lex { token: Tkn::RBracket, line }),
             '?' => tokens.push(Lex { token: Tkn::Ternary, line }),
             _ if is_op(x) => {
-                let op: &str = get_substring!(is_op, i);
-                tokens.push(Lex { token: Tkn::Op(op), line });
+                let token: Tkn = match get_substring!(is_op, i) {
+                    "=" => Tkn::Op(Op::Assign),
+                    "+=" => Tkn::Op(Op::AssignAdd),
+                    "-=" => Tkn::Op(Op::AssignSub),
+                    "*=" => Tkn::Op(Op::AssignMul),
+                    "/=" => Tkn::Op(Op::AssignDiv),
+                    "." => Tkn::Op(Op::Member),
+                    "!" => Tkn::Op(Op::Not),
+                    "~" => Tkn::Op(Op::BitwiseNot),
+                    "++" => Tkn::Op(Op::Increment),
+                    "--" => Tkn::Op(Op::Decrement),
+                    "+" => Tkn::Op(Op::Add),
+                    "-" => Tkn::Op(Op::Sub),
+                    "*" => Tkn::Op(Op::Mul),
+                    "/" => Tkn::Op(Op::Div),
+                    "%" => Tkn::Op(Op::Mod),
+                    "<<" => Tkn::Op(Op::ShiftLeft),
+                    ">>" => Tkn::Op(Op::ShiftRight),
+                    ">>>" => Tkn::Op(Op::UnsignedShiftRight),
+                    "<" => Tkn::Op(Op::LessThan),
+                    ">" => Tkn::Op(Op::GreaterThan),
+                    "<=" => Tkn::Op(Op::LessThanEquals),
+                    ">=" => Tkn::Op(Op::GreaterThanEquals),
+                    "===" => Tkn::Op(Op::Equality),
+                    "!==" => Tkn::Op(Op::Inequality),
+                    "&&" => Tkn::Op(Op::And),
+                    "||" => Tkn::Op(Op::Or),
+                    "&" => Tkn::Op(Op::BitwiseAnd),
+                    "^" => Tkn::Op(Op::BitwiseXor),
+                    "|" => Tkn::Op(Op::BitwiseOr),
+                    op => {
+                        tokens.push(Lex { token: Tkn::Illegal(op), line });
+                        continue;
+                    }
+                };
+                tokens.push(Lex { token, line });
             }
             '"' => {
                 let i: usize = i + 1;

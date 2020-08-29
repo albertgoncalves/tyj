@@ -1,5 +1,5 @@
 use super::{get_ast, Case, Error, Expr, Prop, Stmt, Syntax};
-use crate::tokenizer::{get_tokens, Lex, Tkn};
+use crate::tokenizer::{get_tokens, Lex, Op, Tkn};
 
 macro_rules! assert_ast {
     ($a:expr, $b:expr $(,)?) => {
@@ -130,7 +130,7 @@ fn declare_assign() {
             },
             Syntax {
                 statement: Stmt::Assign {
-                    op: "=",
+                    op: Op::Assign,
                     ident: Expr::Ident("x"),
                     expr: Expr::Null,
                 },
@@ -320,9 +320,9 @@ fn object_fields() {
             },
             Syntax {
                 statement: Stmt::Effect(Expr::Infix {
-                    op: ".",
+                    op: Op::Member,
                     left: Box::new(Expr::Infix {
-                        op: ".",
+                        op: Op::Member,
                         left: Box::new(Expr::Ident("x")),
                         right: Box::new(Expr::Ident("a")),
                     }),
@@ -347,7 +347,7 @@ fn declare_anonymous_function() {
                     args: vec!["x"],
                     body: vec![Syntax {
                         statement: Stmt::Ret(Expr::Infix {
-                            op: "+",
+                            op: Op::Add,
                             left: Box::new(Expr::Ident("x")),
                             right: Box::new(Expr::Num("0.1")),
                         }),
@@ -370,9 +370,9 @@ fn tiny_program() {
          };",
         Ok(vec![Syntax {
             statement: Stmt::Assign {
-                op: "=",
+                op: Op::Assign,
                 ident: Expr::Infix {
-                    op: ".",
+                    op: Op::Member,
                     left: Box::new(Expr::Ident("window")),
                     right: Box::new(Expr::Ident("onload")),
                 },
@@ -395,7 +395,7 @@ fn tiny_program() {
                         },
                         Syntax {
                             statement: Stmt::Ret(Expr::Infix {
-                                op: "+",
+                                op: Op::Add,
                                 left: Box::new(Expr::Ident("a")),
                                 right: Box::new(Expr::Ident("b")),
                             }),
@@ -419,7 +419,7 @@ fn prefix_operators() {
                 statement: Stmt::Decl {
                     ident: "a",
                     expr: Expr::Prefix {
-                        op: "!",
+                        op: Op::Not,
                         expr: Box::new(Expr::Bool("true")),
                     },
                 },
@@ -429,7 +429,7 @@ fn prefix_operators() {
                 statement: Stmt::Decl {
                     ident: "b",
                     expr: Expr::Prefix {
-                        op: "-",
+                        op: Op::Sub,
                         expr: Box::new(Expr::Num("1.0")),
                     },
                 },
@@ -447,16 +447,16 @@ fn nested_expression() {
             statement: Stmt::Decl {
                 ident: "x",
                 expr: Expr::Infix {
-                    op: "+",
+                    op: Op::Add,
                     left: Box::new(Expr::Infix {
-                        op: "+",
+                        op: Op::Add,
                         left: Box::new(Expr::Ident("a")),
                         right: Box::new(Expr::Ident("b")),
                     }),
                     right: Box::new(Expr::Infix {
-                        op: "+",
+                        op: Op::Add,
                         left: Box::new(Expr::Infix {
-                            op: "+",
+                            op: Op::Add,
                             left: Box::new(Expr::Ident("c")),
                             right: Box::new(Expr::Ident("d")),
                         }),
@@ -477,14 +477,14 @@ fn increment() {
         Ok(vec![
             Syntax {
                 statement: Stmt::Effect(Expr::Postfix {
-                    op: "++",
+                    op: Op::Increment,
                     expr: Box::new(Expr::Ident("a")),
                 }),
                 line: 0,
             },
             Syntax {
                 statement: Stmt::Effect(Expr::Prefix {
-                    op: "++",
+                    op: Op::Increment,
                     expr: Box::new(Expr::Ident("b")),
                 }),
                 line: 1,
@@ -501,14 +501,14 @@ fn decrement() {
         Ok(vec![
             Syntax {
                 statement: Stmt::Effect(Expr::Postfix {
-                    op: "--",
+                    op: Op::Decrement,
                     expr: Box::new(Expr::Ident("a")),
                 }),
                 line: 0,
             },
             Syntax {
                 statement: Stmt::Effect(Expr::Prefix {
-                    op: "--",
+                    op: Op::Decrement,
                     expr: Box::new(Expr::Ident("b")),
                 }),
                 line: 1,
@@ -556,7 +556,7 @@ fn if_else() {
                     condition: Expr::Bool("true"),
                     if_: vec![Syntax {
                         statement: Stmt::Assign {
-                            op: "=",
+                            op: Op::Assign,
                             ident: Expr::Ident("a"),
                             expr: Expr::Num("0"),
                         },
@@ -564,7 +564,7 @@ fn if_else() {
                     }],
                     else_: vec![Syntax {
                         statement: Stmt::Assign {
-                            op: "=",
+                            op: Op::Assign,
                             ident: Expr::Ident("a"),
                             expr: Expr::Num("1"),
                         },
@@ -664,7 +664,7 @@ fn small_function() {
                     },
                     Syntax {
                         statement: Stmt::Ret(Expr::Infix {
-                            op: ".",
+                            op: Op::Member,
                             left: Box::new(Expr::Ident("d")),
                             right: Box::new(Expr::Ident("a")),
                         }),
@@ -709,13 +709,13 @@ fn operator_precedence() {
             },
             Syntax {
                 statement: Stmt::Effect(Expr::Infix {
-                    op: "+",
+                    op: Op::Add,
                     left: Box::new(Expr::Postfix {
-                        op: "++",
+                        op: Op::Increment,
                         expr: Box::new(Expr::Infix {
-                            op: ".",
+                            op: Op::Member,
                             left: Box::new(Expr::Infix {
-                                op: ".",
+                                op: Op::Member,
                                 left: Box::new(Expr::Ident("x")),
                                 right: Box::new(Expr::Ident("a")),
                             }),
@@ -728,13 +728,13 @@ fn operator_precedence() {
             },
             Syntax {
                 statement: Stmt::Effect(Expr::Infix {
-                    op: "+",
+                    op: Op::Add,
                     left: Box::new(Expr::Prefix {
-                        op: "++",
+                        op: Op::Increment,
                         expr: Box::new(Expr::Infix {
-                            op: ".",
+                            op: Op::Member,
                             left: Box::new(Expr::Infix {
-                                op: ".",
+                                op: Op::Member,
                                 left: Box::new(Expr::Ident("x")),
                                 right: Box::new(Expr::Ident("a")),
                             }),
@@ -747,14 +747,14 @@ fn operator_precedence() {
             },
             Syntax {
                 statement: Stmt::Effect(Expr::Infix {
-                    op: "+",
+                    op: Op::Add,
                     left: Box::new(Expr::Num(".01")),
                     right: Box::new(Expr::Postfix {
-                        op: "++",
+                        op: Op::Increment,
                         expr: Box::new(Expr::Infix {
-                            op: ".",
+                            op: Op::Member,
                             left: Box::new(Expr::Infix {
-                                op: ".",
+                                op: Op::Member,
                                 left: Box::new(Expr::Ident("x")),
                                 right: Box::new(Expr::Ident("a")),
                             }),
@@ -766,14 +766,14 @@ fn operator_precedence() {
             },
             Syntax {
                 statement: Stmt::Effect(Expr::Infix {
-                    op: "+",
+                    op: Op::Add,
                     left: Box::new(Expr::Num(".01")),
                     right: Box::new(Expr::Prefix {
-                        op: "++",
+                        op: Op::Increment,
                         expr: Box::new(Expr::Infix {
-                            op: ".",
+                            op: Op::Member,
                             left: Box::new(Expr::Infix {
-                                op: ".",
+                                op: Op::Member,
                                 left: Box::new(Expr::Ident("x")),
                                 right: Box::new(Expr::Ident("a")),
                             }),
@@ -847,13 +847,13 @@ fn parse_if_else_chain() {
             Syntax {
                 statement: Stmt::Cond {
                     condition: Expr::Infix {
-                        op: "===",
+                        op: Op::Equality,
                         left: Box::new(Expr::Ident("x")),
                         right: Box::new(Expr::Num("0")),
                     },
                     if_: vec![Syntax {
                         statement: Stmt::Assign {
-                            op: "=",
+                            op: Op::Assign,
                             ident: Expr::Ident("y"),
                             expr: Expr::Num("0"),
                         },
@@ -862,16 +862,16 @@ fn parse_if_else_chain() {
                     else_: vec![Syntax {
                         statement: Stmt::Cond {
                             condition: Expr::Infix {
-                                op: "===",
+                                op: Op::Equality,
                                 left: Box::new(Expr::Ident("x")),
                                 right: Box::new(Expr::Prefix {
-                                    op: "-",
+                                    op: Op::Sub,
                                     expr: Box::new(Expr::Num("1")),
                                 }),
                             },
                             if_: vec![Syntax {
                                 statement: Stmt::Assign {
-                                    op: "=",
+                                    op: Op::Assign,
                                     ident: Expr::Ident("y"),
                                     expr: Expr::Num("1"),
                                 },
@@ -879,7 +879,7 @@ fn parse_if_else_chain() {
                             }],
                             else_: vec![Syntax {
                                 statement: Stmt::Assign {
-                                    op: "=",
+                                    op: Op::Assign,
                                     ident: Expr::Ident("y"),
                                     expr: Expr::Num("2"),
                                 },
@@ -927,7 +927,7 @@ fn switch_simple() {
                                 Syntax {
                                     statement: Stmt::Effect(Expr::Call {
                                         expr: Box::new(Expr::Infix {
-                                            op: ".",
+                                            op: Op::Member,
                                             left: Box::new(Expr::Ident(
                                                 "console",
                                             )),
@@ -948,7 +948,7 @@ fn switch_simple() {
                                 Syntax {
                                     statement: Stmt::Effect(Expr::Call {
                                         expr: Box::new(Expr::Infix {
-                                            op: ".",
+                                            op: Op::Member,
                                             left: Box::new(Expr::Ident(
                                                 "console",
                                             )),
@@ -967,7 +967,7 @@ fn switch_simple() {
                     default: vec![Syntax {
                         statement: Stmt::Effect(Expr::Call {
                             expr: Box::new(Expr::Infix {
-                                op: ".",
+                                op: Op::Member,
                                 left: Box::new(Expr::Ident("console")),
                                 right: Box::new(Expr::Ident("log")),
                             }),
@@ -1029,7 +1029,7 @@ fn switch() {
                             body: vec![
                                 Syntax {
                                     statement: Stmt::Assign {
-                                        op: "=",
+                                        op: Op::Assign,
                                         ident: Expr::Ident("y"),
                                         expr: Expr::Str("0"),
                                     },
@@ -1043,7 +1043,7 @@ fn switch() {
                             body: vec![
                                 Syntax {
                                     statement: Stmt::Assign {
-                                        op: "=",
+                                        op: Op::Assign,
                                         ident: Expr::Ident("y"),
                                         expr: Expr::Str("1"),
                                     },
@@ -1055,7 +1055,7 @@ fn switch() {
                     ],
                     default: vec![Syntax {
                         statement: Stmt::Assign {
-                            op: "=",
+                            op: Op::Assign,
                             ident: Expr::Ident("y"),
                             expr: Expr::Undef,
                         },
@@ -1067,7 +1067,7 @@ fn switch() {
             Syntax {
                 statement: Stmt::Effect(Expr::Call {
                     expr: Box::new(Expr::Infix {
-                        op: ".",
+                        op: Op::Member,
                         left: Box::new(Expr::Ident("console")),
                         right: Box::new(Expr::Ident("log")),
                     }),
@@ -1086,7 +1086,7 @@ fn console_log() {
         Ok(vec![Syntax {
             statement: Stmt::Effect(Expr::Call {
                 expr: Box::new(Expr::Infix {
-                    op: ".",
+                    op: Op::Member,
                     left: Box::new(Expr::Ident("console")),
                     right: Box::new(Expr::Ident("log")),
                 }),
@@ -1127,7 +1127,7 @@ fn ternary_operator() {
                 ident: "x",
                 expr: Expr::Ternary {
                     condition: Box::new(Expr::Infix {
-                        op: "===",
+                        op: Op::Equality,
                         left: Box::new(Expr::Ident("y")),
                         right: Box::new(Expr::Num("0")),
                     }),
@@ -1146,7 +1146,7 @@ fn modulo_operator() {
         "10 % 9;",
         Ok(vec![Syntax {
             statement: Stmt::Effect(Expr::Infix {
-                op: "%",
+                op: Op::Mod,
                 left: Box::new(Expr::Num("10")),
                 right: Box::new(Expr::Num("9")),
             }),
@@ -1161,18 +1161,18 @@ fn boolean_operators() {
         "10 % 9 === 1 || true && false;",
         Ok(vec![Syntax {
             statement: Stmt::Effect(Expr::Infix {
-                op: "||",
+                op: Op::Or,
                 left: Box::new(Expr::Infix {
-                    op: "===",
+                    op: Op::Equality,
                     left: Box::new(Expr::Infix {
-                        op: "%",
+                        op: Op::Mod,
                         left: Box::new(Expr::Num("10")),
                         right: Box::new(Expr::Num("9")),
                     }),
                     right: Box::new(Expr::Num("1")),
                 }),
                 right: Box::new(Expr::Infix {
-                    op: "&&",
+                    op: Op::And,
                     left: Box::new(Expr::Bool("true")),
                     right: Box::new(Expr::Bool("false")),
                 }),
@@ -1188,7 +1188,7 @@ fn negate_call() {
         "!f();",
         Ok(vec![Syntax {
             statement: Stmt::Effect(Expr::Prefix {
-                op: "!",
+                op: Op::Not,
                 expr: Box::new(Expr::Call {
                     expr: Box::new(Expr::Ident("f")),
                     args: Vec::new(),
@@ -1205,7 +1205,7 @@ fn new() {
         "new Uint8Array(buffer, 0, 13);",
         Ok(vec![Syntax {
             statement: Stmt::Effect(Expr::Prefix {
-                op: "new",
+                op: Op::New,
                 expr: Box::new(Expr::Call {
                     expr: Box::new(Expr::Ident("Uint8Array")),
                     args: vec![
@@ -1226,7 +1226,7 @@ fn add_nested_functions() {
         "f(g()) + g(f());",
         Ok(vec![Syntax {
             statement: Stmt::Effect(Expr::Infix {
-                op: "+",
+                op: Op::Add,
                 left: Box::new(Expr::Call {
                     expr: Box::new(Expr::Ident("f")),
                     args: vec![Expr::Call {
@@ -1254,10 +1254,10 @@ fn call_method_chain() {
         Ok(vec![Syntax {
             statement: Stmt::Effect(Expr::Call {
                 expr: Box::new(Expr::Infix {
-                    op: ".",
+                    op: Op::Member,
                     left: Box::new(Expr::Call {
                         expr: Box::new(Expr::Infix {
-                            op: ".",
+                            op: Op::Member,
                             left: Box::new(Expr::Call {
                                 expr: Box::new(Expr::Ident("f")),
                                 args: Vec::new(),
@@ -1269,7 +1269,7 @@ fn call_method_chain() {
                     right: Box::new(Expr::Ident("y")),
                 }),
                 args: vec![Expr::Infix {
-                    op: ".",
+                    op: Op::Member,
                     left: Box::new(Expr::Call {
                         expr: Box::new(Expr::Ident("g")),
                         args: Vec::new(),
@@ -1290,9 +1290,9 @@ fn promise() {
          };",
         Ok(vec![Syntax {
             statement: Stmt::Assign {
-                op: "=",
+                op: Op::Assign,
                 ident: Expr::Infix {
-                    op: ".",
+                    op: Op::Member,
                     left: Box::new(Expr::Ident("window")),
                     right: Box::new(Expr::Ident("onload")),
                 },
@@ -1301,10 +1301,10 @@ fn promise() {
                     body: vec![Syntax {
                         statement: Stmt::Effect(Expr::Call {
                             expr: Box::new(Expr::Infix {
-                                op: ".",
+                                op: Op::Member,
                                 left: Box::new(Expr::Call {
                                     expr: Box::new(Expr::Infix {
-                                        op: ".",
+                                        op: Op::Member,
                                         left: Box::new(Expr::Ident("module")),
                                         right: Box::new(Expr::Ident("init")),
                                     }),
@@ -1335,9 +1335,9 @@ fn brackets() {
         "array[0].x = null;",
         Ok(vec![Syntax {
             statement: Stmt::Assign {
-                op: "=",
+                op: Op::Assign,
                 ident: Expr::Infix {
-                    op: ".",
+                    op: Op::Member,
                     left: Box::new(Expr::Access {
                         expr: Box::new(Expr::Ident("array")),
                         index: Box::new(Expr::Num("0")),
@@ -1364,14 +1364,14 @@ fn bit_operators() {
         Ok(vec![
             Syntax {
                 statement: Stmt::Effect(Expr::Prefix {
-                    op: "~",
+                    op: Op::BitwiseNot,
                     expr: Box::new(Expr::Num("0")),
                 }),
                 line: 0,
             },
             Syntax {
                 statement: Stmt::Effect(Expr::Infix {
-                    op: "&",
+                    op: Op::BitwiseAnd,
                     left: Box::new(Expr::Num("1")),
                     right: Box::new(Expr::Num("1")),
                 }),
@@ -1379,7 +1379,7 @@ fn bit_operators() {
             },
             Syntax {
                 statement: Stmt::Effect(Expr::Infix {
-                    op: "|",
+                    op: Op::BitwiseOr,
                     left: Box::new(Expr::Num("2")),
                     right: Box::new(Expr::Num("2")),
                 }),
@@ -1387,7 +1387,7 @@ fn bit_operators() {
             },
             Syntax {
                 statement: Stmt::Effect(Expr::Infix {
-                    op: "^",
+                    op: Op::BitwiseXor,
                     left: Box::new(Expr::Num("3")),
                     right: Box::new(Expr::Num("3")),
                 }),
@@ -1395,7 +1395,7 @@ fn bit_operators() {
             },
             Syntax {
                 statement: Stmt::Effect(Expr::Infix {
-                    op: "<<",
+                    op: Op::ShiftLeft,
                     left: Box::new(Expr::Num("4")),
                     right: Box::new(Expr::Num("4")),
                 }),
@@ -1403,7 +1403,7 @@ fn bit_operators() {
             },
             Syntax {
                 statement: Stmt::Effect(Expr::Infix {
-                    op: ">>",
+                    op: Op::ShiftRight,
                     left: Box::new(Expr::Num("5")),
                     right: Box::new(Expr::Num("5")),
                 }),
@@ -1411,7 +1411,7 @@ fn bit_operators() {
             },
             Syntax {
                 statement: Stmt::Effect(Expr::Infix {
-                    op: ">>>",
+                    op: Op::UnsignedShiftRight,
                     left: Box::new(Expr::Num("6")),
                     right: Box::new(Expr::Num("6")),
                 }),
@@ -1431,7 +1431,7 @@ fn update_assign() {
         Ok(vec![
             Syntax {
                 statement: Stmt::Assign {
-                    op: "+=",
+                    op: Op::AssignAdd,
                     ident: Expr::Ident("a"),
                     expr: Expr::Num("1"),
                 },
@@ -1439,7 +1439,7 @@ fn update_assign() {
             },
             Syntax {
                 statement: Stmt::Assign {
-                    op: "-=",
+                    op: Op::AssignSub,
                     ident: Expr::Ident("b"),
                     expr: Expr::Num("1"),
                 },
@@ -1447,7 +1447,7 @@ fn update_assign() {
             },
             Syntax {
                 statement: Stmt::Assign {
-                    op: "*=",
+                    op: Op::AssignMul,
                     ident: Expr::Ident("c"),
                     expr: Expr::Num("2"),
                 },
@@ -1455,7 +1455,7 @@ fn update_assign() {
             },
             Syntax {
                 statement: Stmt::Assign {
-                    op: "/=",
+                    op: Op::AssignDiv,
                     ident: Expr::Ident("d"),
                     expr: Expr::Num("2"),
                 },
@@ -1480,19 +1480,19 @@ fn r#while() {
             Syntax {
                 statement: Stmt::While {
                     condition: Expr::Infix {
-                        op: "<",
+                        op: Op::LessThan,
                         left: Box::new(Expr::Ident("i")),
                         right: Box::new(Expr::Num("10")),
                     },
                     body: vec![Syntax {
                         statement: Stmt::Effect(Expr::Call {
                             expr: Box::new(Expr::Infix {
-                                op: ".",
+                                op: Op::Member,
                                 left: Box::new(Expr::Ident("console")),
                                 right: Box::new(Expr::Ident("log")),
                             }),
                             args: vec![Expr::Postfix {
-                                op: "++",
+                                op: Op::Increment,
                                 expr: Box::new(Expr::Ident("i")),
                             }],
                         }),
@@ -1518,13 +1518,13 @@ fn r#for() {
                     line: 0,
                 })),
                 condition: Some(Expr::Infix {
-                    op: "<",
+                    op: Op::LessThan,
                     left: Box::new(Expr::Ident("i")),
                     right: Box::new(Expr::Num("10")),
                 }),
                 update: Some(Box::new(Syntax {
                     statement: Stmt::Effect(Expr::Prefix {
-                        op: "++",
+                        op: Op::Increment,
                         expr: Box::new(Expr::Ident("i")),
                     }),
                     line: 0,
@@ -1532,7 +1532,7 @@ fn r#for() {
                 body: vec![Syntax {
                     statement: Stmt::Effect(Expr::Call {
                         expr: Box::new(Expr::Infix {
-                            op: ".",
+                            op: Op::Member,
                             left: Box::new(Expr::Ident("console")),
                             right: Box::new(Expr::Ident("log")),
                         }),
@@ -1560,7 +1560,7 @@ fn for_empty() {
                 body: vec![Syntax {
                     statement: Stmt::Effect(Expr::Call {
                         expr: Box::new(Expr::Infix {
-                            op: ".",
+                            op: Op::Member,
                             left: Box::new(Expr::Ident("console")),
                             right: Box::new(Expr::Ident("log")),
                         }),
@@ -1590,20 +1590,20 @@ fn for_update() {
                 statement: Stmt::For {
                     init: Some(Box::new(Syntax {
                         statement: Stmt::Assign {
-                            op: "=",
+                            op: Op::Assign,
                             ident: Expr::Ident("i"),
                             expr: Expr::Num("0"),
                         },
                         line: 1,
                     })),
                     condition: Some(Expr::Infix {
-                        op: "<",
+                        op: Op::LessThan,
                         left: Box::new(Expr::Ident("i")),
                         right: Box::new(Expr::Num("10")),
                     }),
                     update: Some(Box::new(Syntax {
                         statement: Stmt::Assign {
-                            op: "+=",
+                            op: Op::AssignAdd,
                             ident: Expr::Ident("i"),
                             expr: Expr::Num("2"),
                         },
@@ -1612,7 +1612,7 @@ fn for_update() {
                     body: vec![Syntax {
                         statement: Stmt::Effect(Expr::Call {
                             expr: Box::new(Expr::Infix {
-                                op: ".",
+                                op: Op::Member,
                                 left: Box::new(Expr::Ident("console")),
                                 right: Box::new(Expr::Ident("log")),
                             }),
@@ -1665,7 +1665,7 @@ fn scoped_array_access() {
             statement: Stmt::Scope(vec![
                 Syntax {
                     statement: Stmt::Assign {
-                        op: "=",
+                        op: Op::Assign,
                         ident: Expr::Access {
                             expr: Box::new(Expr::Ident("x")),
                             index: Box::new(Expr::Num("2")),
@@ -1676,7 +1676,7 @@ fn scoped_array_access() {
                 },
                 Syntax {
                     statement: Stmt::Assign {
-                        op: "=",
+                        op: Op::Assign,
                         ident: Expr::Access {
                             expr: Box::new(Expr::Ident("x")),
                             index: Box::new(Expr::Num("3")),

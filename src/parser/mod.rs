@@ -1,11 +1,12 @@
 #[cfg(test)]
 mod test;
 
-use crate::tokenizer::{Count, Lex, Tkn};
+use crate::tokenizer::{Count, Lex, Op, Tkn};
 use std::iter::Peekable;
 use std::slice::Iter;
 
-const ASSIGN_OPS: [&str; 5] = ["=", "+=", "-=", "*=", "/="];
+const ASSIGN_OPS: [Op; 5] =
+    [Op::Assign, Op::AssignAdd, Op::AssignSub, Op::AssignMul, Op::AssignDiv];
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Error<'a> {
@@ -28,16 +29,16 @@ pub(crate) enum Expr<'a> {
     Array(Vec<Expr<'a>>),
     Ident(&'a str),
     Prefix {
-        op: &'a str,
+        op: Op,
         expr: Box<Expr<'a>>,
     },
     Infix {
-        op: &'a str,
+        op: Op,
         left: Box<Expr<'a>>,
         right: Box<Expr<'a>>,
     },
     Postfix {
-        op: &'a str,
+        op: Op,
         expr: Box<Expr<'a>>,
     },
     Ternary {
@@ -76,7 +77,7 @@ pub(crate) enum Stmt<'a> {
     },
     Decls(Vec<&'a str>),
     Assign {
-        op: &'a str,
+        op: Op,
         ident: Expr<'a>,
         expr: Expr<'a>,
     },
@@ -201,7 +202,7 @@ fn get_fn<'a, 'b>(
     Ok(Expr::Fn { args, body: get_body(tokens)? })
 }
 
-fn is_assign_op(x: &str) -> bool {
+fn is_assign_op(x: Op) -> bool {
     for op in &ASSIGN_OPS {
         if x == *op {
             return true;
@@ -235,12 +236,16 @@ fn get_expr<'a, 'b>(
             }
             Lex { token: Tkn::Op(x), .. } if !is_assign_op(*x) => {
                 let power: u8 = match *x {
-                    "new" => 25,
-                    "-" | "~" | "!" | "++" | "--" => 21,
+                    Op::New => 25,
+                    Op::Sub
+                    | Op::Not
+                    | Op::BitwiseNot
+                    | Op::Increment
+                    | Op::Decrement => 21,
                     _ => return Err(Error::Token(*token)),
                 };
                 Expr::Prefix {
-                    op: x,
+                    op: *x,
                     expr: Box::new(get_expr(tokens, power)?),
                 }
             }
@@ -285,7 +290,7 @@ fn get_expr<'a, 'b>(
             match token {
                 Lex { token: Tkn::Op(x), .. } if !is_assign_op(*x) => {
                     let power: Option<u8> = match *x {
-                        "++" | "--" => Some(23),
+                        Op::Increment | Op::Decrement => Some(23),
                         _ => None,
                     };
                     if let Some(power) = power {
@@ -293,20 +298,25 @@ fn get_expr<'a, 'b>(
                             break;
                         }
                         eat!(tokens);
-                        expr = Expr::Postfix { op: x, expr: Box::new(expr) };
+                        expr = Expr::Postfix { op: *x, expr: Box::new(expr) };
                     } else {
                         let (l_power, r_power): (u8, u8) = match *x {
-                            "." => (25, 26),
-                            "*" | "/" | "%" => (19, 20),
-                            "+" | "-" => (17, 18),
-                            "<<" | ">>" | ">>>" => (15, 16),
-                            "<" | ">" | "<=" | ">=" => (13, 14),
-                            "===" | "!==" => (11, 12),
-                            "&" => (9, 10),
-                            "^" => (7, 8),
-                            "|" => (5, 6),
-                            "&&" => (3, 4),
-                            "||" => (1, 2),
+                            Op::Member => (25, 26),
+                            Op::Mul | Op::Div | Op::Mod => (19, 20),
+                            Op::Add | Op::Sub => (17, 18),
+                            Op::ShiftLeft
+                            | Op::ShiftRight
+                            | Op::UnsignedShiftRight => (15, 16),
+                            Op::LessThan
+                            | Op::GreaterThan
+                            | Op::LessThanEquals
+                            | Op::GreaterThanEquals => (13, 14),
+                            Op::Equality | Op::Inequality => (11, 12),
+                            Op::BitwiseAnd => (9, 10),
+                            Op::BitwiseXor => (7, 8),
+                            Op::BitwiseOr => (5, 6),
+                            Op::And => (3, 4),
+                            Op::Or => (1, 2),
                             _ => return Err(Error::Token(**token)),
                         };
                         if l_power < precedence {
@@ -314,7 +324,7 @@ fn get_expr<'a, 'b>(
                         }
                         eat!(tokens);
                         expr = Expr::Infix {
-                            op: x,
+                            op: *x,
                             left: Box::new(expr),
                             right: Box::new(get_expr(tokens, r_power)?),
                         };
@@ -455,7 +465,7 @@ fn get_stmt<'a, 'b>(
                                 let b: Expr = get_expr(tokens, 0)?;
                                 Some(Box::new(Syntax {
                                     statement: Stmt::Assign {
-                                        op: x,
+                                        op: *x,
                                         ident: a,
                                         expr: b,
                                     },
@@ -529,7 +539,7 @@ fn get_stmt<'a, 'b>(
                     statement: Stmt::Decl { ident, expr: Expr::Uninit },
                     line: *line,
                 },
-                Some(Lex { token: Tkn::Op("="), .. }) => {
+                Some(Lex { token: Tkn::Op(Op::Assign), .. }) => {
                     let var: Syntax = Syntax {
                         statement: Stmt::Decl {
                             ident,
@@ -575,7 +585,7 @@ fn get_stmt<'a, 'b>(
                     eat_or_error!(tokens, Tkn::Semicolon);
                     Syntax {
                         statement: Stmt::Assign {
-                            op: x,
+                            op: *x,
                             ident: expr_a,
                             expr: expr_b,
                         },
