@@ -42,6 +42,7 @@ export RUST_BACKTRACE=1
         -W clippy::pedantic \
         -A clippy::similar-names \
         -A clippy::too_many_lines \
+        -A unused-variables \
         --test \
         "$WD/src/main.rs"
     rm "$WD/src/main"
