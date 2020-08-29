@@ -9,6 +9,7 @@ use std::rc::Rc;
 pub(crate) enum Message {
     ArrayMultiType,
     IdentShadow,
+    IdentUninit,
     IdentUnknown,
     ObjDuplicateKeys,
 }
@@ -29,6 +30,7 @@ pub(crate) enum Type<'a> {
     Obj(Rc<BTreeMap<&'a str, Type<'a>>>),
     EmptyArray,
     Array(Rc<Type<'a>>),
+    Uninit,
 }
 
 fn get_expr<'a, 'b>(
@@ -37,6 +39,7 @@ fn get_expr<'a, 'b>(
 ) -> Result<Type<'a>, Message> {
     Ok(match expr {
         Expr::Ident(ident) => match types.get(&vec![*ident]) {
+            Some(Type::Uninit) => return Err(Message::IdentUninit),
             Some(type_) => type_.clone(),
             None => return Err(Message::IdentUnknown),
         },
@@ -45,6 +48,7 @@ fn get_expr<'a, 'b>(
         Expr::Bool(_) => Type::Bool,
         Expr::Null => Type::Null,
         Expr::Undef => Type::Undef,
+        Expr::Uninit => Type::Uninit,
         Expr::Obj(parse_props) => {
             let mut type_props: BTreeMap<&str, Type> = BTreeMap::new();
             for prop in parse_props {

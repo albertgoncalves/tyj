@@ -25,6 +25,7 @@ fn get_message(message: &Message) -> &'static str {
     match message {
         Message::ArrayMultiType => "array contains multiple types",
         Message::IdentShadow => "shadowed identifier",
+        Message::IdentUninit => "uninitialized identifier",
         Message::IdentUnknown => "unknown identifier",
         Message::ObjDuplicateKeys => "object contains duplicate keys",
     }

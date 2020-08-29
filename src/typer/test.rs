@@ -241,3 +241,18 @@ fn declare_array_err() {
         }),
     )
 }
+
+#[test]
+fn declare_uninit_ident_err() {
+    assert_types!(
+        "var x;
+         var y = x;",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Decl { ident: "y", expr: Expr::Ident("x") },
+                line: 1,
+            },
+            message: Message::IdentUninit,
+        }),
+    )
+}
