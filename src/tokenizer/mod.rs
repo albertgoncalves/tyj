@@ -202,8 +202,9 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
                 line += n;
                 eat!();
             }
-            _ => tokens
-                .push(Lex { token: Tkn::Illegal(&source[i..(i + 1)]), line }),
+            _ => {
+                tokens.push(Lex { token: Tkn::Illegal(&source[i..=i]), line })
+            }
         }
     }
     tokens

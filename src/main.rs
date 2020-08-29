@@ -21,7 +21,7 @@ macro_rules! EXIT {
     };
 }
 
-fn get_message(message: Message) -> &'static str {
+fn get_message(message: &Message) -> &'static str {
     match message {
         Message::ArrayMultiType => "array contains multiple types",
         Message::IdentShadow => "shadowed identifier",
@@ -38,7 +38,7 @@ fn main() {
     let filename: &str = &args[1];
     let source: String = match read_to_string(filename) {
         Ok(source) => source,
-        _ => EXIT!(),
+        Err(_) => EXIT!(),
     };
     let ast: Vec<Syntax> = match get_ast(&get_tokens(&source)) {
         Ok(ast) => ast,
@@ -66,7 +66,7 @@ fn main() {
                 ERROR!(),
                 filename,
                 syntax.line + 1,
-                get_message(message)
+                get_message(&message)
             );
             EXIT!()
         }

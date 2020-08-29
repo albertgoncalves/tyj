@@ -48,8 +48,9 @@ fn get_expr<'a, 'b>(
         Expr::Obj(parse_props) => {
             let mut type_props: BTreeMap<&str, Type> = BTreeMap::new();
             for prop in parse_props {
-                if let Some(_) =
-                    type_props.insert(prop.key, get_expr(types, &prop.value)?)
+                if type_props
+                    .insert(prop.key, get_expr(types, &prop.value)?)
+                    .is_some()
                 {
                     return Err(Message::ObjDuplicateKeys);
                 }
@@ -62,7 +63,7 @@ fn get_expr<'a, 'b>(
                 let _: bool = type_elems.insert(get_expr(types, elem)?);
             }
             let mut type_: Type = Type::EmptyArray;
-            for elem in type_elems.iter() {
+            for elem in &type_elems {
                 match type_ {
                     Type::EmptyArray => {
                         type_ = Type::Array(Rc::new(elem.clone()))

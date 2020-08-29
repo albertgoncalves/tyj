@@ -119,7 +119,7 @@ pub(crate) struct Syntax<'a> {
 
 macro_rules! eat {
     ($tokens:expr $(,)?) => {{
-        if let Some(_) = $tokens.next() {
+        if $tokens.next().is_some() {
             ()
         } else {
             return Err(Error::EOF);
@@ -607,7 +607,7 @@ pub(crate) fn get_ast<'a>(
     }
     let mut ast: Vec<Syntax> = Vec::new();
     let mut ast_tokens: Peekable<Iter<Lex>> = ast_tokens.iter().peekable();
-    while let Some(_) = ast_tokens.peek() {
+    while ast_tokens.peek().is_some() {
         ast.push(get_stmt(&mut ast_tokens)?);
     }
     Ok(ast)

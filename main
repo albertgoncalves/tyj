@@ -2,7 +2,18 @@
 
 set -euo pipefail
 
-rustfmt "$WD/src/main.rs"
+(
+    rustfmt "$WD/src/main.rs"
+    cd "$WD/src" || return
+    clippy-driver \
+        -D warnings \
+        -W clippy::pedantic \
+        -A clippy::similar-names \
+        -A clippy::too_many_lines \
+        --test \
+        "$WD/src/main.rs"
+    rm "$WD/src/main"
+)
 
 export FLAGS=(
     -C "opt-level=0"
