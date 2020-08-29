@@ -90,9 +90,10 @@ fn set_type<'a, 'b>(
             set_type(types, &key, &prop_value)?;
         }
     }
-    match types.insert(keys.to_vec(), type_.clone()) {
-        Some(_) => Err(Message::ObjDuplicateKeys),
-        None => Ok(()),
+    if types.insert(keys.to_vec(), type_.clone()).is_some() {
+        Err(Message::ObjDuplicateKeys)
+    } else {
+        Ok(())
     }
 }
 
