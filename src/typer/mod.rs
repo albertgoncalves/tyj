@@ -2,6 +2,7 @@
 mod test;
 
 use crate::parser::{Expr, Stmt, Syntax};
+use crate::tokenizer::Op;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 
@@ -11,6 +12,7 @@ pub(crate) enum Message {
     IdentShadow,
     IdentUninit,
     IdentUnknown,
+    IncompatibleTypes,
     ObjDuplicateKeys,
 }
 
@@ -77,6 +79,15 @@ fn get_expr<'a, 'b>(
             }
             type_
         }
+        Expr::Prefix { op, expr } => match (get_expr(types, expr)?, op) {
+            (Type::Num, Op::BitwiseNot)
+            | (Type::Num, Op::Sub)
+            | (Type::Num, Op::Increment)
+            | (Type::Num, Op::Decrement) => Type::Num,
+            (Type::Bool, Op::Not) => Type::Bool,
+            (_, Op::New) => panic!("{:#?} {:#?}", op, expr),
+            _ => return Err(Message::IncompatibleTypes),
+        },
         _ => panic!("{:#?}", expr),
     })
 }

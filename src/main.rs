@@ -27,6 +27,7 @@ fn get_message(message: &Message) -> &'static str {
         Message::IdentShadow => "shadowed identifier",
         Message::IdentUninit => "uninitialized identifier",
         Message::IdentUnknown => "unknown identifier",
+        Message::IncompatibleTypes => "incompatible types",
         Message::ObjDuplicateKeys => "object contains duplicate keys",
     }
 }

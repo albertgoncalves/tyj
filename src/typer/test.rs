@@ -1,6 +1,6 @@
 use super::{get_types, Error, Message, Type};
 use crate::parser::{get_ast, Expr, Prop, Stmt, Syntax};
-use crate::tokenizer::get_tokens;
+use crate::tokenizer::{get_tokens, Op};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
@@ -253,6 +253,47 @@ fn declare_uninit_ident_err() {
                 line: 1,
             },
             message: Message::IdentUninit,
+        }),
+    )
+}
+
+#[test]
+fn declare_prefix() {
+    assert_types!(
+        "var a = !false;
+         var b = -0;
+         var c = ~0;
+         var d = ++b;
+         var e = --c;",
+        Ok(vec![
+            (vec!["a"], Type::Bool),
+            (vec!["b"], Type::Num),
+            (vec!["c"], Type::Num),
+            (vec!["d"], Type::Num),
+            (vec!["e"], Type::Num),
+        ]
+        .into_iter()
+        .collect()),
+    )
+}
+
+#[test]
+fn declare_prefix_err() {
+    assert_types!(
+        "var a = null;
+         var b = !a;",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Decl {
+                    ident: "b",
+                    expr: Expr::Prefix {
+                        op: Op::Not,
+                        expr: Box::new(Expr::Ident("a")),
+                    }
+                },
+                line: 1,
+            },
+            message: Message::IncompatibleTypes,
         }),
     )
 }
