@@ -2,19 +2,6 @@
 
 set -euo pipefail
 
-(
-    rustfmt "$WD/src/main.rs"
-    cd "$WD/src" || return
-    clippy-driver \
-        -D warnings \
-        -W clippy::pedantic \
-        -A clippy::similar-names \
-        -A clippy::too_many_lines \
-        --test \
-        "$WD/src/main.rs"
-    rm "$WD/src/main"
-)
-
 export FLAGS=(
     -C "opt-level=0"
     -C "overflow-checks=yes"
@@ -40,6 +27,26 @@ export FLAGS=(
     -W "unused-results"
 )
 export RUST_BACKTRACE=1
+
+(
+    cd "$WD/src" || return
+    rustc \
+        --emit "dep-info,metadata" \
+        -C "embed-bitcode=no" \
+        "${FLAGS[@]}" \
+        "$WD/src/main.rs"
+    rm "$WD/src/libmain.rmeta"
+    rm "$WD/src/main.d"
+    clippy-driver \
+        -D warnings \
+        -W clippy::pedantic \
+        -A clippy::similar-names \
+        -A clippy::too_many_lines \
+        --test \
+        "$WD/src/main.rs"
+    rm "$WD/src/main"
+    rustfmt "$WD/src/main.rs"
+)
 
 set +u
 
