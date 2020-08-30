@@ -28,6 +28,9 @@ fn get_message(message: &Message) -> &'static str {
         Message::IdentUninit => "uninitialized identifier",
         Message::IdentUnknown => "unknown identifier",
         Message::IncompatibleTypes => "incompatible types",
+        Message::NonIdentMember => {
+            "unable to access object with non-identifier"
+        }
         Message::ObjDuplicateKeys => "object contains duplicate keys",
     }
 }

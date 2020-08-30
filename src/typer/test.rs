@@ -297,3 +297,64 @@ fn declare_prefix_err() {
         }),
     )
 }
+
+#[test]
+fn declare_infix_member() {
+    let props: Rc<BTreeMap<&str, Type>> =
+        Rc::new(vec![("y", Type::Num)].into_iter().collect());
+    assert_types!(
+        "var a = {
+             x: {
+                 y: 0,
+             },
+         };
+         var x = null;
+         var y = \"\";
+         var b = a.x.y;",
+        Ok(vec![
+            (vec!["a", "x", "y"], Type::Num),
+            (vec!["a", "x"], Type::Obj(props.clone())),
+            (
+                vec!["a"],
+                Type::Obj(Rc::new(
+                    vec![("x", Type::Obj(props))].into_iter().collect()
+                )),
+            ),
+            (vec!["x"], Type::Null),
+            (vec!["y"], Type::Str),
+            (vec!["b"], Type::Num),
+        ]
+        .into_iter()
+        .collect()),
+    )
+}
+
+#[test]
+fn declare_infix_member_err() {
+    assert_types!(
+        "var a = {
+             x: {
+                 y: 0,
+             },
+         };
+         var b = a.\"x\".y;",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Decl {
+                    ident: "b",
+                    expr: Expr::Infix {
+                        op: Op::Member,
+                        left: Box::new(Expr::Infix {
+                            op: Op::Member,
+                            left: Box::new(Expr::Ident("a")),
+                            right: Box::new(Expr::Str("x")),
+                        }),
+                        right: Box::new(Expr::Ident("y")),
+                    },
+                },
+                line: 5,
+            },
+            message: Message::NonIdentMember,
+        }),
+    )
+}

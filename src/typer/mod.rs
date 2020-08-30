@@ -13,6 +13,7 @@ pub(crate) enum Message {
     IdentUninit,
     IdentUnknown,
     IncompatibleTypes,
+    NonIdentMember,
     ObjDuplicateKeys,
 }
 
@@ -35,16 +36,41 @@ pub(crate) enum Type<'a> {
     Uninit,
 }
 
+fn get_members<'a>(
+    left: &'a Expr<'a>,
+    right: &'a Expr<'a>,
+) -> Result<Vec<&'a str>, Message> {
+    Ok(match (left, right) {
+        /* NOTE: Because `Op::Member` is left-associative, these two branches
+         * *should* be all that we need to recursively parse a nested member
+         * expression.
+         */
+        (Expr::Ident(left), Expr::Ident(right)) => vec![left, right],
+        (Expr::Infix { op: Op::Member, left, right }, Expr::Ident(ident)) => {
+            let mut idents: Vec<&str> = get_members(left, right)?;
+            idents.push(ident);
+            idents
+        }
+        _ => return Err(Message::NonIdentMember),
+    })
+}
+
 fn get_expr<'a, 'b>(
     types: &'b HashMap<Vec<&'a str>, Type<'a>>,
     expr: &'a Expr<'a>,
 ) -> Result<Type<'a>, Message> {
+    macro_rules! deref_ident {
+        ($ident:expr $(,)?) => {
+            match types.get($ident) {
+                Some(Type::Uninit) => return Err(Message::IdentUninit),
+                Some(type_) => type_.clone(),
+                None => return Err(Message::IdentUnknown),
+            }
+        };
+    }
+
     Ok(match expr {
-        Expr::Ident(ident) => match types.get(&vec![*ident]) {
-            Some(Type::Uninit) => return Err(Message::IdentUninit),
-            Some(type_) => type_.clone(),
-            None => return Err(Message::IdentUnknown),
-        },
+        Expr::Ident(ident) => deref_ident!(&vec![*ident]),
         Expr::Num(_) => Type::Num,
         Expr::Str(_) => Type::Str,
         Expr::Bool(_) => Type::Bool,
@@ -87,6 +113,10 @@ fn get_expr<'a, 'b>(
             (Type::Bool, Op::Not) => Type::Bool,
             (_, Op::New) => panic!("{:#?} {:#?}", op, expr),
             _ => return Err(Message::IncompatibleTypes),
+        },
+        Expr::Infix { op, left, right } => match op {
+            Op::Member => deref_ident!(&get_members(left, right)?),
+            _ => panic!("{:?} {:#?} {:#?}", op, left, right),
         },
         _ => panic!("{:#?}", expr),
     })
