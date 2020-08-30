@@ -4,14 +4,13 @@ set -eux
 
 . "$WD/scripts/flags.sh"
 
-cd "$WD/src" || return
 rustc \
     --emit "dep-info,metadata" \
     -C "embed-bitcode=no" \
     "${FLAGS[@]}" \
     "$WD/src/main.rs"
-rm "$WD/src/libmain.rmeta"
-rm "$WD/src/main.d"
+rm libmain.rmeta
+rm main.d
 clippy-driver \
     -D warnings \
     -W clippy::pedantic \
@@ -20,5 +19,5 @@ clippy-driver \
     -A unused-variables \
     --test \
     "$WD/src/main.rs"
-rm "$WD/src/main"
+rm main
 rustfmt "$WD/src/main.rs"
