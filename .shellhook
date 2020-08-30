@@ -5,3 +5,5 @@ export WD=$PWD
 if [ ! -d "$WD/bin" ]; then
     mkdir "$WD/bin"
 fi
+
+alias shellcheck="shellcheck --exclude=SC1090"

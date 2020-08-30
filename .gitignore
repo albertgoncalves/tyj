@@ -2,11 +2,12 @@
 !.gitignore
 !*.nix
 !.shellhook
+!README.md
 !*.toml
 !src/
 !parser/
 !tokenizer/
 !typer/
 !*.rs
-!main
-!profile
+!scripts/
+!*.sh
