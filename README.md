@@ -1,5 +1,9 @@
 # tyj
 
+Static type-checking for the subset of `javascript` syntax that I tend to use.
+
+The idea is to quickly type-check regular `.js` files without needing to bundle or transpile. Should be **fast** and **not require some auxiliary syntax** to facilitate static typing.
+
 Needed things
 ---
 *   [Nix](https://nixos.org/download.html)
