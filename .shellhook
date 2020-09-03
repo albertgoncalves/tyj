@@ -2,8 +2,10 @@
 
 export WD=$PWD
 
-if [ ! -d "$WD/bin" ]; then
-    mkdir "$WD/bin"
-fi
+for x in bin cache cache/main cache/test; do
+    if [ ! -d "$WD/$x" ]; then
+        mkdir "$WD/$x"
+    fi
+done
 
 alias shellcheck="shellcheck --exclude=SC1090"
