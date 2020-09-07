@@ -24,6 +24,12 @@ pub(crate) struct Error<'a> {
     pub(crate) message: Message,
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct Ident<'a> {
+    ident: Vec<&'a str>,
+    scope: Vec<&'a str>,
+}
+
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) enum Type<'a> {
     Num,
@@ -57,12 +63,13 @@ fn get_members<'a>(
 }
 
 fn get_expr<'a, 'b>(
-    types: &'b HashMap<Vec<&'a str>, Type<'a>>,
+    scope: &'b [&'a str],
+    types: &'b HashMap<Ident<'a>, Type<'a>>,
     expr: &'a Expr<'a>,
 ) -> Result<Type<'a>, Message> {
     macro_rules! deref_ident {
         ($ident:expr $(,)?) => {
-            match types.get($ident) {
+            match types.get(&Ident { ident: $ident, scope: scope.to_vec() }) {
                 Some(Type::Uninit) => return Err(Message::IdentUninit),
                 Some(type_) => type_.clone(),
                 None => return Err(Message::IdentUnknown),
@@ -71,7 +78,7 @@ fn get_expr<'a, 'b>(
     }
 
     Ok(match expr {
-        Expr::Ident(ident) => deref_ident!(&vec![*ident]),
+        Expr::Ident(ident) => deref_ident!(vec![*ident]),
         Expr::Num(_) => Type::Num,
         Expr::Str(_) => Type::Str,
         Expr::Bool(_) => Type::Bool,
@@ -82,7 +89,7 @@ fn get_expr<'a, 'b>(
             let mut type_props: BTreeMap<&str, Type> = BTreeMap::new();
             for prop in parse_props {
                 if type_props
-                    .insert(prop.key, get_expr(types, &prop.value)?)
+                    .insert(prop.key, get_expr(scope, types, &prop.value)?)
                     .is_some()
                 {
                     return Err(Message::ObjDuplicateKeys);
@@ -93,7 +100,7 @@ fn get_expr<'a, 'b>(
         Expr::Array(elems) => {
             let mut type_elems: BTreeSet<Type> = BTreeSet::new();
             for elem in elems {
-                let _: bool = type_elems.insert(get_expr(types, elem)?);
+                let _: bool = type_elems.insert(get_expr(scope, types, elem)?);
             }
             let mut type_: Type = Type::EmptyArray;
             for elem in &type_elems {
@@ -106,17 +113,19 @@ fn get_expr<'a, 'b>(
             }
             type_
         }
-        Expr::Prefix { op, expr } => match (get_expr(types, expr)?, op) {
-            (Type::Num, Op::BitwiseNot)
-            | (Type::Num, Op::Sub)
-            | (Type::Num, Op::Increment)
-            | (Type::Num, Op::Decrement) => Type::Num,
-            (Type::Bool, Op::Not) => Type::Bool,
-            (_, Op::New) => panic!("{:#?} {:#?}", op, expr),
-            _ => return Err(Message::IncompatibleTypes),
-        },
+        Expr::Prefix { op, expr } => {
+            match (get_expr(scope, types, expr)?, op) {
+                (Type::Num, Op::BitwiseNot)
+                | (Type::Num, Op::Sub)
+                | (Type::Num, Op::Increment)
+                | (Type::Num, Op::Decrement) => Type::Num,
+                (Type::Bool, Op::Not) => Type::Bool,
+                (_, Op::New) => panic!("{:#?} {:#?}", op, expr),
+                _ => return Err(Message::IncompatibleTypes),
+            }
+        }
         Expr::Infix { op, left, right } => match op {
-            Op::Member => deref_ident!(&get_members(left, right)?),
+            Op::Member => deref_ident!(get_members(left, right)?),
             _ => panic!("{:?} {:#?} {:#?}", op, left, right),
         },
         _ => panic!("{:#?}", expr),
@@ -124,19 +133,26 @@ fn get_expr<'a, 'b>(
 }
 
 fn set_type<'a, 'b>(
-    types: &'b mut HashMap<Vec<&'a str>, Type<'a>>,
-    keys: &'b [&'a str],
+    scope: &'b [&'a str],
+    idents: &'b [&'a str],
+    types: &'b mut HashMap<Ident<'a>, Type<'a>>,
     type_: &'b Type<'a>,
 ) -> Result<(), Message> {
     if let Type::Obj(props) = type_ {
-        for (prop_key, prop_value) in props.iter() {
-            let mut key: Vec<&str> = Vec::with_capacity(keys.len() + 1);
-            key.extend_from_slice(keys);
-            key.push(prop_key);
-            set_type(types, &key, &prop_value)?;
+        for (key, value) in props.iter() {
+            let mut ident: Vec<&str> = Vec::with_capacity(idents.len() + 1);
+            ident.extend_from_slice(idents);
+            ident.push(key);
+            set_type(scope, &ident, types, &value)?;
         }
     }
-    if types.insert(keys.to_vec(), type_.clone()).is_some() {
+    if types
+        .insert(
+            Ident { ident: idents.to_vec(), scope: scope.to_vec() },
+            type_.clone(),
+        )
+        .is_some()
+    {
         Err(Message::ObjDuplicateKeys)
     } else {
         Ok(())
@@ -144,8 +160,9 @@ fn set_type<'a, 'b>(
 }
 
 fn set_assign<'a, 'b>(
-    types: &'b mut HashMap<Vec<&'a str>, Type<'a>>,
+    scope: &'b [&'a str],
     ident: &'a Expr<'a>,
+    types: &'b mut HashMap<Ident<'a>, Type<'a>>,
     expr: &'a Expr<'a>,
 ) -> Result<(), Message> {
     let ident: Vec<&str> = match ident {
@@ -155,14 +172,19 @@ fn set_assign<'a, 'b>(
         }
         _ => return Err(Message::AssignNonIdent),
     };
-    let expr_type: Type = get_expr(&types, expr)?;
-    let ident_type: Type = match types.get(&ident) {
+    let expr_type: Type = get_expr(scope, &types, expr)?;
+    let ident_type: Type = match types
+        .get(&Ident { ident: ident.to_vec(), scope: scope.to_vec() })
+    {
         Some(type_) => type_.clone(),
         None => return Err(Message::IdentUnknown),
     };
     match ident_type {
         Type::Uninit => {
-            let _: Option<_> = types.insert(ident, expr_type.clone());
+            let _: Option<_> = types.insert(
+                Ident { ident, scope: scope.to_vec() },
+                expr_type.clone(),
+            );
         }
         ident_type => {
             if ident_type != expr_type {
@@ -175,23 +197,27 @@ fn set_assign<'a, 'b>(
 
 pub(crate) fn get_types<'a>(
     ast: &'a [Syntax<'a>],
-) -> Result<HashMap<Vec<&'a str>, Type<'a>>, Error<'a>> {
-    let mut types: HashMap<Vec<&str>, Type> = HashMap::new();
+) -> Result<HashMap<Ident<'a>, Type<'a>>, Error<'a>> {
+    let mut types: HashMap<Ident, Type> = HashMap::new();
+    let scope: Vec<&str> = Vec::new();
     for syntax in ast {
         match &syntax.statement {
             Stmt::Decl { ident, expr } => {
-                let key: Vec<&str> = vec![ident];
-                if types.contains_key(&key) {
+                let ident: Vec<&str> = vec![ident];
+                if types.contains_key(&Ident {
+                    ident: ident.to_vec(),
+                    scope: scope.to_vec(),
+                }) {
                     return Err(Error {
                         syntax,
                         message: Message::IdentShadow,
                     });
                 }
-                match get_expr(&types, expr) {
+                match get_expr(&scope, &types, expr) {
                     Err(message) => return Err(Error { syntax, message }),
                     Ok(type_) => {
                         if let Err(message) =
-                            set_type(&mut types, &key, &type_)
+                            set_type(&scope, &ident, &mut types, &type_)
                         {
                             return Err(Error { syntax, message });
                         }
@@ -200,7 +226,9 @@ pub(crate) fn get_types<'a>(
             }
             Stmt::Assign { op, ident, expr } => match op {
                 Asn::Reg => {
-                    if let Err(message) = set_assign(&mut types, ident, expr) {
+                    if let Err(message) =
+                        set_assign(&scope, ident, &mut types, expr)
+                    {
                         return Err(Error { syntax, message });
                     }
                 }
