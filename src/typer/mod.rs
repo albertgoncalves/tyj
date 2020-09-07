@@ -24,8 +24,16 @@ pub(crate) struct Error<'a> {
     pub(crate) message: Message,
 }
 
+struct Ident<'a, 'b> {
+    unwrap: &'b [&'a str],
+}
+
+struct Scope<'a, 'b> {
+    unwrap: &'b [&'a str],
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct Ident<'a> {
+pub(crate) struct Target<'a> {
     ident: Vec<&'a str>,
     scope: Vec<&'a str>,
 }
@@ -43,33 +51,43 @@ pub(crate) enum Type<'a> {
     Uninit,
 }
 
-fn get_members<'a>(
-    left: &'a Expr<'a>,
-    right: &'a Expr<'a>,
-) -> Result<Vec<&'a str>, Message> {
-    Ok(match (left, right) {
-        /* NOTE: Because `Op::Member` is left-associative, these two branches
-         * *should* be all that we need to recursively parse a nested member
-         * expression.
-         */
-        (Expr::Ident(left), Expr::Ident(right)) => vec![left, right],
-        (Expr::Infix { op: Op::Member, left, right }, Expr::Ident(ident)) => {
-            let mut idents: Vec<&str> = get_members(left, right)?;
-            idents.push(ident);
+fn get_idents<'a>(expr: &'a Expr<'a>) -> Result<Vec<&'a str>, Message> {
+    Ok(match expr {
+        Expr::Ident(ident) => vec![ident],
+        Expr::Infix { op: Op::Member, left, right } => {
+            let mut idents: Vec<&str> = get_idents(left)?;
+            idents.extend_from_slice(&get_idents(right)?);
             idents
         }
         _ => return Err(Message::NonIdentMember),
     })
 }
 
+fn deref_ident<'a, 'b>(
+    scope: &'b Scope<'a, 'b>,
+    ident: &'b Ident<'a, 'b>,
+    types: &'b HashMap<Target<'a>, Type<'a>>,
+) -> Option<&'b Type<'a>> {
+    let mut scope: Vec<&str> = scope.unwrap.to_vec();
+    loop {
+        let type_: Option<&Type> = types.get(&Target {
+            ident: ident.unwrap.to_vec(),
+            scope: scope.to_vec(),
+        });
+        if type_.is_some() || scope.pop().is_none() {
+            return type_;
+        }
+    }
+}
+
 fn get_expr<'a, 'b>(
-    scope: &'b [&'a str],
-    types: &'b HashMap<Ident<'a>, Type<'a>>,
+    scope: &'b Scope<'a, 'b>,
+    types: &'b HashMap<Target<'a>, Type<'a>>,
     expr: &'a Expr<'a>,
 ) -> Result<Type<'a>, Message> {
     macro_rules! deref_ident {
         ($ident:expr $(,)?) => {
-            match types.get(&Ident { ident: $ident, scope: scope.to_vec() }) {
+            match deref_ident(scope, $ident, types) {
                 Some(Type::Uninit) => return Err(Message::IdentUninit),
                 Some(type_) => type_.clone(),
                 None => return Err(Message::IdentUnknown),
@@ -78,7 +96,7 @@ fn get_expr<'a, 'b>(
     }
 
     Ok(match expr {
-        Expr::Ident(ident) => deref_ident!(vec![*ident]),
+        Expr::Ident(ident) => deref_ident!(&Ident { unwrap: &[*ident] }),
         Expr::Num(_) => Type::Num,
         Expr::Str(_) => Type::Str,
         Expr::Bool(_) => Type::Bool,
@@ -124,31 +142,32 @@ fn get_expr<'a, 'b>(
                 _ => return Err(Message::IncompatibleTypes),
             }
         }
-        Expr::Infix { op, left, right } => match op {
-            Op::Member => deref_ident!(get_members(left, right)?),
-            _ => panic!("{:?} {:#?} {:#?}", op, left, right),
-        },
+        Expr::Infix { op: Op::Member, .. } => {
+            deref_ident!(&Ident { unwrap: &get_idents(expr)? })
+        }
         _ => panic!("{:#?}", expr),
     })
 }
 
 fn set_type<'a, 'b>(
-    scope: &'b [&'a str],
-    idents: &'b [&'a str],
-    types: &'b mut HashMap<Ident<'a>, Type<'a>>,
+    scope: &'b Scope<'a, 'b>,
+    ident: &'b Ident<'a, 'b>,
+    types: &'b mut HashMap<Target<'a>, Type<'a>>,
     type_: &'b Type<'a>,
 ) -> Result<(), Message> {
     if let Type::Obj(props) = type_ {
         for (key, value) in props.iter() {
-            let mut ident: Vec<&str> = Vec::with_capacity(idents.len() + 1);
-            ident.extend_from_slice(idents);
+            let mut ident: Vec<&str> = ident.unwrap.to_vec();
             ident.push(key);
-            set_type(scope, &ident, types, &value)?;
+            set_type(scope, &Ident { unwrap: &ident }, types, &value)?;
         }
     }
     if types
         .insert(
-            Ident { ident: idents.to_vec(), scope: scope.to_vec() },
+            Target {
+                ident: ident.unwrap.to_vec(),
+                scope: scope.unwrap.to_vec(),
+            },
             type_.clone(),
         )
         .is_some()
@@ -160,21 +179,19 @@ fn set_type<'a, 'b>(
 }
 
 fn set_assign<'a, 'b>(
-    scope: &'b [&'a str],
-    ident: &'a Expr<'a>,
-    types: &'b mut HashMap<Ident<'a>, Type<'a>>,
-    expr: &'a Expr<'a>,
+    scope: &'b Scope<'a, 'b>,
+    ident_expr: &'a Expr<'a>,
+    types: &'b mut HashMap<Target<'a>, Type<'a>>,
+    value_expr: &'a Expr<'a>,
 ) -> Result<(), Message> {
-    let ident: Vec<&str> = match ident {
+    let ident: Vec<&str> = match ident_expr {
         Expr::Ident(ident) => vec![ident],
-        Expr::Infix { op: Op::Member, left, right } => {
-            get_members(left, right)?
-        }
+        Expr::Infix { op: Op::Member, .. } => get_idents(ident_expr)?,
         _ => return Err(Message::AssignNonIdent),
     };
-    let expr_type: Type = get_expr(scope, &types, expr)?;
+    let expr_type: Type = get_expr(scope, &types, value_expr)?;
     let ident_type: Type = match types
-        .get(&Ident { ident: ident.to_vec(), scope: scope.to_vec() })
+        .get(&Target { ident: ident.to_vec(), scope: scope.unwrap.to_vec() })
     {
         Some(type_) => type_.clone(),
         None => return Err(Message::IdentUnknown),
@@ -182,7 +199,7 @@ fn set_assign<'a, 'b>(
     match ident_type {
         Type::Uninit => {
             let _: Option<_> = types.insert(
-                Ident { ident, scope: scope.to_vec() },
+                Target { ident, scope: scope.unwrap.to_vec() },
                 expr_type.clone(),
             );
         }
@@ -197,16 +214,16 @@ fn set_assign<'a, 'b>(
 
 pub(crate) fn get_types<'a>(
     ast: &'a [Syntax<'a>],
-) -> Result<HashMap<Ident<'a>, Type<'a>>, Error<'a>> {
-    let mut types: HashMap<Ident, Type> = HashMap::new();
-    let scope: Vec<&str> = Vec::new();
+) -> Result<HashMap<Target<'a>, Type<'a>>, Error<'a>> {
+    let mut types: HashMap<Target, Type> = HashMap::new();
+    let scope: Scope = Scope { unwrap: &Vec::new() };
     for syntax in ast {
         match &syntax.statement {
             Stmt::Decl { ident, expr } => {
                 let ident: Vec<&str> = vec![ident];
-                if types.contains_key(&Ident {
+                if types.contains_key(&Target {
                     ident: ident.to_vec(),
-                    scope: scope.to_vec(),
+                    scope: scope.unwrap.to_vec(),
                 }) {
                     return Err(Error {
                         syntax,
@@ -216,9 +233,12 @@ pub(crate) fn get_types<'a>(
                 match get_expr(&scope, &types, expr) {
                     Err(message) => return Err(Error { syntax, message }),
                     Ok(type_) => {
-                        if let Err(message) =
-                            set_type(&scope, &ident, &mut types, &type_)
-                        {
+                        if let Err(message) = set_type(
+                            &scope,
+                            &Ident { unwrap: &ident },
+                            &mut types,
+                            &type_,
+                        ) {
                             return Err(Error { syntax, message });
                         }
                     }

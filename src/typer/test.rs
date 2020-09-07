@@ -1,4 +1,4 @@
-use super::{get_types, Error, Ident, Message, Type};
+use super::{get_types, Error, Message, Target, Type};
 use crate::parser::{get_ast, Expr, Prop, Stmt, Syntax};
 use crate::tokenizer::{get_tokens, Asn, Op};
 use std::collections::BTreeMap;
@@ -19,11 +19,11 @@ fn declares() {
          var d = null;
          var e = undefined;",
         Ok(vec![
-            (Ident { ident: vec!["a"], scope: Vec::new() }, Type::Str),
-            (Ident { ident: vec!["b"], scope: Vec::new() }, Type::Num),
-            (Ident { ident: vec!["c"], scope: Vec::new() }, Type::Bool),
-            (Ident { ident: vec!["d"], scope: Vec::new() }, Type::Null),
-            (Ident { ident: vec!["e"], scope: Vec::new() }, Type::Undef),
+            (Target { ident: vec!["a"], scope: Vec::new() }, Type::Str),
+            (Target { ident: vec!["b"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["c"], scope: Vec::new() }, Type::Bool),
+            (Target { ident: vec!["d"], scope: Vec::new() }, Type::Null),
+            (Target { ident: vec!["e"], scope: Vec::new() }, Type::Undef),
         ]
         .into_iter()
         .collect()),
@@ -68,8 +68,8 @@ fn declare_ident() {
         "var x = 0;
          var y = x;",
         Ok(vec![
-            (Ident { ident: vec!["x"], scope: Vec::new() }, Type::Num),
-            (Ident { ident: vec!["y"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["x"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["y"], scope: Vec::new() }, Type::Num),
         ]
         .into_iter()
         .collect()),
@@ -82,10 +82,10 @@ fn declare_object() {
         "var x = 0;
          var y = { a: x };",
         Ok(vec![
-            (Ident { ident: vec!["x"], scope: Vec::new() }, Type::Num),
-            (Ident { ident: vec!["y", "a"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["x"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["y", "a"], scope: Vec::new() }, Type::Num),
             (
-                Ident { ident: vec!["y"], scope: Vec::new() },
+                Target { ident: vec!["y"], scope: Vec::new() },
                 Type::Obj(Rc::new(
                     vec![("a", Type::Num)].into_iter().collect(),
                 )),
@@ -101,7 +101,7 @@ fn declare_empty_object() {
     assert_types!(
         "var x = {};",
         Ok(vec![(
-            Ident { ident: vec!["x"], scope: Vec::new() },
+            Target { ident: vec!["x"], scope: Vec::new() },
             Type::Obj(Rc::new(BTreeMap::new())),
         )]
         .into_iter()
@@ -125,21 +125,21 @@ fn declare_nested_object() {
              },
          };",
         Ok(vec![
-            (Ident { ident: vec!["x", "a"], scope: Vec::new() }, Type::Num),
-            (Ident { ident: vec!["x", "b"], scope: Vec::new() }, Type::Str),
-            (Ident { ident: vec!["x", "c"], scope: Vec::new() }, Type::Bool),
-            (Ident { ident: vec!["x", "d"], scope: Vec::new() }, Type::Null),
-            (Ident { ident: vec!["x", "e"], scope: Vec::new() }, Type::Undef),
+            (Target { ident: vec!["x", "a"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["x", "b"], scope: Vec::new() }, Type::Str),
+            (Target { ident: vec!["x", "c"], scope: Vec::new() }, Type::Bool),
+            (Target { ident: vec!["x", "d"], scope: Vec::new() }, Type::Null),
+            (Target { ident: vec!["x", "e"], scope: Vec::new() }, Type::Undef),
             (
-                Ident { ident: vec!["x", "f", "a"], scope: Vec::new() },
+                Target { ident: vec!["x", "f", "a"], scope: Vec::new() },
                 Type::Num,
             ),
             (
-                Ident { ident: vec!["x", "f"], scope: Vec::new() },
+                Target { ident: vec!["x", "f"], scope: Vec::new() },
                 Type::Obj(props.clone()),
             ),
             (
-                Ident { ident: vec!["x"], scope: Vec::new() },
+                Target { ident: vec!["x"], scope: Vec::new() },
                 Type::Obj(Rc::new(
                     vec![
                         ("a", Type::Num),
@@ -187,7 +187,7 @@ fn declare_array() {
     assert_types!(
         "var x = [0, 1, 2, 3];",
         Ok(vec![(
-            Ident { ident: vec!["x"], scope: Vec::new() },
+            Target { ident: vec!["x"], scope: Vec::new() },
             Type::Array(Rc::new(Type::Num)),
         )]
         .into_iter()
@@ -200,7 +200,7 @@ fn declare_array_empty() {
     assert_types!(
         "var x = [];",
         Ok(vec![(
-            Ident { ident: vec!["x"], scope: Vec::new() },
+            Target { ident: vec!["x"], scope: Vec::new() },
             Type::EmptyArray,
         )]
         .into_iter()
@@ -219,22 +219,22 @@ fn declare_array_obj() {
          };
          var xs = [a, b];",
         Ok(vec![
-            (Ident { ident: vec!["a", "x"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["a", "x"], scope: Vec::new() }, Type::Num),
             (
-                Ident { ident: vec!["a"], scope: Vec::new() },
+                Target { ident: vec!["a"], scope: Vec::new() },
                 Type::Obj(Rc::new(
                     vec![("x", Type::Num)].into_iter().collect()
                 )),
             ),
-            (Ident { ident: vec!["b", "x"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["b", "x"], scope: Vec::new() }, Type::Num),
             (
-                Ident { ident: vec!["b"], scope: Vec::new() },
+                Target { ident: vec!["b"], scope: Vec::new() },
                 Type::Obj(Rc::new(
                     vec![("x", Type::Num)].into_iter().collect()
                 )),
             ),
             (
-                Ident { ident: vec!["xs"], scope: Vec::new() },
+                Target { ident: vec!["xs"], scope: Vec::new() },
                 Type::Array(Rc::new(Type::Obj(Rc::new(
                     vec![("x", Type::Num)].into_iter().collect()
                 )))),
@@ -286,11 +286,11 @@ fn declare_prefix() {
          var d = ++b;
          var e = --c;",
         Ok(vec![
-            (Ident { ident: vec!["a"], scope: Vec::new() }, Type::Bool),
-            (Ident { ident: vec!["b"], scope: Vec::new() }, Type::Num),
-            (Ident { ident: vec!["c"], scope: Vec::new() }, Type::Num),
-            (Ident { ident: vec!["d"], scope: Vec::new() }, Type::Num),
-            (Ident { ident: vec!["e"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["a"], scope: Vec::new() }, Type::Bool),
+            (Target { ident: vec!["b"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["c"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["d"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["e"], scope: Vec::new() }, Type::Num),
         ]
         .into_iter()
         .collect()),
@@ -333,22 +333,22 @@ fn declare_infix_member() {
          var b = a.x.y;",
         Ok(vec![
             (
-                Ident { ident: vec!["a", "x", "y"], scope: Vec::new() },
+                Target { ident: vec!["a", "x", "y"], scope: Vec::new() },
                 Type::Num,
             ),
             (
-                Ident { ident: vec!["a", "x"], scope: Vec::new() },
+                Target { ident: vec!["a", "x"], scope: Vec::new() },
                 Type::Obj(props.clone()),
             ),
             (
-                Ident { ident: vec!["a"], scope: Vec::new() },
+                Target { ident: vec!["a"], scope: Vec::new() },
                 Type::Obj(Rc::new(
                     vec![("x", Type::Obj(props))].into_iter().collect()
                 )),
             ),
-            (Ident { ident: vec!["x"], scope: Vec::new() }, Type::Null),
-            (Ident { ident: vec!["y"], scope: Vec::new() }, Type::Str),
-            (Ident { ident: vec!["b"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["x"], scope: Vec::new() }, Type::Null),
+            (Target { ident: vec!["y"], scope: Vec::new() }, Type::Str),
+            (Target { ident: vec!["b"], scope: Vec::new() }, Type::Num),
         ]
         .into_iter()
         .collect()),
@@ -390,7 +390,7 @@ fn declare_update() {
     assert_types!(
         "var x = 0;
          x = 1;",
-        Ok(vec![(Ident { ident: vec!["x"], scope: Vec::new() }, Type::Num)]
+        Ok(vec![(Target { ident: vec!["x"], scope: Vec::new() }, Type::Num)]
             .into_iter()
             .collect()),
     )
@@ -421,7 +421,7 @@ fn declare_uninit() {
         "var x;
          x = 1;
          x = 2;",
-        Ok(vec![(Ident { ident: vec!["x"], scope: Vec::new() }, Type::Num)]
+        Ok(vec![(Target { ident: vec!["x"], scope: Vec::new() }, Type::Num)]
             .into_iter()
             .collect()),
     )
@@ -472,9 +472,9 @@ fn assign_obj() {
         "var x = { a: 0 };
          x.a = 1;",
         Ok(vec![
-            (Ident { ident: vec!["x", "a"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["x", "a"], scope: Vec::new() }, Type::Num),
             (
-                Ident { ident: vec!["x"], scope: Vec::new() },
+                Target { ident: vec!["x"], scope: Vec::new() },
                 Type::Obj(Rc::new(
                     vec![("a", Type::Num)].into_iter().collect()
                 )),
