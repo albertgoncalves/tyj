@@ -470,7 +470,8 @@ fn assign_err() {
 fn assign_obj() {
     assert_types!(
         "var x = { a: 0 };
-         x.a = 1;",
+         var y = 1;
+         x.a = y;",
         Ok(vec![
             (Target { ident: vec!["x", "a"], scope: Vec::new() }, Type::Num),
             (
@@ -479,6 +480,7 @@ fn assign_obj() {
                     vec![("a", Type::Num)].into_iter().collect()
                 )),
             ),
+            (Target { ident: vec!["y"], scope: Vec::new() }, Type::Num),
         ]
         .into_iter()
         .collect()),
@@ -527,6 +529,26 @@ fn assign_obj_key_err() {
                 line: 1,
             },
             message: Message::IdentUnknown,
+        }),
+    )
+}
+
+#[test]
+fn assign_uninit_ident_err() {
+    assert_types!(
+        "var x;
+         var y;
+         y = x;",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Assign {
+                    op: Asn::Reg,
+                    ident: Expr::Ident("y"),
+                    expr: Expr::Ident("x"),
+                },
+                line: 2,
+            },
+            message: Message::IdentUninit,
         }),
     )
 }
