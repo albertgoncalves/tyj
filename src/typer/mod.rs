@@ -24,13 +24,9 @@ pub(crate) struct Error<'a> {
     pub(crate) message: Message,
 }
 
-struct Ident<'a, 'b> {
-    unwrap: &'b [&'a str],
-}
+struct Ident<'a, 'b>(&'b [&'a str]);
 
-struct Scope<'a, 'b> {
-    unwrap: &'b [&'a str],
-}
+struct Scope<'a, 'b>(&'b [&'a str]);
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct Target<'a> {
@@ -68,12 +64,10 @@ fn deref_ident<'a, 'b>(
     ident: &'b Ident<'a, 'b>,
     types: &'b HashMap<Target<'a>, Type<'a>>,
 ) -> Option<&'b Type<'a>> {
-    let mut scope: Vec<&str> = scope.unwrap.to_vec();
+    let mut scope: Vec<&str> = scope.0.to_vec();
     loop {
-        let type_: Option<&Type> = types.get(&Target {
-            ident: ident.unwrap.to_vec(),
-            scope: scope.to_vec(),
-        });
+        let type_: Option<&Type> = types
+            .get(&Target { ident: ident.0.to_vec(), scope: scope.to_vec() });
         if type_.is_some() || scope.pop().is_none() {
             return type_;
         }
@@ -96,7 +90,7 @@ fn get_expr<'a, 'b>(
     }
 
     Ok(match expr {
-        Expr::Ident(ident) => deref_ident!(&Ident { unwrap: &[*ident] }),
+        Expr::Ident(ident) => deref_ident!(&Ident(&[*ident])),
         Expr::Num(_) => Type::Num,
         Expr::Str(_) => Type::Str,
         Expr::Bool(_) => Type::Bool,
@@ -143,7 +137,7 @@ fn get_expr<'a, 'b>(
             }
         }
         Expr::Infix { op: Op::Member, .. } => {
-            deref_ident!(&Ident { unwrap: &get_idents(expr)? })
+            deref_ident!(&Ident(&get_idents(expr)?))
         }
         _ => panic!("{:#?}", expr),
     })
@@ -157,17 +151,14 @@ fn set_type<'a, 'b>(
 ) -> Result<(), Message> {
     if let Type::Obj(props) = type_ {
         for (key, value) in props.iter() {
-            let mut ident: Vec<&str> = ident.unwrap.to_vec();
+            let mut ident: Vec<&str> = ident.0.to_vec();
             ident.push(key);
-            set_type(scope, &Ident { unwrap: &ident }, types, &value)?;
+            set_type(scope, &Ident(&ident), types, &value)?;
         }
     }
     if types
         .insert(
-            Target {
-                ident: ident.unwrap.to_vec(),
-                scope: scope.unwrap.to_vec(),
-            },
+            Target { ident: ident.0.to_vec(), scope: scope.0.to_vec() },
             type_.clone(),
         )
         .is_some()
@@ -191,7 +182,7 @@ fn set_assign<'a, 'b>(
     };
     let expr_type: Type = get_expr(scope, &types, value_expr)?;
     let ident_type: Type = match types
-        .get(&Target { ident: ident.to_vec(), scope: scope.unwrap.to_vec() })
+        .get(&Target { ident: ident.to_vec(), scope: scope.0.to_vec() })
     {
         Some(type_) => type_.clone(),
         None => return Err(Message::IdentUnknown),
@@ -199,7 +190,7 @@ fn set_assign<'a, 'b>(
     match ident_type {
         Type::Uninit => {
             let _: Option<_> = types.insert(
-                Target { ident, scope: scope.unwrap.to_vec() },
+                Target { ident, scope: scope.0.to_vec() },
                 expr_type.clone(),
             );
         }
@@ -216,14 +207,15 @@ pub(crate) fn get_types<'a>(
     ast: &'a [Syntax<'a>],
 ) -> Result<HashMap<Target<'a>, Type<'a>>, Error<'a>> {
     let mut types: HashMap<Target, Type> = HashMap::new();
-    let scope: Scope = Scope { unwrap: &Vec::new() };
+    let scope: Vec<&str> = Vec::new();
+    let scope: Scope = Scope(&scope);
     for syntax in ast {
         match &syntax.statement {
             Stmt::Decl { ident, expr } => {
                 let ident: Vec<&str> = vec![ident];
                 if types.contains_key(&Target {
                     ident: ident.to_vec(),
-                    scope: scope.unwrap.to_vec(),
+                    scope: scope.0.to_vec(),
                 }) {
                     return Err(Error {
                         syntax,
@@ -235,7 +227,7 @@ pub(crate) fn get_types<'a>(
                     Ok(type_) => {
                         if let Err(message) = set_type(
                             &scope,
-                            &Ident { unwrap: &ident },
+                            &Ident(&ident),
                             &mut types,
                             &type_,
                         ) {
