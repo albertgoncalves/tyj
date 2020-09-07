@@ -2,13 +2,14 @@
 mod test;
 
 use crate::parser::{Expr, Stmt, Syntax};
-use crate::tokenizer::Op;
+use crate::tokenizer::{Asn, Op};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Message {
     ArrayMultiType,
+    AssignNonIdent,
     IdentShadow,
     IdentUninit,
     IdentUnknown,
@@ -167,6 +168,55 @@ pub(crate) fn get_types<'a>(
                     }
                 }
             }
+            Stmt::Assign { op, ident, expr } => match op {
+                Asn::Reg => {
+                    let ident: Vec<&str> = match ident {
+                        Expr::Ident(ident) => vec![ident],
+                        Expr::Infix { op: Op::Member, left, right } => {
+                            match get_members(left, right) {
+                                Ok(ident) => ident,
+                                Err(message) => {
+                                    return Err(Error { syntax, message })
+                                }
+                            }
+                        }
+                        _ => {
+                            return Err(Error {
+                                syntax,
+                                message: Message::AssignNonIdent,
+                            })
+                        }
+                    };
+                    let expr_type: Type = match get_expr(&types, expr) {
+                        Err(message) => return Err(Error { syntax, message }),
+                        Ok(type_) => type_,
+                    };
+                    let ident_type: Type = match types.get(&ident) {
+                        Some(type_) => type_.clone(),
+                        None => {
+                            return Err(Error {
+                                syntax,
+                                message: Message::IdentUnknown,
+                            })
+                        }
+                    };
+                    match ident_type {
+                        Type::Uninit => {
+                            let _: Option<_> =
+                                types.insert(ident, expr_type.clone());
+                        }
+                        ident_type => {
+                            if ident_type != expr_type {
+                                return Err(Error {
+                                    syntax,
+                                    message: Message::IncompatibleTypes,
+                                });
+                            }
+                        }
+                    }
+                }
+                _ => panic!("{:#?}", syntax),
+            },
             _ => panic!("{:#?}", syntax),
         }
     }

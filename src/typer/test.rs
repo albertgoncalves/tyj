@@ -1,6 +1,6 @@
 use super::{get_types, Error, Message, Type};
 use crate::parser::{get_ast, Expr, Prop, Stmt, Syntax};
-use crate::tokenizer::{get_tokens, Op};
+use crate::tokenizer::{get_tokens, Asn, Op};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
@@ -355,6 +355,148 @@ fn declare_infix_member_err() {
                 line: 5,
             },
             message: Message::NonIdentMember,
+        }),
+    )
+}
+
+#[test]
+fn declare_update() {
+    assert_types!(
+        "var x = 0;
+         x = 1;",
+        Ok(vec![(vec!["x"], Type::Num)].into_iter().collect()),
+    )
+}
+
+#[test]
+fn declare_update_err() {
+    assert_types!(
+        "var x = 0;
+         x = \"?\";",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Assign {
+                    op: Asn::Reg,
+                    ident: Expr::Ident("x"),
+                    expr: Expr::Str("?"),
+                },
+                line: 1,
+            },
+            message: Message::IncompatibleTypes,
+        }),
+    )
+}
+
+#[test]
+fn declare_uninit() {
+    assert_types!(
+        "var x;
+         x = 1;
+         x = 2;",
+        Ok(vec![(vec!["x"], Type::Num)].into_iter().collect()),
+    )
+}
+
+#[test]
+fn declare_uninit_err() {
+    assert_types!(
+        "var x;
+         x = \"?\";
+         x = 2;",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Assign {
+                    op: Asn::Reg,
+                    ident: Expr::Ident("x"),
+                    expr: Expr::Num("2"),
+                },
+                line: 2,
+            },
+            message: Message::IncompatibleTypes,
+        }),
+    )
+}
+
+#[test]
+fn assign_err() {
+    assert_types!(
+        "var x;
+         \"x\" = 0;",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Assign {
+                    op: Asn::Reg,
+                    ident: Expr::Str("x"),
+                    expr: Expr::Num("0"),
+                },
+                line: 1,
+            },
+            message: Message::AssignNonIdent,
+        }),
+    )
+}
+
+#[test]
+fn assign_obj() {
+    assert_types!(
+        "var x = { a: 0 };
+         x.a = 1;",
+        Ok(vec![
+            (vec!["x", "a"], Type::Num),
+            (
+                vec!["x"],
+                Type::Obj(Rc::new(
+                    vec![("a", Type::Num)].into_iter().collect()
+                )),
+            ),
+        ]
+        .into_iter()
+        .collect()),
+    )
+}
+
+#[test]
+fn assign_obj_type_err() {
+    assert_types!(
+        "var x = { a: 0 };
+         x.a = \"0\";",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Assign {
+                    op: Asn::Reg,
+                    ident: Expr::Infix {
+                        op: Op::Member,
+                        left: Box::new(Expr::Ident("x")),
+                        right: Box::new(Expr::Ident("a")),
+                    },
+                    expr: Expr::Str("0"),
+                },
+                line: 1,
+            },
+            message: Message::IncompatibleTypes,
+        }),
+    )
+}
+
+#[test]
+fn assign_obj_key_err() {
+    assert_types!(
+        "var x = { a: 0 };
+         x.b = 1;",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Assign {
+                    op: Asn::Reg,
+                    ident: Expr::Infix {
+                        op: Op::Member,
+                        left: Box::new(Expr::Ident("x")),
+                        right: Box::new(Expr::Ident("b")),
+                    },
+                    expr: Expr::Num("1"),
+                },
+                line: 1,
+            },
+            message: Message::IdentUnknown,
         }),
     )
 }
