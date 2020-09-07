@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 export FLAGS=(
+    --color "always"
     -C "opt-level=0"
     -C "overflow-checks=yes"
     -C "panic=unwind"
