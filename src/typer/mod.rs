@@ -9,6 +9,8 @@ use std::rc::Rc;
 #[derive(Debug, PartialEq)]
 pub(crate) enum Message {
     ArrayMultiType,
+    AccessNonArray,
+    AccessNonIndex,
     AssignNonIdent,
     IdentShadow,
     IdentUninit,
@@ -43,7 +45,7 @@ pub(crate) enum Type<'a> {
     Undef,
     Obj(Rc<BTreeMap<&'a str, Type<'a>>>),
     EmptyArray,
-    Array(Rc<Type<'a>>),
+    Array(Box<Type<'a>>),
     Uninit,
 }
 
@@ -118,7 +120,7 @@ fn get_expr<'a, 'b>(
             for elem in &type_elems {
                 match type_ {
                     Type::EmptyArray => {
-                        type_ = Type::Array(Rc::new(elem.clone()))
+                        type_ = Type::Array(Box::new(elem.clone()))
                     }
                     _ => return Err(Message::ArrayMultiType),
                 }
@@ -138,6 +140,15 @@ fn get_expr<'a, 'b>(
         }
         Expr::Infix { op: Op::Member, .. } => {
             deref_ident!(&Ident(&get_idents(expr)?))
+        }
+        Expr::Access { expr, index } => {
+            let expr: Type = get_expr(scope, types, expr)?;
+            let index: Type = get_expr(scope, types, index)?;
+            match (expr, index) {
+                (Type::Array(type_), Type::Num) => *type_.clone(),
+                (Type::Array(_), _) => return Err(Message::AccessNonIndex),
+                _ => return Err(Message::AccessNonArray),
+            }
         }
         _ => panic!("{:#?}", expr),
     })

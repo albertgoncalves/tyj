@@ -188,7 +188,7 @@ fn declare_array() {
         "var x = [0, 1, 2, 3];",
         Ok(vec![(
             Target { ident: vec!["x"], scope: Vec::new() },
-            Type::Array(Rc::new(Type::Num)),
+            Type::Array(Box::new(Type::Num)),
         )]
         .into_iter()
         .collect()),
@@ -235,7 +235,7 @@ fn declare_array_obj() {
             ),
             (
                 Target { ident: vec!["xs"], scope: Vec::new() },
-                Type::Array(Rc::new(Type::Obj(Rc::new(
+                Type::Array(Box::new(Type::Obj(Rc::new(
                     vec![("x", Type::Num)].into_iter().collect()
                 )))),
             ),
@@ -549,6 +549,65 @@ fn assign_uninit_ident_err() {
                 line: 2,
             },
             message: Message::IdentUninit,
+        }),
+    )
+}
+
+#[test]
+fn access() {
+    assert_types!(
+        "var xs = [1];
+         var x = xs[0];",
+        Ok(vec![
+            (
+                Target { ident: vec!["xs"], scope: Vec::new() },
+                Type::Array(Box::new(Type::Num)),
+            ),
+            (Target { ident: vec!["x"], scope: Vec::new() }, Type::Num),
+        ]
+        .into_iter()
+        .collect()),
+    )
+}
+
+#[test]
+fn access_non_array_err() {
+    assert_types!(
+        "var xs = \"[1]\";
+         var x = xs[0];",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Decl {
+                    ident: "x",
+                    expr: Expr::Access {
+                        expr: Box::new(Expr::Ident("xs")),
+                        index: Box::new(Expr::Num("0")),
+                    },
+                },
+                line: 1,
+            },
+            message: Message::AccessNonArray,
+        }),
+    )
+}
+
+#[test]
+fn access_non_index_err() {
+    assert_types!(
+        "var xs = [1];
+         var x = xs[\"0\"];",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Decl {
+                    ident: "x",
+                    expr: Expr::Access {
+                        expr: Box::new(Expr::Ident("xs")),
+                        index: Box::new(Expr::Str("0")),
+                    },
+                },
+                line: 1,
+            },
+            message: Message::AccessNonIndex,
         }),
     )
 }
