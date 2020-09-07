@@ -1,12 +1,9 @@
 #[cfg(test)]
 mod test;
 
-use crate::tokenizer::{Count, Lex, Op, Tkn};
+use crate::tokenizer::{Asn, Count, Lex, Op, Tkn};
 use std::iter::Peekable;
 use std::slice::Iter;
-
-const ASSIGN_OPS: [Op; 5] =
-    [Op::Assign, Op::AssignAdd, Op::AssignSub, Op::AssignMul, Op::AssignDiv];
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Error<'a> {
@@ -77,7 +74,7 @@ pub(crate) enum Stmt<'a> {
     },
     Decls(Vec<&'a str>),
     Assign {
-        op: Op,
+        op: Asn,
         ident: Expr<'a>,
         expr: Expr<'a>,
     },
@@ -202,15 +199,6 @@ fn get_fn<'a, 'b>(
     Ok(Expr::Fn { args, body: get_body(tokens)? })
 }
 
-fn is_assign_op(x: Op) -> bool {
-    for op in &ASSIGN_OPS {
-        if x == *op {
-            return true;
-        }
-    }
-    false
-}
-
 fn get_expr<'a, 'b>(
     tokens: &mut Peekable<Iter<'b, Lex<'a>>>,
     precedence: u8,
@@ -234,7 +222,7 @@ fn get_expr<'a, 'b>(
                 eat_or_error!(tokens, Tkn::RBracket);
                 Expr::Array(exprs)
             }
-            Lex { token: Tkn::Op(x), .. } if !is_assign_op(*x) => {
+            Lex { token: Tkn::Op(x), .. } => {
                 let power: u8 = match *x {
                     Op::New => 25,
                     Op::Sub
@@ -288,7 +276,7 @@ fn get_expr<'a, 'b>(
     loop {
         if let Some(token) = tokens.peek() {
             match token {
-                Lex { token: Tkn::Op(x), .. } if !is_assign_op(*x) => {
+                Lex { token: Tkn::Op(x), .. } => {
                     let power: Option<u8> = match *x {
                         Op::Increment | Op::Decrement => Some(23),
                         _ => None,
@@ -458,9 +446,7 @@ fn get_stmt<'a, 'b>(
                     Some(Lex { line, .. }) => {
                         let a: Expr = get_expr(tokens, 0)?;
                         match tokens.peek() {
-                            Some(Lex { token: Tkn::Op(x), .. })
-                                if is_assign_op(*x) =>
-                            {
+                            Some(Lex { token: Tkn::Assign(x), .. }) => {
                                 eat!(tokens);
                                 let b: Expr = get_expr(tokens, 0)?;
                                 Some(Box::new(Syntax {
@@ -539,7 +525,7 @@ fn get_stmt<'a, 'b>(
                     statement: Stmt::Decl { ident, expr: Expr::Uninit },
                     line: *line,
                 },
-                Some(Lex { token: Tkn::Op(Op::Assign), .. }) => {
+                Some(Lex { token: Tkn::Assign(Asn::Reg), .. }) => {
                     let var: Syntax = Syntax {
                         statement: Stmt::Decl {
                             ident,
@@ -580,7 +566,7 @@ fn get_stmt<'a, 'b>(
         Some(Lex { line, .. }) => {
             let expr_a: Expr = get_expr(tokens, 0)?;
             match tokens.next() {
-                Some(Lex { token: Tkn::Op(x), .. }) if is_assign_op(*x) => {
+                Some(Lex { token: Tkn::Assign(x), .. }) => {
                     let expr_b: Expr = get_expr(tokens, 0)?;
                     eat_or_error!(tokens, Tkn::Semicolon);
                     Syntax {

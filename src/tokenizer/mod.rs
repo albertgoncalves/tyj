@@ -12,11 +12,6 @@ const DECIMAL: u32 = 10;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Op {
-    Assign,
-    AssignAdd,
-    AssignSub,
-    AssignMul,
-    AssignDiv,
     New,
     Member,
     Not,
@@ -45,6 +40,15 @@ pub(crate) enum Op {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum Asn {
+    Reg,
+    Add,
+    Sub,
+    Mul,
+    Div,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Tkn<'a> {
     LBrace,
     RBrace,
@@ -67,6 +71,7 @@ pub(crate) enum Tkn<'a> {
     While,
     Fn,
     Op(Op),
+    Assign(Asn),
     Ret,
     Ident(&'a str),
     Null,
@@ -215,11 +220,11 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
             '?' => tokens.push(Lex { token: Tkn::Ternary, line }),
             _ if is_op(x) => {
                 let token: Tkn = match get_substring!(is_op, i) {
-                    "=" => Tkn::Op(Op::Assign),
-                    "+=" => Tkn::Op(Op::AssignAdd),
-                    "-=" => Tkn::Op(Op::AssignSub),
-                    "*=" => Tkn::Op(Op::AssignMul),
-                    "/=" => Tkn::Op(Op::AssignDiv),
+                    "=" => Tkn::Assign(Asn::Reg),
+                    "+=" => Tkn::Assign(Asn::Add),
+                    "-=" => Tkn::Assign(Asn::Sub),
+                    "*=" => Tkn::Assign(Asn::Mul),
+                    "/=" => Tkn::Assign(Asn::Div),
                     "." => Tkn::Op(Op::Member),
                     "!" => Tkn::Op(Op::Not),
                     "~" => Tkn::Op(Op::BitwiseNot),

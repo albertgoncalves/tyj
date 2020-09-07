@@ -1,5 +1,5 @@
 use super::{get_ast, Case, Error, Expr, Prop, Stmt, Syntax};
-use crate::tokenizer::{get_tokens, Lex, Op, Tkn};
+use crate::tokenizer::{get_tokens, Asn, Lex, Op, Tkn};
 
 macro_rules! assert_ast {
     ($a:expr, $b:expr $(,)?) => {
@@ -130,7 +130,7 @@ fn declare_assign() {
             },
             Syntax {
                 statement: Stmt::Assign {
-                    op: Op::Assign,
+                    op: Asn::Reg,
                     ident: Expr::Ident("x"),
                     expr: Expr::Null,
                 },
@@ -370,7 +370,7 @@ fn tiny_program() {
          };",
         Ok(vec![Syntax {
             statement: Stmt::Assign {
-                op: Op::Assign,
+                op: Asn::Reg,
                 ident: Expr::Infix {
                     op: Op::Member,
                     left: Box::new(Expr::Ident("window")),
@@ -556,7 +556,7 @@ fn if_else() {
                     condition: Expr::Bool("true"),
                     if_: vec![Syntax {
                         statement: Stmt::Assign {
-                            op: Op::Assign,
+                            op: Asn::Reg,
                             ident: Expr::Ident("a"),
                             expr: Expr::Num("0"),
                         },
@@ -564,7 +564,7 @@ fn if_else() {
                     }],
                     else_: vec![Syntax {
                         statement: Stmt::Assign {
-                            op: Op::Assign,
+                            op: Asn::Reg,
                             ident: Expr::Ident("a"),
                             expr: Expr::Num("1"),
                         },
@@ -853,7 +853,7 @@ fn parse_if_else_chain() {
                     },
                     if_: vec![Syntax {
                         statement: Stmt::Assign {
-                            op: Op::Assign,
+                            op: Asn::Reg,
                             ident: Expr::Ident("y"),
                             expr: Expr::Num("0"),
                         },
@@ -871,7 +871,7 @@ fn parse_if_else_chain() {
                             },
                             if_: vec![Syntax {
                                 statement: Stmt::Assign {
-                                    op: Op::Assign,
+                                    op: Asn::Reg,
                                     ident: Expr::Ident("y"),
                                     expr: Expr::Num("1"),
                                 },
@@ -879,7 +879,7 @@ fn parse_if_else_chain() {
                             }],
                             else_: vec![Syntax {
                                 statement: Stmt::Assign {
-                                    op: Op::Assign,
+                                    op: Asn::Reg,
                                     ident: Expr::Ident("y"),
                                     expr: Expr::Num("2"),
                                 },
@@ -1029,7 +1029,7 @@ fn switch() {
                             body: vec![
                                 Syntax {
                                     statement: Stmt::Assign {
-                                        op: Op::Assign,
+                                        op: Asn::Reg,
                                         ident: Expr::Ident("y"),
                                         expr: Expr::Str("0"),
                                     },
@@ -1043,7 +1043,7 @@ fn switch() {
                             body: vec![
                                 Syntax {
                                     statement: Stmt::Assign {
-                                        op: Op::Assign,
+                                        op: Asn::Reg,
                                         ident: Expr::Ident("y"),
                                         expr: Expr::Str("1"),
                                     },
@@ -1055,7 +1055,7 @@ fn switch() {
                     ],
                     default: vec![Syntax {
                         statement: Stmt::Assign {
-                            op: Op::Assign,
+                            op: Asn::Reg,
                             ident: Expr::Ident("y"),
                             expr: Expr::Undef,
                         },
@@ -1290,7 +1290,7 @@ fn promise() {
          };",
         Ok(vec![Syntax {
             statement: Stmt::Assign {
-                op: Op::Assign,
+                op: Asn::Reg,
                 ident: Expr::Infix {
                     op: Op::Member,
                     left: Box::new(Expr::Ident("window")),
@@ -1335,7 +1335,7 @@ fn brackets() {
         "array[0].x = null;",
         Ok(vec![Syntax {
             statement: Stmt::Assign {
-                op: Op::Assign,
+                op: Asn::Reg,
                 ident: Expr::Infix {
                     op: Op::Member,
                     left: Box::new(Expr::Access {
@@ -1431,7 +1431,7 @@ fn update_assign() {
         Ok(vec![
             Syntax {
                 statement: Stmt::Assign {
-                    op: Op::AssignAdd,
+                    op: Asn::Add,
                     ident: Expr::Ident("a"),
                     expr: Expr::Num("1"),
                 },
@@ -1439,7 +1439,7 @@ fn update_assign() {
             },
             Syntax {
                 statement: Stmt::Assign {
-                    op: Op::AssignSub,
+                    op: Asn::Sub,
                     ident: Expr::Ident("b"),
                     expr: Expr::Num("1"),
                 },
@@ -1447,7 +1447,7 @@ fn update_assign() {
             },
             Syntax {
                 statement: Stmt::Assign {
-                    op: Op::AssignMul,
+                    op: Asn::Mul,
                     ident: Expr::Ident("c"),
                     expr: Expr::Num("2"),
                 },
@@ -1455,7 +1455,7 @@ fn update_assign() {
             },
             Syntax {
                 statement: Stmt::Assign {
-                    op: Op::AssignDiv,
+                    op: Asn::Div,
                     ident: Expr::Ident("d"),
                     expr: Expr::Num("2"),
                 },
@@ -1590,7 +1590,7 @@ fn for_update() {
                 statement: Stmt::For {
                     init: Some(Box::new(Syntax {
                         statement: Stmt::Assign {
-                            op: Op::Assign,
+                            op: Asn::Reg,
                             ident: Expr::Ident("i"),
                             expr: Expr::Num("0"),
                         },
@@ -1603,7 +1603,7 @@ fn for_update() {
                     }),
                     update: Some(Box::new(Syntax {
                         statement: Stmt::Assign {
-                            op: Op::AssignAdd,
+                            op: Asn::Add,
                             ident: Expr::Ident("i"),
                             expr: Expr::Num("2"),
                         },
@@ -1665,7 +1665,7 @@ fn scoped_array_access() {
             statement: Stmt::Scope(vec![
                 Syntax {
                     statement: Stmt::Assign {
-                        op: Op::Assign,
+                        op: Asn::Reg,
                         ident: Expr::Access {
                             expr: Box::new(Expr::Ident("x")),
                             index: Box::new(Expr::Num("2")),
@@ -1676,7 +1676,7 @@ fn scoped_array_access() {
                 },
                 Syntax {
                     statement: Stmt::Assign {
-                        op: Op::Assign,
+                        op: Asn::Reg,
                         ident: Expr::Access {
                             expr: Box::new(Expr::Ident("x")),
                             index: Box::new(Expr::Num("3")),
