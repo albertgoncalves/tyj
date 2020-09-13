@@ -247,16 +247,13 @@ pub(crate) fn get_types<'a>(
                     }
                 }
             }
-            Stmt::Assign { op, ident, expr } => match op {
-                Asn::Reg => {
-                    if let Err(message) =
-                        set_assign(&scope, ident, &mut types, expr)
-                    {
-                        return Err(Error { syntax, message });
-                    }
+            Stmt::Assign { op: Asn::Reg, ident, expr } => {
+                if let Err(message) =
+                    set_assign(&scope, ident, &mut types, expr)
+                {
+                    return Err(Error { syntax, message });
                 }
-                _ => panic!("{:#?}", syntax),
-            },
+            }
             _ => panic!("{:#?}", syntax),
         }
     }

@@ -589,10 +589,10 @@ fn get_stmt<'a, 'b>(
     })
 }
 
-pub(crate) fn get_ast<'a>(
-    tokens: &[Lex<'a>],
+pub(crate) fn get_ast<'a, 'b>(
+    tokens: &'b [Lex<'a>],
 ) -> Result<(Vec<Syntax<'a>>, Vec<&'a str>), Error<'a>> {
-    let mut ast_tokens: Vec<Lex> = Vec::new();
+    let mut ast_tokens: Vec<Lex> = Vec::with_capacity(tokens.len());
     let mut comments: Vec<&str> = Vec::new();
     for token in tokens {
         if let Lex { token: Tkn::Comment(x), .. } = token {
