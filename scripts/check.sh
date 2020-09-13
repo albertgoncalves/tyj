@@ -12,11 +12,12 @@ rustc \
 rm libmain.rmeta
 rm main.d
 clippy-driver \
-    -D warnings \
     -W clippy::pedantic \
     -A clippy::similar-names \
     -A clippy::too_many_lines \
+    -A dead-code \
     -A unused-variables \
+    -D warnings \
     --test \
     "$WD/src/main.rs"
 rm main
