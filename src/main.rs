@@ -1,3 +1,4 @@
+mod commenter;
 mod parser;
 mod tokenizer;
 mod typer;

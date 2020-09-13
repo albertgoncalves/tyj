@@ -5,6 +5,7 @@
 !README.md
 !*.toml
 !src/
+!commenter/
 !parser/
 !tokenizer/
 !typer/

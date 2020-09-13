@@ -8,7 +8,7 @@ pub(crate) type Count = u16;
 
 const OP_CHARS: [char; 14] =
     ['=', '.', '+', '-', '*', '%', '<', '>', '!', '~', '&', '^', '|', '/'];
-const DECIMAL: u32 = 10;
+pub(crate) const DECIMAL: u32 = 10;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Op {
