@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 macro_rules! assert_types {
     ($a:expr, $b:expr $(,)?) => {
-        assert_eq!(get_types(&get_ast(&get_tokens($a)).unwrap()), $b)
+        assert_eq!(get_types(&get_ast(&get_tokens($a)).unwrap().0), $b)
     };
 }
 

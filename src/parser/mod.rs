@@ -591,7 +591,7 @@ fn get_stmt<'a, 'b>(
 
 pub(crate) fn get_ast<'a>(
     tokens: &[Lex<'a>],
-) -> Result<Vec<Syntax<'a>>, Error<'a>> {
+) -> Result<(Vec<Syntax<'a>>, Vec<&'a str>), Error<'a>> {
     let mut ast_tokens: Vec<Lex> = Vec::new();
     let mut comments: Vec<&str> = Vec::new();
     for token in tokens {
@@ -606,5 +606,5 @@ pub(crate) fn get_ast<'a>(
     while ast_tokens.peek().is_some() {
         ast.push(get_stmt(&mut ast_tokens)?);
     }
-    Ok(ast)
+    Ok((ast, comments))
 }

@@ -51,7 +51,7 @@ fn main() {
         Err(_) => EXIT!(),
     };
     let ast: Vec<Syntax> = match get_ast(&get_tokens(&source)) {
-        Ok(ast) => ast,
+        Ok((ast, _)) => ast,
         Err(error) => {
             let line: Count = match error {
                 ParseError::EOF => {
