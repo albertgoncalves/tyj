@@ -10,7 +10,7 @@ const OP_CHARS: [char; 14] =
     ['=', '.', '+', '-', '*', '%', '<', '>', '!', '~', '&', '^', '|', '/'];
 pub(crate) const DECIMAL: u32 = 10;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Op {
     New,
     Member,
@@ -39,7 +39,7 @@ pub(crate) enum Op {
     BitwiseOr,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Asn {
     Reg,
     Add,
@@ -48,7 +48,7 @@ pub(crate) enum Asn {
     Div,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Tkn<'a> {
     LBrace,
     RBrace,
@@ -83,7 +83,7 @@ pub(crate) enum Tkn<'a> {
     Comment(&'a str),
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Lex<'a> {
     pub(crate) token: Tkn<'a>,
     pub(crate) line: Count,
