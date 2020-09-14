@@ -16,6 +16,9 @@ clippy-driver \
     -A clippy::similar-names \
     -A clippy::too_many_lines \
     -A dead-code \
+    -A unreachable-code \
+    -A unused-macros \
+    -A unused-mut \
     -A unused-variables \
     -D warnings \
     --test \
