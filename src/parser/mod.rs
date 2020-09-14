@@ -135,8 +135,8 @@ macro_rules! eat_or_error {
     };
 }
 
-fn get_ident<'a, 'b>(
-    tokens: &mut Peekable<Iter<'b, Lex<'a>>>,
+fn get_ident<'a, 'b, 'c>(
+    tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
 ) -> Result<&'a str, Error<'a>> {
     match tokens.next() {
         Some(Lex { token: Tkn::Ident(x), .. }) => Ok(x),
@@ -145,16 +145,16 @@ fn get_ident<'a, 'b>(
     }
 }
 
-fn get_prop<'a, 'b>(
-    tokens: &mut Peekable<Iter<'b, Lex<'a>>>,
+fn get_prop<'a, 'b, 'c>(
+    tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
 ) -> Result<Prop<'a>, Error<'a>> {
     let key: &str = get_ident(tokens)?;
     eat_or_error!(tokens, Tkn::Colon);
     Ok(Prop { key, value: get_expr(tokens, 0)? })
 }
 
-fn get_args<'a, 'b>(
-    tokens: &mut Peekable<Iter<'b, Lex<'a>>>,
+fn get_args<'a, 'b, 'c>(
+    tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
 ) -> Result<Vec<&'a str>, Error<'a>> {
     eat_or_error!(tokens, Tkn::LParen);
     let mut args: Vec<&str> = Vec::new();
@@ -176,8 +176,8 @@ fn get_args<'a, 'b>(
     Ok(args)
 }
 
-fn get_body<'a, 'b>(
-    tokens: &mut Peekable<Iter<'b, Lex<'a>>>,
+fn get_body<'a, 'b, 'c>(
+    tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
 ) -> Result<Vec<Syntax<'a>>, Error<'a>> {
     eat_or_error!(tokens, Tkn::LBrace);
     let mut body: Vec<Syntax> = Vec::new();
@@ -192,15 +192,15 @@ fn get_body<'a, 'b>(
     Ok(body)
 }
 
-fn get_fn<'a, 'b>(
-    tokens: &mut Peekable<Iter<'b, Lex<'a>>>,
+fn get_fn<'a, 'b, 'c>(
+    tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
 ) -> Result<Expr<'a>, Error<'a>> {
     let args: Vec<&str> = get_args(tokens)?;
     Ok(Expr::Fn { args, body: get_body(tokens)? })
 }
 
-fn get_expr<'a, 'b>(
-    tokens: &mut Peekable<Iter<'b, Lex<'a>>>,
+fn get_expr<'a, 'b, 'c>(
+    tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
     precedence: u8,
 ) -> Result<Expr<'a>, Error<'a>> {
     let mut expr: Expr = if let Some(token) = tokens.next() {
@@ -366,8 +366,8 @@ fn get_expr<'a, 'b>(
     Ok(expr)
 }
 
-fn get_stmt<'a, 'b>(
-    tokens: &mut Peekable<Iter<'b, Lex<'a>>>,
+fn get_stmt<'a, 'b, 'c>(
+    tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
 ) -> Result<Syntax<'a>, Error<'a>> {
     Ok(match tokens.peek() {
         Some(Lex { token: Tkn::Fn, line }) => {
