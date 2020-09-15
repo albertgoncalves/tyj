@@ -33,12 +33,13 @@ fn tokenize_function() {
 fn tokenize_object() {
     assert_tokens!(
         "/* x {
-             a: number,
-             b: string,
-             c: bool,
-             d: null,
-             e: undefined
-         } */",
+          *     a: number,
+          *     b: string,
+          *     c: bool,
+          *     d: null,
+          *     e: undefined,
+          * }
+          */",
         vec![
             Lex { token: Tkn::Ident("x"), line: 0 },
             Lex { token: Tkn::LBrace, line: 0 },
@@ -61,6 +62,7 @@ fn tokenize_object() {
             Lex { token: Tkn::Ident("e"), line: 5 },
             Lex { token: Tkn::Colon, line: 5 },
             Lex { token: Tkn::Undef, line: 5 },
+            Lex { token: Tkn::Comma, line: 5 },
             Lex { token: Tkn::RBrace, line: 6 },
         ],
     )
@@ -75,7 +77,7 @@ macro_rules! assert_sigs {
 #[test]
 fn parse_fn() {
     assert_sigs!(
-        "f(null, undefined) -> null",
+        "// f(null, undefined) -> null",
         Ok(vec![Sig {
             statement: Stmt::Fn {
                 ident: "f",
@@ -90,7 +92,7 @@ fn parse_fn() {
 #[test]
 fn parse_fn_empty_args() {
     assert_sigs!(
-        "f() -> undefined",
+        "/* f() -> undefined */",
         Ok(vec![Sig {
             statement: Stmt::Fn {
                 ident: "f",
@@ -105,14 +107,15 @@ fn parse_fn_empty_args() {
 #[test]
 fn parse_obj() {
     assert_sigs!(
-        "x {
-             a: number,
-             b: string,
-             c: bool,
-             d: null,
-             e: undefined,
-             f: { g: null },
-         }",
+        "/* x {
+          *     a: number,
+          *     b: string,
+          *     c: bool,
+          *     d: null,
+          *     e: undefined,
+          *     f: { g: null },
+          * }
+          */",
         Ok(vec![Sig {
             statement: Stmt::Obj {
                 ident: "x",
@@ -139,7 +142,7 @@ fn parse_obj() {
 #[test]
 fn parse_obj_empty() {
     assert_sigs!(
-        "x {}",
+        "// x {}",
         Ok(vec![Sig {
             statement: Stmt::Obj { ident: "x", props: Vec::new() },
             line: 0,
@@ -150,8 +153,9 @@ fn parse_obj_empty() {
 #[test]
 fn parse_combined() {
     assert_sigs!(
-        "x { a: number }
-         f(a) -> { b: bool }",
+        "/* x { a: number }
+          * f(a) -> { b: bool }
+          */",
         Ok(vec![
             Sig {
                 statement: Stmt::Obj {
