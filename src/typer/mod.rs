@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod test;
 
+use crate::commenter::Sig;
 use crate::parser::{Expr, Stmt, Syntax};
 use crate::tokenizer::{Asn, Op};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -216,6 +217,7 @@ fn set_assign<'a, 'b>(
 
 pub(crate) fn get_types<'a>(
     ast: &'a [Syntax<'a>],
+    sigs: &'a [Sig<'a>],
 ) -> Result<HashMap<Target<'a>, Type<'a>>, Error<'a>> {
     let mut types: HashMap<Target, Type> = HashMap::new();
     let scope: Vec<&str> = Vec::new();

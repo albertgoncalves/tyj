@@ -68,7 +68,7 @@ fn tokenize_object() {
 
 macro_rules! assert_sigs {
     ($a:expr, $b:expr $(,)?) => {
-        assert_eq!(get_sigs(&get_tokens($a)), $b)
+        assert_eq!(get_sigs(&[$a]), $b)
     };
 }
 

@@ -24,9 +24,9 @@ enum Tkn<'a> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct Lex<'a> {
+pub(crate) struct Lex<'a> {
     token: Tkn<'a>,
-    line: Count,
+    pub(crate) line: Count,
 }
 
 #[derive(Debug, PartialEq)]
@@ -54,15 +54,14 @@ enum Stmt<'a> {
 }
 
 #[derive(Debug, PartialEq)]
-struct Sig<'a> {
+pub(crate) struct Sig<'a> {
     statement: Stmt<'a>,
     line: Count,
 }
 
 #[derive(Debug, PartialEq)]
-enum Error<'a> {
+pub(crate) enum Error<'a> {
     Token(Lex<'a>),
-    Type(Type<'a>),
     EOF,
 }
 
@@ -141,16 +140,6 @@ macro_rules! eat_or_error {
     };
 }
 
-fn get_ident<'a, 'b, 'c>(
-    tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
-) -> Result<&'a str, Error<'a>> {
-    match tokens.next() {
-        Some(Lex { token: Tkn::Ident(x), .. }) => Ok(x),
-        Some(token) => Err(Error::Token(*token)),
-        None => Err(Error::EOF),
-    }
-}
-
 fn get_type<'a, 'b, 'c>(
     tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
 ) -> Result<Type<'a>, Error<'a>> {
@@ -206,6 +195,10 @@ fn get_stmt<'a, 'b, 'c>(
 ) -> Result<Sig<'a>, Error<'a>> {
     Ok(match tokens.next() {
         Some(Lex { token: Tkn::Ident(ident), line }) => {
+            let token: Lex = match tokens.peek() {
+                Some(lex) => **lex,
+                None => return Err(Error::EOF),
+            };
             match get_type(tokens)? {
                 Type::Props(props) => {
                     Sig { statement: Stmt::Obj { ident, props }, line: *line }
@@ -214,7 +207,7 @@ fn get_stmt<'a, 'b, 'c>(
                     statement: Stmt::Fn { ident, args, return_: *return_ },
                     line: *line,
                 },
-                type_ => return Err(Error::Type(type_)),
+                _ => return Err(Error::Token(token)),
             }
         }
         Some(token) => return Err(Error::Token(*token)),
@@ -222,7 +215,13 @@ fn get_stmt<'a, 'b, 'c>(
     })
 }
 
-fn get_sigs<'a, 'b>(tokens: &'b [Lex<'a>]) -> Result<Vec<Sig<'a>>, Error<'a>> {
+pub(crate) fn get_sigs<'a, 'b>(
+    comments: &'b [&'a str],
+) -> Result<Vec<Sig<'a>>, Error<'a>> {
+    let mut tokens: Vec<Lex> = Vec::new();
+    for comment in comments {
+        tokens.extend_from_slice(&get_tokens(comment));
+    }
     let mut sigs: Vec<Sig> = Vec::new();
     let mut tokens: Peekable<Iter<Lex>> = tokens.iter().peekable();
     while tokens.peek().is_some() {

@@ -3,6 +3,7 @@ mod parser;
 mod tokenizer;
 mod typer;
 
+use crate::commenter::{get_sigs, Error as SigError, Sig};
 use crate::parser::{get_ast, Error as ParseError, Syntax};
 use crate::tokenizer::{get_tokens, Count};
 use crate::typer::{get_types, Error as TypeError, Message};
@@ -41,6 +42,16 @@ fn get_message(message: &Message) -> &'static str {
     }
 }
 
+fn get_count(source: &str) -> Count {
+    let mut line: Count = 0;
+    for x in source.chars() {
+        if x == '\n' {
+            line += 1;
+        }
+    }
+    line
+}
+
 fn main() {
     let args: Vec<String> = args().collect();
     if args.len() < 2 {
@@ -51,26 +62,30 @@ fn main() {
         Ok(source) => source,
         Err(_) => EXIT!(),
     };
-    let ast: Vec<Syntax> = match get_ast(&get_tokens(&source)) {
-        Ok((ast, _)) => ast,
+    let (ast, comments): (Vec<Syntax>, Vec<&str>) =
+        match get_ast(&get_tokens(&source)) {
+            Ok((ast, comments)) => (ast, comments),
+            Err(error) => {
+                let line: Count = match error {
+                    ParseError::EOF => get_count(&source),
+                    ParseError::Token(token) => token.line + 1,
+                };
+                eprintln!(ERROR!(), filename, line, "parse error");
+                EXIT!()
+            }
+        };
+    let sigs: Vec<Sig> = match get_sigs(&comments) {
+        Ok(sigs) => sigs,
         Err(error) => {
             let line: Count = match error {
-                ParseError::EOF => {
-                    let mut line: Count = 0;
-                    for x in source.chars() {
-                        if x == '\n' {
-                            line += 1;
-                        }
-                    }
-                    line
-                }
-                ParseError::Token(token) => token.line + 1,
+                SigError::EOF => get_count(&source),
+                SigError::Token(token) => token.line + 1,
             };
-            eprintln!(ERROR!(), filename, line, "parse error");
+            eprintln!(ERROR!(), filename, line, "signature error");
             EXIT!()
         }
     };
-    match get_types(&ast) {
+    match get_types(&ast, &sigs) {
         Ok(table) => println!("{:#?}", table),
         Err(TypeError { syntax, message }) => {
             eprintln!(

@@ -1,13 +1,17 @@
 use super::{get_types, Error, Message, Target, Type};
+use crate::commenter::{get_sigs, Sig};
 use crate::parser::{get_ast, Expr, Prop, Stmt, Syntax};
 use crate::tokenizer::{get_tokens, Asn, Op};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
 macro_rules! assert_types {
-    ($a:expr, $b:expr $(,)?) => {
-        assert_eq!(get_types(&get_ast(&get_tokens($a)).unwrap().0), $b)
-    };
+    ($a:expr, $b:expr $(,)?) => {{
+        let (ast, comments): (Vec<Syntax>, Vec<&str>) =
+            get_ast(&get_tokens($a)).unwrap();
+        let sigs: Vec<Sig> = get_sigs(&comments).unwrap();
+        assert_eq!(get_types(&ast, &sigs), $b)
+    }};
 }
 
 #[test]
