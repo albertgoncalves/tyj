@@ -145,14 +145,6 @@ fn get_ident<'a, 'b, 'c>(
     }
 }
 
-fn get_prop<'a, 'b, 'c>(
-    tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
-) -> Result<Prop<'a>, Error<'a>> {
-    let key: &str = get_ident(tokens)?;
-    eat_or_error!(tokens, Tkn::Colon);
-    Ok(Prop { key, value: get_expr(tokens, 0)? })
-}
-
 fn get_args<'a, 'b, 'c>(
     tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
 ) -> Result<Vec<&'a str>, Error<'a>> {
@@ -246,10 +238,14 @@ fn get_expr<'a, 'b, 'c>(
             Lex { token: Tkn::Undef, .. } => Expr::Undef,
             Lex { token: Tkn::LBrace, .. } => {
                 let mut props: Vec<Prop> = Vec::new();
-                while let Some(token) = tokens.peek() {
+                while let Some(token) = tokens.next() {
                     match token {
-                        Lex { token: Tkn::Ident(_), .. } => {
-                            props.push(get_prop(tokens)?);
+                        Lex { token: Tkn::Ident(key), .. } => {
+                            eat_or_error!(tokens, Tkn::Colon);
+                            props.push(Prop {
+                                key,
+                                value: get_expr(tokens, 0)?,
+                            });
                             match tokens.next() {
                                 Some(Lex { token: Tkn::Comma, .. }) => (),
                                 Some(Lex { token: Tkn::RBrace, .. }) => break,
@@ -259,11 +255,8 @@ fn get_expr<'a, 'b, 'c>(
                                 None => return Err(Error::EOF),
                             }
                         }
-                        Lex { token: Tkn::RBrace, .. } => {
-                            eat!(tokens);
-                            break;
-                        }
-                        token => return Err(Error::Token(**token)),
+                        Lex { token: Tkn::RBrace, .. } => break,
+                        token => return Err(Error::Token(*token)),
                     }
                 }
                 Expr::Obj(props)
