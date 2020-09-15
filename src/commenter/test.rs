@@ -1,4 +1,4 @@
-use super::{get_tokens, Lex, Tkn};
+use super::{get_sigs, get_tokens, Lex, Prop, Sig, Stmt, Tkn, Type};
 
 macro_rules! assert_tokens {
     ($a:expr, $b:expr $(,)?) => {
@@ -7,17 +7,16 @@ macro_rules! assert_tokens {
 }
 
 #[test]
-fn empty() {
+fn tokenize_empty() {
     assert_tokens!("/* \n *\n */", Vec::new());
     assert_tokens!("//", Vec::new());
 }
 
 #[test]
-fn function() {
+fn tokenize_function() {
     assert_tokens!(
-        "// fn f(number, number) -> number",
+        "// f(number, number) -> number",
         vec![
-            Lex { token: Tkn::Fn, line: 0 },
             Lex { token: Tkn::Ident("f"), line: 0 },
             Lex { token: Tkn::LParen, line: 0 },
             Lex { token: Tkn::Num, line: 0 },
@@ -31,9 +30,9 @@ fn function() {
 }
 
 #[test]
-fn object() {
+fn tokenize_object() {
     assert_tokens!(
-        "/* obj x {
+        "/* x {
              a: number,
              b: string,
              c: bool,
@@ -41,7 +40,6 @@ fn object() {
              e: undefined
          } */",
         vec![
-            Lex { token: Tkn::Obj, line: 0 },
             Lex { token: Tkn::Ident("x"), line: 0 },
             Lex { token: Tkn::LBrace, line: 0 },
             Lex { token: Tkn::Ident("a"), line: 1 },
@@ -65,5 +63,114 @@ fn object() {
             Lex { token: Tkn::Undef, line: 5 },
             Lex { token: Tkn::RBrace, line: 6 },
         ],
+    )
+}
+
+macro_rules! assert_sigs {
+    ($a:expr, $b:expr $(,)?) => {
+        assert_eq!(get_sigs(&get_tokens($a)), $b)
+    };
+}
+
+#[test]
+fn parse_fn() {
+    assert_sigs!(
+        "f(null, undefined) -> null",
+        Ok(vec![Sig {
+            statement: Stmt::Fn {
+                ident: "f",
+                args: vec![Type::Null, Type::Undef],
+                return_: Type::Null
+            },
+            line: 0,
+        }]),
+    )
+}
+
+#[test]
+fn parse_fn_empty_args() {
+    assert_sigs!(
+        "f() -> undefined",
+        Ok(vec![Sig {
+            statement: Stmt::Fn {
+                ident: "f",
+                args: Vec::new(),
+                return_: Type::Undef,
+            },
+            line: 0,
+        }]),
+    )
+}
+
+#[test]
+fn parse_obj() {
+    assert_sigs!(
+        "x {
+             a: number,
+             b: string,
+             c: bool,
+             d: null,
+             e: undefined,
+             f: { g: null },
+         }",
+        Ok(vec![Sig {
+            statement: Stmt::Obj {
+                ident: "x",
+                props: vec![
+                    Prop { key: "a", value: Type::Num },
+                    Prop { key: "b", value: Type::Str },
+                    Prop { key: "c", value: Type::Bool },
+                    Prop { key: "d", value: Type::Null },
+                    Prop { key: "e", value: Type::Undef },
+                    Prop {
+                        key: "f",
+                        value: Type::Props(vec![Prop {
+                            key: "g",
+                            value: Type::Null,
+                        }]),
+                    },
+                ],
+            },
+            line: 0,
+        }]),
+    )
+}
+
+#[test]
+fn parse_obj_empty() {
+    assert_sigs!(
+        "x {}",
+        Ok(vec![Sig {
+            statement: Stmt::Obj { ident: "x", props: Vec::new() },
+            line: 0,
+        }]),
+    )
+}
+
+#[test]
+fn parse_combined() {
+    assert_sigs!(
+        "x { a: number }
+         f(a) -> { b: bool }",
+        Ok(vec![
+            Sig {
+                statement: Stmt::Obj {
+                    ident: "x",
+                    props: vec![Prop { key: "a", value: Type::Num }],
+                },
+                line: 0,
+            },
+            Sig {
+                statement: Stmt::Fn {
+                    ident: "f",
+                    args: vec![Type::Ident("a")],
+                    return_: Type::Props(vec![Prop {
+                        key: "b",
+                        value: Type::Bool
+                    }]),
+                },
+                line: 1,
+            },
+        ]),
     )
 }

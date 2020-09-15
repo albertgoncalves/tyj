@@ -15,8 +15,6 @@ enum Tkn<'a> {
     Colon,
     Comma,
     Arrow,
-    Obj,
-    Fn,
     Ident(&'a str),
     Num,
     Str,
@@ -33,8 +31,8 @@ struct Lex<'a> {
 
 #[derive(Debug, PartialEq)]
 struct Prop<'a> {
-    pub(crate) key: &'a str,
-    pub(crate) value: Type<'a>,
+    key: &'a str,
+    value: Type<'a>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -108,8 +106,6 @@ fn get_tokens<'a>(comment: &'a str) -> Vec<Lex<'a>> {
                     }
                 }
                 let token: Tkn = match &comment[i..k] {
-                    "obj" => Tkn::Obj,
-                    "fn" => Tkn::Fn,
                     "number" => Tkn::Num,
                     "bool" => Tkn::Bool,
                     "string" => Tkn::Str,
@@ -135,6 +131,16 @@ macro_rules! eat {
     }};
 }
 
+macro_rules! eat_or_error {
+    ($tokens:expr, $x:path $(,)?) => {
+        match $tokens.next() {
+            Some(Lex { token: $x, .. }) => (),
+            Some(token) => return Err(Error::Token(*token)),
+            None => return Err(Error::EOF),
+        };
+    };
+}
+
 fn get_ident<'a, 'b, 'c>(
     tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
 ) -> Result<&'a str, Error<'a>> {
@@ -148,26 +154,70 @@ fn get_ident<'a, 'b, 'c>(
 fn get_type<'a, 'b, 'c>(
     tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
 ) -> Result<Type<'a>, Error<'a>> {
-    panic!("{:?}", tokens.peek())
+    Ok(match tokens.next() {
+        Some(Lex { token: Tkn::Num, .. }) => Type::Num,
+        Some(Lex { token: Tkn::Bool, .. }) => Type::Bool,
+        Some(Lex { token: Tkn::Str, .. }) => Type::Str,
+        Some(Lex { token: Tkn::Null, .. }) => Type::Null,
+        Some(Lex { token: Tkn::Undef, .. }) => Type::Undef,
+        Some(Lex { token: Tkn::Ident(x), .. }) => Type::Ident(x),
+        Some(Lex { token: Tkn::LBrace, .. }) => {
+            let mut props: Vec<Prop> = Vec::new();
+            while let Some(token) = tokens.next() {
+                match token {
+                    Lex { token: Tkn::Ident(key), .. } => {
+                        eat_or_error!(tokens, Tkn::Colon);
+                        props.push(Prop { key, value: get_type(tokens)? });
+                        match tokens.next() {
+                            Some(Lex { token: Tkn::Comma, .. }) => (),
+                            Some(Lex { token: Tkn::RBrace, .. }) => break,
+                            Some(token) => return Err(Error::Token(*token)),
+                            None => return Err(Error::EOF),
+                        }
+                    }
+                    Lex { token: Tkn::RBrace, .. } => break,
+                    token => return Err(Error::Token(*token)),
+                }
+            }
+            Type::Props(props)
+        }
+        Some(Lex { token: Tkn::LParen, .. }) => {
+            let mut args: Vec<Type> = Vec::new();
+            while let Some(token) = tokens.peek() {
+                match token {
+                    Lex { token: Tkn::RParen, .. } => {
+                        eat!(tokens);
+                        break;
+                    }
+                    Lex { token: Tkn::Comma, .. } => eat!(tokens),
+                    _ => args.push(get_type(tokens)?),
+                }
+            }
+            eat_or_error!(tokens, Tkn::Arrow);
+            Type::Fn { args, return_: Box::new(get_type(tokens)?) }
+        }
+        Some(token) => return Err(Error::Token(*token)),
+        None => return Err(Error::EOF),
+    })
 }
 
 fn get_stmt<'a, 'b, 'c>(
     tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
 ) -> Result<Sig<'a>, Error<'a>> {
-    Ok(match tokens.peek() {
-        Some(Lex { token: Tkn::Obj, line }) => panic!("{:?}", Tkn::Obj),
-        Some(Lex { token: Tkn::Fn, line }) => {
-            eat!(tokens);
-            let ident: &str = get_ident(tokens)?;
-            let (args, return_): (Vec<Type>, Type) = {
-                match get_type(tokens)? {
-                    Type::Fn { args, return_ } => (args, *return_),
-                    type_ => return Err(Error::Type(type_)),
+    Ok(match tokens.next() {
+        Some(Lex { token: Tkn::Ident(ident), line }) => {
+            match get_type(tokens)? {
+                Type::Props(props) => {
+                    Sig { statement: Stmt::Obj { ident, props }, line: *line }
                 }
-            };
-            Sig { statement: Stmt::Fn { ident, args, return_ }, line: *line }
+                Type::Fn { args, return_ } => Sig {
+                    statement: Stmt::Fn { ident, args, return_: *return_ },
+                    line: *line,
+                },
+                type_ => return Err(Error::Type(type_)),
+            }
         }
-        Some(token) => return Err(Error::Token(**token)),
+        Some(token) => return Err(Error::Token(*token)),
         None => return Err(Error::EOF),
     })
 }
