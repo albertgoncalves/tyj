@@ -2,9 +2,6 @@
 
 export FLAGS=(
     --color "always"
-    -C "opt-level=0"
-    -C "overflow-checks=yes"
-    -C "panic=unwind"
     -W "absolute-paths-not-starting-with-crate"
     -W "anonymous-parameters"
     -W "deprecated-in-future"
@@ -24,4 +21,16 @@ export FLAGS=(
     -W "unused-lifetimes"
     -W "unused-qualifications"
     -W "unused-results"
+)
+export DEBUG_FLAGS=(
+    -C "opt-level=0"
+    -C "overflow-checks=yes"
+    -C "panic=unwind"
+)
+export RELEASE_FLAGS=(
+    -C "codegen-units=1"
+    -C "lto=fat"
+    -C "opt-level=3"
+    -C "overflow-checks=no"
+    -C "panic=abort"
 )

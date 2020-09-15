@@ -8,6 +8,6 @@ if [ "$1" = "test" ]; then
     "$WD/scripts/build.sh" test
     "$WD/bin/test"
 else
-    "$WD/scripts/build.sh" main
-    "$WD/bin/main" "$1"
+    "$WD/scripts/build.sh" debug
+    "$WD/bin/debug" "$1"
 fi
