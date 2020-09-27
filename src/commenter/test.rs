@@ -154,7 +154,7 @@ fn parse_obj_empty() {
 fn parse_combined() {
     assert_sigs!(
         "/* x { a: number }
-          * f(a) -> { b: bool }
+          * f(x) -> { b: bool }
           */",
         Ok(vec![
             Sig {
@@ -167,11 +167,37 @@ fn parse_combined() {
             Sig {
                 statement: Stmt::Fn {
                     ident: "f",
-                    args: vec![Type::Ident("a")],
+                    args: vec![Type::Ident("x")],
                     return_: Type::Props(vec![Prop {
                         key: "b",
                         value: Type::Bool
                     }]),
+                },
+                line: 1,
+            },
+        ]),
+    )
+}
+
+#[test]
+fn parse_overload() {
+    assert_sigs!(
+        "// f(bool, bool) -> bool
+         // f(null, null) -> null",
+        Ok(vec![
+            Sig {
+                statement: Stmt::Fn {
+                    ident: "f",
+                    args: vec![Type::Bool, Type::Bool],
+                    return_: Type::Bool,
+                },
+                line: 0,
+            },
+            Sig {
+                statement: Stmt::Fn {
+                    ident: "f",
+                    args: vec![Type::Null, Type::Null],
+                    return_: Type::Null,
                 },
                 line: 1,
             },
