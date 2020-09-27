@@ -11,5 +11,6 @@ perf record --call-graph fp "$WD/bin/release" "$1" > /dev/null 2>&1 \
 perf report
 valgrind --tool=cachegrind --branch-sim=yes "$WD/bin/release" "$1" 2>&1 \
     | less || true
-rm perf.data*
 rm cachegrind.out*
+rm perf.data*
+rm vgcore*
