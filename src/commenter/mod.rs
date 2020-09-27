@@ -8,18 +8,18 @@ use std::str::CharIndices;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Tkn<'a> {
-    LBrace,
-    RBrace,
-    LParen,
-    RParen,
+    Arrow,
+    Bool,
     Colon,
     Comma,
-    Arrow,
     Ident(&'a str),
-    Num,
-    Str,
-    Bool,
+    LBrace,
+    LParen,
     Null,
+    Num,
+    RBrace,
+    RParen,
+    Str,
     Undef,
 }
 
@@ -37,20 +37,20 @@ struct Prop<'a> {
 
 #[derive(Debug, PartialEq)]
 enum Type<'a> {
-    Num,
-    Str,
     Bool,
-    Null,
-    Undef,
-    Ident(&'a str),
-    Props(Vec<Prop<'a>>),
     Fn { args: Vec<Type<'a>>, return_: Box<Type<'a>> },
+    Ident(&'a str),
+    Null,
+    Num,
+    Props(Vec<Prop<'a>>),
+    Str,
+    Undef,
 }
 
 #[derive(Debug, PartialEq)]
 enum Stmt<'a> {
-    Obj { ident: &'a str, props: Vec<Prop<'a>> },
     Fn { ident: &'a str, args: Vec<Type<'a>>, return_: Type<'a> },
+    Obj { ident: &'a str, props: Vec<Prop<'a>> },
 }
 
 #[derive(Debug, PartialEq)]
@@ -61,8 +61,8 @@ pub(crate) struct Sig<'a> {
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Error<'a> {
-    Token(Lex<'a>),
     EOF,
+    Token(Lex<'a>),
 }
 
 fn get_tokens<'a>(comment: &'a str) -> Vec<Lex<'a>> {

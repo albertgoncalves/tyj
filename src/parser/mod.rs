@@ -7,8 +7,8 @@ use std::slice::Iter;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Error<'a> {
-    Token(Lex<'a>),
     EOF,
+    Token(Lex<'a>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -19,43 +19,43 @@ pub(crate) struct Prop<'a> {
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Expr<'a> {
-    Num(&'a str),
-    Str(&'a str),
-    Bool(&'a str),
-    Obj(Vec<Prop<'a>>),
+    Access {
+        expr: Box<Expr<'a>>,
+        index: Box<Expr<'a>>,
+    },
     Array(Vec<Expr<'a>>),
-    Ident(&'a str),
-    Prefix {
-        op: Op,
+    Bool(&'a str),
+    Call {
         expr: Box<Expr<'a>>,
-    },
-    Infix {
-        op: Op,
-        left: Box<Expr<'a>>,
-        right: Box<Expr<'a>>,
-    },
-    Postfix {
-        op: Op,
-        expr: Box<Expr<'a>>,
-    },
-    Ternary {
-        condition: Box<Expr<'a>>,
-        if_: Box<Expr<'a>>,
-        else_: Box<Expr<'a>>,
+        args: Vec<Expr<'a>>,
     },
     Fn {
         args: Vec<&'a str>,
         body: Vec<Syntax<'a>>,
     },
-    Call {
-        expr: Box<Expr<'a>>,
-        args: Vec<Expr<'a>>,
-    },
-    Access {
-        expr: Box<Expr<'a>>,
-        index: Box<Expr<'a>>,
+    Ident(&'a str),
+    Infix {
+        op: Op,
+        left: Box<Expr<'a>>,
+        right: Box<Expr<'a>>,
     },
     Null,
+    Num(&'a str),
+    Obj(Vec<Prop<'a>>),
+    Postfix {
+        op: Op,
+        expr: Box<Expr<'a>>,
+    },
+    Prefix {
+        op: Op,
+        expr: Box<Expr<'a>>,
+    },
+    Str(&'a str),
+    Ternary {
+        condition: Box<Expr<'a>>,
+        if_: Box<Expr<'a>>,
+        else_: Box<Expr<'a>>,
+    },
     Undef,
     Uninit,
 }
@@ -68,29 +68,26 @@ pub(crate) struct Case<'a> {
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Stmt<'a> {
-    Decl {
-        ident: &'a str,
-        expr: Expr<'a>,
-    },
-    Decls(Vec<&'a str>),
     Assign {
         op: Asn,
         ident: Expr<'a>,
         expr: Expr<'a>,
     },
-    Ret(Expr<'a>),
-    Fn {
-        ident: &'a str,
-        args: Vec<&'a str>,
-        body: Vec<Syntax<'a>>,
-    },
+    Break,
     Cond {
         condition: Expr<'a>,
         if_: Vec<Syntax<'a>>,
         else_: Vec<Syntax<'a>>,
     },
-    While {
-        condition: Expr<'a>,
+    Decl {
+        ident: &'a str,
+        expr: Expr<'a>,
+    },
+    Decls(Vec<&'a str>),
+    Effect(Expr<'a>),
+    Fn {
+        ident: &'a str,
+        args: Vec<&'a str>,
         body: Vec<Syntax<'a>>,
     },
     For {
@@ -99,14 +96,17 @@ pub(crate) enum Stmt<'a> {
         update: Option<Box<Syntax<'a>>>,
         body: Vec<Syntax<'a>>,
     },
+    Ret(Expr<'a>),
+    Scope(Vec<Syntax<'a>>),
     Switch {
         expr: Expr<'a>,
         cases: Vec<Case<'a>>,
         default: Vec<Syntax<'a>>,
     },
-    Break,
-    Scope(Vec<Syntax<'a>>),
-    Effect(Expr<'a>),
+    While {
+        condition: Expr<'a>,
+        body: Vec<Syntax<'a>>,
+    },
 }
 
 #[derive(Debug, PartialEq)]

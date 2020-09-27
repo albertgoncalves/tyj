@@ -9,9 +9,9 @@ use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Message {
-    ArrayMultiType,
     AccessNonArray,
     AccessNonIndex,
+    ArrayMultiType,
     AssignNonIdent,
     IdentShadow,
     IdentUninit,
@@ -39,14 +39,14 @@ pub(crate) struct Target<'a> {
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) enum Type<'a> {
-    Num,
-    Str,
-    Bool,
-    Null,
-    Undef,
-    Obj(Rc<BTreeMap<&'a str, Type<'a>>>),
-    EmptyArray,
     Array(Box<Type<'a>>),
+    Bool,
+    EmptyArray,
+    Null,
+    Num,
+    Obj(Rc<BTreeMap<&'a str, Type<'a>>>),
+    Str,
+    Undef,
     Uninit,
 }
 
