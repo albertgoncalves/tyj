@@ -89,10 +89,6 @@ pub(crate) struct Lex<'a> {
     pub(crate) line: Count,
 }
 
-fn is_numeric(x: char) -> bool {
-    x.is_digit(DECIMAL) || (x == '.')
-}
-
 fn is_op(x: char) -> bool {
     for op in &OP_CHARS {
         if x == *op {
@@ -170,16 +166,32 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
                 };
                 push!(token);
             }
-            _ if is_numeric(x) => {
-                let num: &str = get_substring!(is_numeric, i);
-                if num == "." {
-                    push!(Tkn::Op(Op::Member));
-                } else if (num.matches('.').count() < 2)
-                    && (0 < num.matches(|x: char| x.is_digit(DECIMAL)).count())
-                {
-                    push!(Tkn::Num(num));
-                } else {
-                    push!(Tkn::Illegal(num));
+            _ if x.is_digit(DECIMAL) || x == '.' => {
+                let mut k: usize = i;
+                let mut dot: bool = &source[i..=i] == ".";
+                loop {
+                    if let Some((j, x)) = chars.peek() {
+                        k = *j;
+                        match x {
+                            _ if x.is_digit(DECIMAL) => eat!(),
+                            '.' if !dot => {
+                                dot = true;
+                                eat!();
+                            }
+                            _ => break,
+                        }
+                    } else {
+                        k += 1;
+                        break;
+                    }
+                }
+                if i != k {
+                    let token: &str = &source[i..k];
+                    if token == "." {
+                        push!(Tkn::Op(Op::Member));
+                    } else {
+                        push!(Tkn::Num(token));
+                    }
                 }
             }
             '/' if chars.peek() == Some(&(i + 1, '/')) => {

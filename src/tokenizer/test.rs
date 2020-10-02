@@ -42,7 +42,13 @@ fn number() {
     assert_token!("10", Lex { token: Tkn::Num("10"), line: 0 });
     assert_token!(".10", Lex { token: Tkn::Num(".10"), line: 0 });
     assert_token!("1.0", Lex { token: Tkn::Num("1.0"), line: 0 });
-    assert_token!("1.0.", Lex { token: Tkn::Illegal("1.0."), line: 0 });
+    assert_tokens!(
+        "1.0.",
+        vec![
+            Lex { token: Tkn::Num("1.0"), line: 0 },
+            Lex { token: Tkn::Op(Op::Member), line: 0 },
+        ],
+    );
     assert_tokens!(
         "1;",
         vec![
@@ -74,7 +80,8 @@ fn number() {
     assert_tokens!(
         "1.0.;",
         vec![
-            Lex { token: Tkn::Illegal("1.0."), line: 0 },
+            Lex { token: Tkn::Num("1.0"), line: 0 },
+            Lex { token: Tkn::Op(Op::Member), line: 0 },
             Lex { token: Tkn::Semicolon, line: 0 },
         ],
     )
@@ -827,6 +834,39 @@ fn empty_string() {
             Lex { token: Tkn::Assign(Asn::Reg), line: 0 },
             Lex { token: Tkn::Str(""), line: 0 },
             Lex { token: Tkn::Semicolon, line: 0 },
+        ],
+    )
+}
+
+#[test]
+fn dots() {
+    assert_tokens!(
+        "100.000.",
+        vec![
+            Lex { token: Tkn::Num("100.000"), line: 0 },
+            Lex { token: Tkn::Op(Op::Member), line: 0 },
+        ],
+    );
+    assert_tokens!(
+        ".100.000",
+        vec![
+            Lex { token: Tkn::Num(".100"), line: 0 },
+            Lex { token: Tkn::Num(".000"), line: 0 },
+        ],
+    );
+    assert_tokens!(
+        ".100 000.",
+        vec![
+            Lex { token: Tkn::Num(".100"), line: 0 },
+            Lex { token: Tkn::Num("000."), line: 0 },
+        ],
+    );
+    assert_tokens!(
+        ".100 000..",
+        vec![
+            Lex { token: Tkn::Num(".100"), line: 0 },
+            Lex { token: Tkn::Num("000."), line: 0 },
+            Lex { token: Tkn::Op(Op::Member), line: 0 },
         ],
     )
 }
