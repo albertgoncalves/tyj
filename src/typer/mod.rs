@@ -241,6 +241,10 @@ pub(crate) fn get_types<'a>(
     sigs: &'a mut HashMap<&'a str, Type<'a>>,
 ) -> Result<HashMap<Target<'a>, Type<'a>>, Error<'a>> {
     let mut types: HashMap<Target, Type> = HashMap::new();
+    for (ident, type_) in sigs.drain() {
+        let _: Option<_> = types
+            .insert(Target { ident: vec![ident], scope: Vec::new() }, type_);
+    }
     let scope: Vec<&str> = Vec::new();
     let scope: Scope = Scope(&scope);
     for syntax in ast {
