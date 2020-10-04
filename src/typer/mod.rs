@@ -201,6 +201,41 @@ fn set_assign<'a, 'b>(
     Ok(())
 }
 
+fn type_check<'a, 'b>(
+    scope: &'b Scope<'a, 'b>,
+    types: &'b mut HashMap<Target<'a>, Type<'a>>,
+    syntax: &'a Syntax<'a>,
+) -> Result<(), Error<'a>> {
+    match &syntax.statement {
+        Stmt::Decl { ident, expr } => {
+            let ident: Vec<&str> = vec![ident];
+            if types.contains_key(&Target {
+                ident: ident.to_vec(),
+                scope: scope.0.to_vec(),
+            }) {
+                return Err(Error { syntax, message: Message::IdentShadow });
+            }
+            match get_expr(&scope, &types, expr) {
+                Err(message) => return Err(Error { syntax, message }),
+                Ok(type_) => {
+                    if let Err(message) =
+                        set_type(&scope, &Ident(&ident), types, &type_)
+                    {
+                        return Err(Error { syntax, message });
+                    }
+                }
+            }
+        }
+        Stmt::Assign { op: Asn::Reg, ident, expr } => {
+            if let Err(message) = set_assign(&scope, ident, types, expr) {
+                return Err(Error { syntax, message });
+            }
+        }
+        _ => panic!("{:#?}", syntax),
+    }
+    Ok(())
+}
+
 pub(crate) fn get_types<'a>(
     ast: &'a [Syntax<'a>],
     sigs: &'a mut HashMap<&'a str, Type<'a>>,
@@ -209,41 +244,7 @@ pub(crate) fn get_types<'a>(
     let scope: Vec<&str> = Vec::new();
     let scope: Scope = Scope(&scope);
     for syntax in ast {
-        match &syntax.statement {
-            Stmt::Decl { ident, expr } => {
-                let ident: Vec<&str> = vec![ident];
-                if types.contains_key(&Target {
-                    ident: ident.to_vec(),
-                    scope: scope.0.to_vec(),
-                }) {
-                    return Err(Error {
-                        syntax,
-                        message: Message::IdentShadow,
-                    });
-                }
-                match get_expr(&scope, &types, expr) {
-                    Err(message) => return Err(Error { syntax, message }),
-                    Ok(type_) => {
-                        if let Err(message) = set_type(
-                            &scope,
-                            &Ident(&ident),
-                            &mut types,
-                            &type_,
-                        ) {
-                            return Err(Error { syntax, message });
-                        }
-                    }
-                }
-            }
-            Stmt::Assign { op: Asn::Reg, ident, expr } => {
-                if let Err(message) =
-                    set_assign(&scope, ident, &mut types, expr)
-                {
-                    return Err(Error { syntax, message });
-                }
-            }
-            _ => panic!("{:#?}", syntax),
-        }
+        type_check(&scope, &mut types, syntax)?;
     }
     Ok(types)
 }
