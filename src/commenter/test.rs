@@ -127,7 +127,7 @@ fn parse_obj() {
                     Prop { key: "e", value: Type::Undef },
                     Prop {
                         key: "f",
-                        value: Type::Props(vec![Prop {
+                        value: Type::Obj(vec![Prop {
                             key: "g",
                             value: Type::Null,
                         }]),
@@ -168,7 +168,7 @@ fn parse_combined() {
                 statement: Stmt::Fn {
                     ident: "f",
                     args: vec![Type::Ident("x")],
-                    return_: Type::Props(vec![Prop {
+                    return_: Type::Obj(vec![Prop {
                         key: "b",
                         value: Type::Bool
                     }]),

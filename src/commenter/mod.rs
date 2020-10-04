@@ -42,7 +42,7 @@ enum Type<'a> {
     Ident(&'a str),
     Null,
     Num,
-    Props(Vec<Prop<'a>>),
+    Obj(Vec<Prop<'a>>),
     Str,
     Undef,
 }
@@ -168,7 +168,7 @@ fn get_type<'a, 'b, 'c>(
                     token => return Err(Error::Token(*token)),
                 }
             }
-            Type::Props(props)
+            Type::Obj(props)
         }
         Some(Lex { token: Tkn::LParen, .. }) => {
             let mut args: Vec<Type> = Vec::new();
@@ -200,7 +200,7 @@ fn get_stmt<'a, 'b, 'c>(
                 None => return Err(Error::EOF),
             };
             match get_type(tokens)? {
-                Type::Props(props) => {
+                Type::Obj(props) => {
                     Sig { statement: Stmt::Obj { ident, props }, line: *line }
                 }
                 Type::Fn { args, return_ } => Sig {
