@@ -1,11 +1,10 @@
 #[cfg(test)]
 mod test;
 
-use crate::commenter::Sig;
 use crate::parser::{Expr, Stmt, Syntax};
 use crate::tokenizer::{Asn, Op};
+use crate::types::Type;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Message {
@@ -35,19 +34,6 @@ struct Scope<'a, 'b>(&'b [&'a str]);
 pub(crate) struct Target<'a> {
     ident: Vec<&'a str>,
     scope: Vec<&'a str>,
-}
-
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub(crate) enum Type<'a> {
-    Array(Box<Type<'a>>),
-    Bool,
-    EmptyArray,
-    Null,
-    Num,
-    Obj(Rc<BTreeMap<&'a str, Type<'a>>>),
-    Str,
-    Undef,
-    Uninit,
 }
 
 fn get_idents<'a>(expr: &'a Expr<'a>) -> Result<Vec<&'a str>, Message> {
@@ -110,7 +96,7 @@ fn get_expr<'a, 'b>(
                     return Err(Message::ObjDuplicateKeys);
                 }
             }
-            Type::Obj(Rc::new(type_props))
+            Type::Obj(type_props)
         }
         Expr::Array(elems) => {
             let mut type_elems: BTreeSet<Type> = BTreeSet::new();
@@ -217,7 +203,7 @@ fn set_assign<'a, 'b>(
 
 pub(crate) fn get_types<'a>(
     ast: &'a [Syntax<'a>],
-    sigs: &'a [Sig<'a>],
+    sigs: &'a mut HashMap<&'a str, Type<'a>>,
 ) -> Result<HashMap<Target<'a>, Type<'a>>, Error<'a>> {
     let mut types: HashMap<Target, Type> = HashMap::new();
     let scope: Vec<&str> = Vec::new();

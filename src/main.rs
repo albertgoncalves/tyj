@@ -2,11 +2,14 @@ mod commenter;
 mod parser;
 mod tokenizer;
 mod typer;
+mod types;
 
-use crate::commenter::{get_sigs, Error as SigError, Sig};
+use crate::commenter::{get_sigs, Error as SigError};
 use crate::parser::{get_ast, Error as ParseError, Syntax};
 use crate::tokenizer::{get_tokens, Count};
 use crate::typer::{get_types, Error as TypeError, Message};
+use crate::types::Type;
+use std::collections::HashMap;
 use std::env::args;
 use std::fs::read_to_string;
 use std::process::exit;
@@ -74,18 +77,18 @@ fn main() {
                 EXIT!()
             }
         };
-    let sigs: Vec<Sig> = match get_sigs(&comments) {
+    let mut sigs: HashMap<&str, Type> = match get_sigs(&comments) {
         Ok(sigs) => sigs,
         Err(error) => {
             let line: Count = match error {
                 SigError::EOF => get_count(&source),
-                SigError::Token(token) => token.line + 1,
+                SigError::Line(line) => line + 1,
             };
             eprintln!(ERROR!(), filename, line, "signature error");
             EXIT!()
         }
     };
-    match get_types(&ast, &sigs) {
+    match get_types(&ast, &mut sigs) {
         Ok(table) => println!("{:#?}", table),
         Err(TypeError { syntax, message }) => {
             eprintln!(

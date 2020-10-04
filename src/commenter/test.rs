@@ -1,4 +1,5 @@
-use super::{get_sigs, get_tokens, Lex, Prop, Sig, Stmt, Tkn, Type};
+use super::{get_sigs, get_tokens, Lex, Tkn, Type};
+use std::collections::BTreeMap;
 
 macro_rules! assert_tokens {
     ($a:expr, $b:expr $(,)?) => {
@@ -78,14 +79,16 @@ macro_rules! assert_sigs {
 fn parse_fn() {
     assert_sigs!(
         "// f(null, undefined) -> null",
-        Ok(vec![Sig {
-            statement: Stmt::Fn {
-                ident: "f",
-                args: vec![Type::Null, Type::Undef],
-                return_: Type::Null
-            },
-            line: 0,
-        }]),
+        Ok(vec![(
+            "f",
+            Type::Fn(
+                vec![(vec![Type::Null, Type::Undef], Type::Null)]
+                    .into_iter()
+                    .collect(),
+            ),
+        )]
+        .into_iter()
+        .collect()),
     )
 }
 
@@ -93,14 +96,12 @@ fn parse_fn() {
 fn parse_fn_empty_args() {
     assert_sigs!(
         "/* f() -> undefined */",
-        Ok(vec![Sig {
-            statement: Stmt::Fn {
-                ident: "f",
-                args: Vec::new(),
-                return_: Type::Undef,
-            },
-            line: 0,
-        }]),
+        Ok(vec![(
+            "f",
+            Type::Fn(vec![(Vec::new(), Type::Undef)].into_iter().collect()),
+        )]
+        .into_iter()
+        .collect()),
     )
 }
 
@@ -116,26 +117,28 @@ fn parse_obj() {
           *     f: { g: null },
           * }
           */",
-        Ok(vec![Sig {
-            statement: Stmt::Obj {
-                ident: "x",
-                props: vec![
-                    Prop { key: "a", value: Type::Num },
-                    Prop { key: "b", value: Type::Str },
-                    Prop { key: "c", value: Type::Bool },
-                    Prop { key: "d", value: Type::Null },
-                    Prop { key: "e", value: Type::Undef },
-                    Prop {
-                        key: "f",
-                        value: Type::Obj(vec![Prop {
-                            key: "g",
-                            value: Type::Null,
-                        }]),
-                    },
-                ],
-            },
-            line: 0,
-        }]),
+        Ok(vec![(
+            "x",
+            Type::Obj(
+                vec![
+                    ("a", Type::Num),
+                    ("b", Type::Str),
+                    ("c", Type::Bool),
+                    ("d", Type::Null),
+                    ("e", Type::Undef),
+                    (
+                        "f",
+                        Type::Obj(
+                            vec![("g", Type::Null)].into_iter().collect(),
+                        ),
+                    ),
+                ]
+                .into_iter()
+                .collect(),
+            )
+        )]
+        .into_iter()
+        .collect()),
     )
 }
 
@@ -143,10 +146,7 @@ fn parse_obj() {
 fn parse_obj_empty() {
     assert_sigs!(
         "// x {}",
-        Ok(vec![Sig {
-            statement: Stmt::Obj { ident: "x", props: Vec::new() },
-            line: 0,
-        }]),
+        Ok(vec![("x", Type::Obj(BTreeMap::new()))].into_iter().collect()),
     )
 }
 
@@ -157,25 +157,25 @@ fn parse_combined() {
           * f(x) -> { b: bool }
           */",
         Ok(vec![
-            Sig {
-                statement: Stmt::Obj {
-                    ident: "x",
-                    props: vec![Prop { key: "a", value: Type::Num }],
-                },
-                line: 0,
-            },
-            Sig {
-                statement: Stmt::Fn {
-                    ident: "f",
-                    args: vec![Type::Ident("x")],
-                    return_: Type::Obj(vec![Prop {
-                        key: "b",
-                        value: Type::Bool
-                    }]),
-                },
-                line: 1,
-            },
-        ]),
+            ("x", Type::Obj(vec![("a", Type::Num)].into_iter().collect(),)),
+            (
+                "f",
+                Type::Fn(
+                    vec![(
+                        vec![Type::Obj(
+                            vec![("a", Type::Num)].into_iter().collect(),
+                        )],
+                        Type::Obj(
+                            vec![("b", Type::Bool)].into_iter().collect(),
+                        )
+                    )]
+                    .into_iter()
+                    .collect(),
+                ),
+            ),
+        ]
+        .into_iter()
+        .collect()),
     )
 }
 
@@ -183,24 +183,25 @@ fn parse_combined() {
 fn parse_overload() {
     assert_sigs!(
         "// f(bool, bool) -> bool
-         // f(null, null) -> null",
+         // f(null, null) -> null
+         // x {}
+         // f(number, number) -> number",
         Ok(vec![
-            Sig {
-                statement: Stmt::Fn {
-                    ident: "f",
-                    args: vec![Type::Bool, Type::Bool],
-                    return_: Type::Bool,
-                },
-                line: 0,
-            },
-            Sig {
-                statement: Stmt::Fn {
-                    ident: "f",
-                    args: vec![Type::Null, Type::Null],
-                    return_: Type::Null,
-                },
-                line: 1,
-            },
-        ]),
+            (
+                "f",
+                Type::Fn(
+                    vec![
+                        (vec![Type::Bool, Type::Bool], Type::Bool),
+                        (vec![Type::Null, Type::Null], Type::Null),
+                        (vec![Type::Num, Type::Num], Type::Num),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+            ),
+            ("x", Type::Obj(BTreeMap::new())),
+        ]
+        .into_iter()
+        .collect()),
     )
 }

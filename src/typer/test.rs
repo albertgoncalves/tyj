@@ -1,16 +1,16 @@
-use super::{get_types, Error, Message, Target, Type};
-use crate::commenter::{get_sigs, Sig};
+use super::{get_types, Error, Message, Target};
+use crate::commenter::get_sigs;
 use crate::parser::{get_ast, Expr, Prop, Stmt, Syntax};
 use crate::tokenizer::{get_tokens, Asn, Op};
-use std::collections::BTreeMap;
-use std::rc::Rc;
+use crate::types::Type;
+use std::collections::{BTreeMap, HashMap};
 
 macro_rules! assert_types {
     ($a:expr, $b:expr $(,)?) => {{
         let (ast, comments): (Vec<Syntax>, Vec<&str>) =
             get_ast(&get_tokens($a)).unwrap();
-        let sigs: Vec<Sig> = get_sigs(&comments).unwrap();
-        assert_eq!(get_types(&ast, &sigs), $b)
+        let mut sigs: HashMap<&str, Type> = get_sigs(&comments).unwrap();
+        assert_eq!(get_types(&ast, &mut sigs), $b)
     }};
 }
 
@@ -90,9 +90,7 @@ fn declare_object() {
             (Target { ident: vec!["y", "a"], scope: Vec::new() }, Type::Num),
             (
                 Target { ident: vec!["y"], scope: Vec::new() },
-                Type::Obj(Rc::new(
-                    vec![("a", Type::Num)].into_iter().collect(),
-                )),
+                Type::Obj(vec![("a", Type::Num)].into_iter().collect()),
             ),
         ]
         .into_iter()
@@ -106,7 +104,7 @@ fn declare_empty_object() {
         "var x = {};",
         Ok(vec![(
             Target { ident: vec!["x"], scope: Vec::new() },
-            Type::Obj(Rc::new(BTreeMap::new())),
+            Type::Obj(BTreeMap::new()),
         )]
         .into_iter()
         .collect()),
@@ -115,8 +113,8 @@ fn declare_empty_object() {
 
 #[test]
 fn declare_nested_object() {
-    let props: Rc<BTreeMap<&str, Type>> =
-        Rc::new(vec![("a", Type::Num)].into_iter().collect());
+    let props: BTreeMap<&str, Type> =
+        vec![("a", Type::Num)].into_iter().collect();
     assert_types!(
         "var x = {
              a: 0,
@@ -144,7 +142,7 @@ fn declare_nested_object() {
             ),
             (
                 Target { ident: vec!["x"], scope: Vec::new() },
-                Type::Obj(Rc::new(
+                Type::Obj(
                     vec![
                         ("a", Type::Num),
                         ("b", Type::Str),
@@ -155,7 +153,7 @@ fn declare_nested_object() {
                     ]
                     .into_iter()
                     .collect(),
-                )),
+                ),
             ),
         ]
         .into_iter()
@@ -226,22 +224,18 @@ fn declare_array_obj() {
             (Target { ident: vec!["a", "x"], scope: Vec::new() }, Type::Num),
             (
                 Target { ident: vec!["a"], scope: Vec::new() },
-                Type::Obj(Rc::new(
-                    vec![("x", Type::Num)].into_iter().collect()
-                )),
+                Type::Obj(vec![("x", Type::Num)].into_iter().collect()),
             ),
             (Target { ident: vec!["b", "x"], scope: Vec::new() }, Type::Num),
             (
                 Target { ident: vec!["b"], scope: Vec::new() },
-                Type::Obj(Rc::new(
-                    vec![("x", Type::Num)].into_iter().collect()
-                )),
+                Type::Obj(vec![("x", Type::Num)].into_iter().collect()),
             ),
             (
                 Target { ident: vec!["xs"], scope: Vec::new() },
-                Type::Array(Box::new(Type::Obj(Rc::new(
-                    vec![("x", Type::Num)].into_iter().collect()
-                )))),
+                Type::Array(Box::new(Type::Obj(
+                    vec![("x", Type::Num)].into_iter().collect(),
+                ))),
             ),
         ]
         .into_iter()
@@ -324,8 +318,8 @@ fn declare_prefix_err() {
 
 #[test]
 fn declare_infix_member() {
-    let props: Rc<BTreeMap<&str, Type>> =
-        Rc::new(vec![("y", Type::Num)].into_iter().collect());
+    let props: BTreeMap<&str, Type> =
+        vec![("y", Type::Num)].into_iter().collect();
     assert_types!(
         "var a = {
              x: {
@@ -346,9 +340,7 @@ fn declare_infix_member() {
             ),
             (
                 Target { ident: vec!["a"], scope: Vec::new() },
-                Type::Obj(Rc::new(
-                    vec![("x", Type::Obj(props))].into_iter().collect()
-                )),
+                Type::Obj(vec![("x", Type::Obj(props))].into_iter().collect()),
             ),
             (Target { ident: vec!["x"], scope: Vec::new() }, Type::Null),
             (Target { ident: vec!["y"], scope: Vec::new() }, Type::Str),
@@ -480,9 +472,7 @@ fn assign_obj() {
             (Target { ident: vec!["x", "a"], scope: Vec::new() }, Type::Num),
             (
                 Target { ident: vec!["x"], scope: Vec::new() },
-                Type::Obj(Rc::new(
-                    vec![("a", Type::Num)].into_iter().collect()
-                )),
+                Type::Obj(vec![("a", Type::Num)].into_iter().collect()),
             ),
             (Target { ident: vec!["y"], scope: Vec::new() }, Type::Num),
         ]
