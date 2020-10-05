@@ -14,13 +14,13 @@ use std::env::args;
 use std::fs::read_to_string;
 use std::process::exit;
 
-macro_rules! ERROR {
+macro_rules! error {
     () => {
         "{}:{}:\x1b[1m{}\x1b[0m"
     };
 }
 
-macro_rules! EXIT {
+macro_rules! exit {
     () => {
         exit(1)
     };
@@ -62,12 +62,12 @@ fn get_count(source: &str) -> Count {
 fn main() {
     let args: Vec<String> = args().collect();
     if args.len() < 2 {
-        EXIT!();
+        exit!();
     }
     let filename: &str = &args[1];
     let source: String = match read_to_string(filename) {
         Ok(source) => source,
-        Err(_) => EXIT!(),
+        Err(_) => exit!(),
     };
     let (ast, comments): (Vec<Syntax>, Vec<&str>) =
         match get_ast(&get_tokens(&source)) {
@@ -77,8 +77,8 @@ fn main() {
                     ParseError::EOF => get_count(&source),
                     ParseError::Token(token) => token.line + 1,
                 };
-                eprintln!(ERROR!(), filename, line, "parse error");
-                EXIT!()
+                eprintln!(error!(), filename, line, "parse error");
+                exit!()
             }
         };
     let mut sigs: HashMap<&str, Type> = match get_sigs(&comments) {
@@ -88,20 +88,20 @@ fn main() {
                 SigError::EOF => get_count(&source),
                 SigError::Line(line) => line + 1,
             };
-            eprintln!(ERROR!(), filename, line, "signature error");
-            EXIT!()
+            eprintln!(error!(), filename, line, "signature error");
+            exit!()
         }
     };
     match get_types(&ast, &mut sigs) {
         Ok(table) => println!("{:#?}", table),
         Err(TypeError { syntax, message }) => {
             eprintln!(
-                ERROR!(),
+                error!(),
                 filename,
                 syntax.line + 1,
                 get_message(&message)
             );
-            EXIT!()
+            exit!()
         }
     }
 }
