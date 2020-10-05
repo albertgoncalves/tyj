@@ -34,6 +34,10 @@ fn get_message(message: &Message) -> &'static str {
         }
         Message::ArrayMultiType => "array contains multiple types",
         Message::AssignNonIdent => "unable to assign value to non-identifier",
+        Message::FnMissingReturn => "missing return statement",
+        Message::FnMissingSig => "function signature not found",
+        Message::FnWrongNumArgs => "incorrect number of arguments",
+        Message::FnWrongReturn => "incorrect return type",
         Message::IdentShadow => "shadowed identifier",
         Message::IdentUninit => "uninitialized identifier",
         Message::IdentUnknown => "unknown identifier",

@@ -12,6 +12,10 @@ pub(crate) enum Message {
     AccessNonIndex,
     ArrayMultiType,
     AssignNonIdent,
+    FnMissingReturn,
+    FnMissingSig,
+    FnWrongNumArgs,
+    FnWrongReturn,
     IdentShadow,
     IdentUninit,
     IdentUnknown,
@@ -34,6 +38,11 @@ struct Scope<'a, 'b>(&'b [&'a str]);
 pub(crate) struct Target<'a> {
     ident: Vec<&'a str>,
     scope: Vec<&'a str>,
+}
+
+enum Return<'a> {
+    Undef,
+    Type(Type<'a>),
 }
 
 fn get_idents<'a>(expr: &'a Expr<'a>) -> Result<Vec<&'a str>, Message> {
@@ -205,7 +214,7 @@ fn type_check<'a, 'b>(
     scope: &'b Scope<'a, 'b>,
     types: &'b mut HashMap<Target<'a>, Type<'a>>,
     syntax: &'a Syntax<'a>,
-) -> Result<(), Error<'a>> {
+) -> Result<Return<'a>, Error<'a>> {
     match &syntax.statement {
         Stmt::Decl { ident, expr } => {
             let ident: Vec<&str> = vec![ident];
@@ -231,9 +240,85 @@ fn type_check<'a, 'b>(
                 return Err(Error { syntax, message });
             }
         }
+        Stmt::Ret(expr) => match get_expr(&scope, &types, expr) {
+            Ok(type_) => return Ok(Return::Type(type_)),
+            Err(message) => return Err(Error { syntax, message }),
+        },
+        Stmt::Fn { ident, args: arg_idents, body } => {
+            let fn_ident: Vec<&str> = vec![ident];
+            let fn_scope: Vec<&str> = vec![ident];
+            let global_scope: Vec<&str> = Vec::new();
+            if let Some(Type::Fn(overloads)) = types
+                .get(&Target { ident: fn_ident.to_vec(), scope: global_scope })
+            {
+                for (arg_types, return_) in &overloads.clone() {
+                    if arg_idents.len() != arg_types.len() {
+                        return Err(Error {
+                            syntax,
+                            message: Message::FnWrongNumArgs,
+                        });
+                    }
+                    for (arg_ident, arg_type) in
+                        arg_idents.iter().zip(arg_types)
+                    {
+                        let _: Option<_> = types.insert(
+                            Target {
+                                ident: vec![*arg_ident],
+                                scope: fn_scope.to_vec(),
+                            },
+                            arg_type.clone(),
+                        );
+                    }
+                    if let Some((last, body)) = body.split_last() {
+                        for syntax in body {
+                            match type_check(&Scope(&fn_scope), types, syntax)
+                            {
+                                Ok(Return::Type(type_)) => {
+                                    if *return_ != type_ {
+                                        return Err(Error {
+                                            syntax,
+                                            message: Message::FnWrongReturn,
+                                        });
+                                    }
+                                }
+                                Err(error) => return Err(error),
+                                Ok(_) => (),
+                            }
+                        }
+                        let syntax: &Syntax = last;
+                        match type_check(&Scope(&fn_scope), types, syntax) {
+                            Ok(Return::Type(type_)) => {
+                                if *return_ != type_ {
+                                    return Err(Error {
+                                        syntax,
+                                        message: Message::FnWrongReturn,
+                                    });
+                                }
+                            }
+                            Ok(_) => {
+                                if *return_ != Type::Undef {
+                                    return Err(Error {
+                                        syntax,
+                                        message: Message::FnMissingReturn,
+                                    });
+                                }
+                            }
+                            Err(error) => return Err(error),
+                        }
+                    } else if *return_ != Type::Undef {
+                        return Err(Error {
+                            syntax,
+                            message: Message::FnMissingReturn,
+                        });
+                    }
+                }
+            } else {
+                return Err(Error { syntax, message: Message::FnMissingSig });
+            }
+        }
         _ => panic!("{:#?}", syntax),
     }
-    Ok(())
+    Ok(Return::Undef)
 }
 
 pub(crate) fn get_types<'a>(
@@ -242,13 +327,17 @@ pub(crate) fn get_types<'a>(
 ) -> Result<HashMap<Target<'a>, Type<'a>>, Error<'a>> {
     let mut types: HashMap<Target, Type> = HashMap::new();
     for (ident, type_) in sigs.drain() {
-        let _: Option<_> = types
-            .insert(Target { ident: vec![ident], scope: Vec::new() }, type_);
+        if let Type::Fn(_) = type_ {
+            let _: Option<_> = types.insert(
+                Target { ident: vec![ident], scope: Vec::new() },
+                type_,
+            );
+        }
     }
     let scope: Vec<&str> = Vec::new();
     let scope: Scope = Scope(&scope);
     for syntax in ast {
-        type_check(&scope, &mut types, syntax)?;
+        let _: Return = type_check(&scope, &mut types, syntax)?;
     }
     Ok(types)
 }
