@@ -1,4 +1,5 @@
-use super::{get_sigs, get_tokens, Lex, Tkn, Type};
+use super::{get_sigs, get_tokens, Lex, Tkn};
+use crate::{Target, Type};
 use std::collections::BTreeMap;
 
 macro_rules! assert_tokens {
@@ -80,7 +81,7 @@ fn parse_fn() {
     assert_sigs!(
         "// f(null, undefined) -> null",
         Ok(vec![(
-            "f",
+            Target { ident: vec!["f"], scope: Vec::new() },
             Type::Fn(
                 vec![(vec![Type::Null, Type::Undef], Type::Null)]
                     .into_iter()
@@ -97,7 +98,7 @@ fn parse_fn_empty_args() {
     assert_sigs!(
         "/* f() -> undefined */",
         Ok(vec![(
-            "f",
+            Target { ident: vec!["f"], scope: Vec::new() },
             Type::Fn(vec![(Vec::new(), Type::Undef)].into_iter().collect()),
         )]
         .into_iter()
@@ -118,7 +119,7 @@ fn parse_obj() {
           * }
           */",
         Ok(vec![(
-            "x",
+            Target { ident: vec!["x"], scope: Vec::new() },
             Type::Obj(
                 vec![
                     ("a", Type::Num),
@@ -146,28 +147,32 @@ fn parse_obj() {
 fn parse_obj_empty() {
     assert_sigs!(
         "// x {}",
-        Ok(vec![("x", Type::Obj(BTreeMap::new()))].into_iter().collect()),
+        Ok(vec![(
+            Target { ident: vec!["x"], scope: Vec::new() },
+            Type::Obj(BTreeMap::new()),
+        )]
+        .into_iter()
+        .collect()),
     )
 }
 
 #[test]
 fn parse_combined() {
+    let obj: Type = Type::Obj(vec![("a", Type::Num)].into_iter().collect());
     assert_sigs!(
         "/* x { a: number }
           * f(x) -> { b: bool }
           */",
         Ok(vec![
-            ("x", Type::Obj(vec![("a", Type::Num)].into_iter().collect(),)),
+            (Target { ident: vec!["x"], scope: Vec::new() }, obj.clone()),
             (
-                "f",
+                Target { ident: vec!["f"], scope: Vec::new() },
                 Type::Fn(
                     vec![(
-                        vec![Type::Obj(
-                            vec![("a", Type::Num)].into_iter().collect(),
-                        )],
+                        vec![obj],
                         Type::Obj(
                             vec![("b", Type::Bool)].into_iter().collect(),
-                        )
+                        ),
                     )]
                     .into_iter()
                     .collect(),
@@ -188,7 +193,7 @@ fn parse_overload() {
          // f(number, number) -> number",
         Ok(vec![
             (
-                "f",
+                Target { ident: vec!["f"], scope: Vec::new() },
                 Type::Fn(
                     vec![
                         (vec![Type::Bool, Type::Bool], Type::Bool),
@@ -199,7 +204,49 @@ fn parse_overload() {
                     .collect(),
                 ),
             ),
-            ("x", Type::Obj(BTreeMap::new())),
+            (
+                Target { ident: vec!["x"], scope: Vec::new() },
+                Type::Obj(BTreeMap::new()),
+            ),
+        ]
+        .into_iter()
+        .collect()),
+    )
+}
+
+#[test]
+fn parse_scopes() {
+    let obj: Type = Type::Obj(vec![("a", Type::Num)].into_iter().collect());
+    assert_sigs!(
+        "/* x {
+          *     a: number,
+          * }
+          * f(x) -> number
+          * g(x) -> undefined
+          * g @ f() -> number
+          */",
+        Ok(vec![
+            (Target { ident: vec!["x"], scope: Vec::new() }, obj.clone()),
+            (
+                Target { ident: vec!["f"], scope: Vec::new() },
+                Type::Fn(
+                    vec![(vec![obj.clone()], Type::Num),]
+                        .into_iter()
+                        .collect(),
+                ),
+            ),
+            (
+                Target { ident: vec!["g"], scope: Vec::new() },
+                Type::Fn(
+                    vec![(vec![obj.clone()], Type::Undef)]
+                        .into_iter()
+                        .collect(),
+                ),
+            ),
+            (
+                Target { ident: vec!["f"], scope: vec!["g"] },
+                Type::Fn(vec![(Vec::new(), Type::Num)].into_iter().collect()),
+            ),
         ]
         .into_iter()
         .collect()),

@@ -1,5 +1,11 @@
 use std::collections::BTreeMap;
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct Target<'a> {
+    pub(crate) ident: Vec<&'a str>,
+    pub(crate) scope: Vec<&'a str>,
+}
+
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) enum Type<'a> {
     Array(Box<Type<'a>>),

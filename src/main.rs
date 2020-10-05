@@ -8,7 +8,7 @@ use crate::commenter::{get_sigs, Error as SigError};
 use crate::parser::{get_ast, Error as ParseError, Syntax};
 use crate::tokenizer::{get_tokens, Count};
 use crate::typer::{get_types, Error as TypeError, Message};
-use crate::types::Type;
+use crate::types::{Target, Type};
 use std::collections::HashMap;
 use std::env::args;
 use std::fs::read_to_string;
@@ -81,7 +81,7 @@ fn main() {
                 exit!()
             }
         };
-    let mut sigs: HashMap<&str, Type> = match get_sigs(&comments) {
+    let mut sigs: HashMap<Target, Type> = match get_sigs(&comments) {
         Ok(sigs) => sigs,
         Err(error) => {
             let line: Count = match error {

@@ -2,7 +2,7 @@
 mod test;
 
 use crate::tokenizer::{Count, DECIMAL};
-use crate::types::Type;
+use crate::types::{Target, Type};
 use std::collections::{BTreeMap, HashMap};
 use std::iter::Peekable;
 use std::slice::Iter;
@@ -11,6 +11,7 @@ use std::str::CharIndices;
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Tkn<'a> {
     Arrow,
+    At,
     Bool,
     Colon,
     Comma,
@@ -51,12 +52,13 @@ fn get_tokens<'a>(comment: &'a str) -> Vec<Lex<'a>> {
     while let Some((i, x)) = chars.next() {
         match x {
             '\n' => line += 1,
-            '{' => push!(Tkn::LBrace),
-            '}' => push!(Tkn::RBrace),
             '(' => push!(Tkn::LParen),
             ')' => push!(Tkn::RParen),
-            ':' => push!(Tkn::Colon),
             ',' => push!(Tkn::Comma),
+            ':' => push!(Tkn::Colon),
+            '@' => push!(Tkn::At),
+            '{' => push!(Tkn::LBrace),
+            '}' => push!(Tkn::RBrace),
             '-' if chars.peek() == Some(&(i + 1, '>')) => push!(Tkn::Arrow),
             _ if x.is_alphabetic() || x == '_' => {
                 let mut k: usize = i;
@@ -114,7 +116,7 @@ macro_rules! eat_or_error {
 
 fn get_type<'a, 'b, 'c>(
     tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
-    types: &'c mut HashMap<&'a str, Type<'a>>,
+    types: &'c mut HashMap<Target<'a>, Type<'a>>,
 ) -> Result<Type<'a>, Error> {
     Ok(match tokens.next() {
         Some(Lex { token: Tkn::Num, .. }) => Type::Num,
@@ -123,7 +125,9 @@ fn get_type<'a, 'b, 'c>(
         Some(Lex { token: Tkn::Null, .. }) => Type::Null,
         Some(Lex { token: Tkn::Undef, .. }) => Type::Undef,
         Some(Lex { token: Tkn::Ident(ident), line }) => {
-            if let Some(type_) = types.get(ident) {
+            if let Some(type_) =
+                types.get(&Target { ident: vec![ident], scope: Vec::new() })
+            {
                 type_.clone()
             } else {
                 return Err(Error::Line(*line));
@@ -180,23 +184,35 @@ fn get_type<'a, 'b, 'c>(
 
 fn push_type<'a, 'b, 'c>(
     tokens: &'c mut Peekable<Iter<'b, Lex<'a>>>,
-    types: &'c mut HashMap<&'a str, Type<'a>>,
+    types: &'c mut HashMap<Target<'a>, Type<'a>>,
 ) -> Result<(), Error> {
     match tokens.next() {
-        Some(Lex { token: Tkn::Ident(ident), .. }) => {
+        Some(Lex { token: Tkn::Ident(first_ident), .. }) => {
+            let mut ident: &str = first_ident;
+            let mut scope: Vec<&str> = Vec::new();
+            while let Some(Lex { token: Tkn::At, .. }) = tokens.peek() {
+                eat!(tokens);
+                if let Some(Lex { token: Tkn::Ident(next_ident), .. }) =
+                    tokens.next()
+                {
+                    scope.push(ident);
+                    ident = next_ident;
+                }
+            }
+            let target: Target = Target { ident: vec![ident], scope };
             let mut new_type: Type = get_type(tokens, types)?;
-            if let Some(mut type_) = types.remove(ident) {
+            if let Some(mut type_) = types.remove(&target) {
                 match (&mut type_, &mut new_type) {
                     (Type::Fn(fn_a), Type::Fn(fn_b)) => {
                         fn_a.append(fn_b);
                         let type_: Type = Type::Fn(fn_a.clone());
-                        let _: Option<_> = types.insert(ident, type_.clone());
+                        let _: Option<_> = types.insert(target, type_.clone());
                         return Ok(());
                     }
                     _ => panic!(),
                 }
             } else {
-                let _: Option<_> = types.insert(ident, new_type.clone());
+                let _: Option<_> = types.insert(target, new_type.clone());
             }
         }
         Some(token) => return Err(Error::Line(token.line)),
@@ -207,8 +223,8 @@ fn push_type<'a, 'b, 'c>(
 
 pub(crate) fn get_sigs<'a, 'b>(
     comments: &'b [&'a str],
-) -> Result<HashMap<&'a str, Type<'a>>, Error> {
-    let mut types: HashMap<&str, Type> = HashMap::new();
+) -> Result<HashMap<Target<'a>, Type<'a>>, Error> {
+    let mut types: HashMap<Target, Type> = HashMap::new();
     let mut tokens: Vec<Lex> = Vec::new();
     for comment in comments {
         tokens.extend_from_slice(&get_tokens(comment));

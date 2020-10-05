@@ -3,7 +3,7 @@ mod test;
 
 use crate::parser::{Expr, Stmt, Syntax};
 use crate::tokenizer::{Asn, Op};
-use crate::types::Type;
+use crate::types::{Target, Type};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 #[derive(Debug, PartialEq)]
@@ -33,12 +33,6 @@ pub(crate) struct Error<'a> {
 struct Ident<'a, 'b>(&'b [&'a str]);
 
 struct Scope<'a, 'b>(&'b [&'a str]);
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct Target<'a> {
-    ident: Vec<&'a str>,
-    scope: Vec<&'a str>,
-}
 
 enum Return<'a> {
     Undef,
@@ -215,6 +209,12 @@ fn type_check<'a, 'b>(
     types: &'b mut HashMap<Target<'a>, Type<'a>>,
     syntax: &'a Syntax<'a>,
 ) -> Result<Return<'a>, Error<'a>> {
+    macro_rules! error {
+        ($syntax:expr, $message:expr $(,)?) => {
+            return Err(Error { syntax: $syntax, message: $message });
+        };
+    }
+
     match &syntax.statement {
         Stmt::Decl { ident, expr } => {
             let ident: Vec<&str> = vec![ident];
@@ -222,7 +222,7 @@ fn type_check<'a, 'b>(
                 ident: ident.to_vec(),
                 scope: scope.0.to_vec(),
             }) {
-                return Err(Error { syntax, message: Message::IdentShadow });
+                error!(syntax, Message::IdentShadow);
             }
             match get_expr(&scope, &types, expr) {
                 Err(message) => return Err(Error { syntax, message }),
@@ -230,55 +230,57 @@ fn type_check<'a, 'b>(
                     if let Err(message) =
                         set_type(&scope, &Ident(&ident), types, &type_)
                     {
-                        return Err(Error { syntax, message });
+                        error!(syntax, message);
                     }
                 }
             }
         }
         Stmt::Assign { op: Asn::Reg, ident, expr } => {
             if let Err(message) = set_assign(&scope, ident, types, expr) {
-                return Err(Error { syntax, message });
+                error!(syntax, message);
             }
         }
         Stmt::Ret(expr) => match get_expr(&scope, &types, expr) {
             Ok(type_) => return Ok(Return::Type(type_)),
-            Err(message) => return Err(Error { syntax, message }),
+            Err(message) => error!(syntax, message),
         },
         Stmt::Fn { ident, args: arg_idents, body } => {
             let fn_ident: Vec<&str> = vec![ident];
-            let fn_scope: Vec<&str> = vec![ident];
-            let global_scope: Vec<&str> = Vec::new();
+            let parent_scope: Vec<&str> = scope.0.to_vec();
+            let mut fn_scope: Vec<&str> =
+                Vec::with_capacity(parent_scope.len() + 1);
+            fn_scope.append(&mut scope.0.to_vec());
+            fn_scope.push(ident);
             if let Some(Type::Fn(overloads)) = types
-                .get(&Target { ident: fn_ident.to_vec(), scope: global_scope })
+                .get(&Target { ident: fn_ident.to_vec(), scope: parent_scope })
             {
                 for (arg_types, return_) in &overloads.clone() {
                     if arg_idents.len() != arg_types.len() {
-                        return Err(Error {
-                            syntax,
-                            message: Message::FnWrongNumArgs,
-                        });
+                        error!(syntax, Message::FnWrongNumArgs);
                     }
+                    let mut types: HashMap<Target, Type> = types.clone();
                     for (arg_ident, arg_type) in
                         arg_idents.iter().zip(arg_types)
                     {
-                        let _: Option<_> = types.insert(
-                            Target {
-                                ident: vec![*arg_ident],
-                                scope: fn_scope.to_vec(),
-                            },
-                            arg_type.clone(),
-                        );
+                        if let Err(message) = set_type(
+                            &Scope(&fn_scope),
+                            &Ident(vec![*arg_ident].as_slice()),
+                            &mut types,
+                            arg_type,
+                        ) {
+                            error!(syntax, message);
+                        }
                     }
                     if let Some((last, body)) = body.split_last() {
                         for syntax in body {
-                            match type_check(&Scope(&fn_scope), types, syntax)
-                            {
+                            match type_check(
+                                &Scope(&fn_scope),
+                                &mut types,
+                                syntax,
+                            ) {
                                 Ok(Return::Type(type_)) => {
                                     if *return_ != type_ {
-                                        return Err(Error {
-                                            syntax,
-                                            message: Message::FnWrongReturn,
-                                        });
+                                        error!(syntax, Message::FnWrongReturn);
                                     }
                                 }
                                 Err(error) => return Err(error),
@@ -286,34 +288,27 @@ fn type_check<'a, 'b>(
                             }
                         }
                         let syntax: &Syntax = last;
-                        match type_check(&Scope(&fn_scope), types, syntax) {
+                        let return_or_error: Result<Return, Error> =
+                            type_check(&Scope(&fn_scope), &mut types, syntax);
+                        match return_or_error {
                             Ok(Return::Type(type_)) => {
                                 if *return_ != type_ {
-                                    return Err(Error {
-                                        syntax,
-                                        message: Message::FnWrongReturn,
-                                    });
+                                    error!(syntax, Message::FnWrongReturn);
                                 }
                             }
                             Ok(_) => {
                                 if *return_ != Type::Undef {
-                                    return Err(Error {
-                                        syntax,
-                                        message: Message::FnMissingReturn,
-                                    });
+                                    error!(syntax, Message::FnMissingReturn);
                                 }
                             }
                             Err(error) => return Err(error),
                         }
                     } else if *return_ != Type::Undef {
-                        return Err(Error {
-                            syntax,
-                            message: Message::FnMissingReturn,
-                        });
+                        error!(syntax, Message::FnMissingReturn);
                     }
                 }
             } else {
-                return Err(Error { syntax, message: Message::FnMissingSig });
+                error!(syntax, Message::FnMissingSig);
             }
         }
         _ => panic!("{:#?}", syntax),
@@ -323,15 +318,12 @@ fn type_check<'a, 'b>(
 
 pub(crate) fn get_types<'a>(
     ast: &'a [Syntax<'a>],
-    sigs: &'a mut HashMap<&'a str, Type<'a>>,
+    sigs: &'a mut HashMap<Target<'a>, Type<'a>>,
 ) -> Result<HashMap<Target<'a>, Type<'a>>, Error<'a>> {
     let mut types: HashMap<Target, Type> = HashMap::new();
-    for (ident, type_) in sigs.drain() {
+    for (target, type_) in sigs.drain() {
         if let Type::Fn(_) = type_ {
-            let _: Option<_> = types.insert(
-                Target { ident: vec![ident], scope: Vec::new() },
-                type_,
-            );
+            let _: Option<_> = types.insert(target, type_);
         }
     }
     let scope: Vec<&str> = Vec::new();

@@ -1,15 +1,15 @@
-use super::{get_types, Error, Message, Target};
+use super::{get_types, Error, Message};
 use crate::commenter::get_sigs;
 use crate::parser::{get_ast, Expr, Prop, Stmt, Syntax};
 use crate::tokenizer::{get_tokens, Asn, Op};
-use crate::types::Type;
+use crate::types::{Target, Type};
 use std::collections::{BTreeMap, HashMap};
 
 macro_rules! assert_types {
     ($a:expr, $b:expr $(,)?) => {{
         let (ast, comments): (Vec<Syntax>, Vec<&str>) =
             get_ast(&get_tokens($a)).unwrap();
-        let mut sigs: HashMap<&str, Type> = get_sigs(&comments).unwrap();
+        let mut sigs: HashMap<Target, Type> = get_sigs(&comments).unwrap();
         assert_eq!(get_types(&ast, &mut sigs), $b)
     }};
 }
@@ -603,5 +603,151 @@ fn access_non_index_err() {
             },
             message: Message::AccessNonIndex,
         }),
+    )
+}
+
+#[test]
+fn declare_functions() {
+    let obj: Type = Type::Obj(vec![("a", Type::Bool)].into_iter().collect());
+    assert_types!(
+        "/* x { a: bool }
+          * f(number, string) -> number
+          * f(string, bool) -> string
+          * f(string, null) -> string
+          * f(x, undefined) -> x
+          * g(number) -> number
+          * g(string) -> number
+          * g(x) -> number
+          */
+
+         var x = \"???\";
+         var y = null;
+
+         function f(x, _) {
+             return x;
+         }
+
+         function g(_) {
+             var y = 0;
+             return y;
+         }
+
+         /* h(x) -> bool */
+         function h(x) {
+             return x.a;
+         }
+
+         // i(number) -> undefined
+         // i(string) -> undefined
+         // i(null) -> undefined
+         // i(bool) -> undefined
+         // i(undefined) -> undefined
+         function i(_) {}",
+        Ok(vec![
+            (Target { ident: vec!["x"], scope: Vec::new() }, Type::Str),
+            (Target { ident: vec!["y"], scope: Vec::new() }, Type::Null),
+            (
+                Target { ident: vec!["f"], scope: Vec::new() },
+                Type::Fn(
+                    vec![
+                        (vec![Type::Num, Type::Str], Type::Num),
+                        (vec![Type::Str, Type::Bool], Type::Str),
+                        (vec![Type::Str, Type::Null], Type::Str),
+                        (vec![obj.clone(), Type::Undef], obj.clone()),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+            ),
+            (
+                Target { ident: vec!["g"], scope: Vec::new() },
+                Type::Fn(
+                    vec![
+                        (vec![Type::Num], Type::Num),
+                        (vec![Type::Str], Type::Num),
+                        (vec![obj.clone()], Type::Num),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+            ),
+            (
+                Target { ident: vec!["h"], scope: Vec::new() },
+                Type::Fn(vec![(vec![obj], Type::Bool)].into_iter().collect()),
+            ),
+            (
+                Target { ident: vec!["i"], scope: Vec::new() },
+                Type::Fn(
+                    vec![
+                        (vec![Type::Num], Type::Undef),
+                        (vec![Type::Str], Type::Undef),
+                        (vec![Type::Null], Type::Undef),
+                        (vec![Type::Bool], Type::Undef),
+                        (vec![Type::Undef], Type::Undef),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+            ),
+        ]
+        .into_iter()
+        .collect()),
+    )
+}
+
+#[test]
+fn declare_scoped_function() {
+    let obj: Type = Type::Obj(vec![("a", Type::Num)].into_iter().collect());
+    assert_types!(
+        "/* x {
+          *     a: number,
+          * }
+          * f(x) -> number
+          * h(x) -> undefined
+          * h @ g() -> undefined
+          * h @ g @ f() -> number
+          */
+
+         function f(x) {
+             return x.a;
+         }
+
+         function h(x) {
+             function g() {
+                 function f() {
+                     return x.a;
+                 }
+             }
+         }",
+        Ok(vec![
+            (
+                Target { ident: vec!["f"], scope: Vec::new() },
+                Type::Fn(
+                    vec![(vec![obj.clone()], Type::Num),]
+                        .into_iter()
+                        .collect(),
+                ),
+            ),
+            (
+                Target { ident: vec!["h"], scope: Vec::new() },
+                Type::Fn(
+                    vec![(vec![obj.clone()], Type::Undef)]
+                        .into_iter()
+                        .collect(),
+                ),
+            ),
+            (
+                Target { ident: vec!["g"], scope: vec!["h"] },
+                Type::Fn(
+                    vec![(Vec::new(), Type::Undef)].into_iter().collect(),
+                ),
+            ),
+            (
+                Target { ident: vec!["f"], scope: vec!["h", "g"] },
+                Type::Fn(vec![(Vec::new(), Type::Num)].into_iter().collect()),
+            ),
+        ]
+        .into_iter()
+        .collect()),
     )
 }
