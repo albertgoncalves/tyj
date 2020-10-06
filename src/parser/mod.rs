@@ -204,7 +204,7 @@ fn get_expr<'a, 'b, 'c>(
                 expr
             }
             Lex { token: Tkn::LBracket, .. } => {
-                let mut exprs = Vec::new();
+                let mut exprs: Vec<Expr> = Vec::new();
                 while let Some(token) = tokens.peek() {
                     match token {
                         Lex { token: Tkn::Comma, .. } => eat!(tokens),
