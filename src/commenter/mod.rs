@@ -50,6 +50,12 @@ fn get_tokens<'a, 'b>(comment: &'b Comment<'a>) -> Vec<Lex<'a>> {
     let mut tokens: Vec<Lex> = Vec::with_capacity(comment.string.len());
     let mut line: Count = comment.line;
 
+    macro_rules! eat {
+        () => {
+            let _: Option<(usize, char)> = chars.next();
+        };
+    }
+
     macro_rules! push {
         ($token:expr $(,)?) => {{
             tokens.push(Lex { token: $token, line })
@@ -66,7 +72,10 @@ fn get_tokens<'a, 'b>(comment: &'b Comment<'a>) -> Vec<Lex<'a>> {
             '@' => push!(Tkn::At),
             '{' => push!(Tkn::LBrace),
             '}' => push!(Tkn::RBrace),
-            '-' if chars.peek() == Some(&(i + 1, '>')) => push!(Tkn::Arrow),
+            '-' if chars.peek() == Some(&(i + 1, '>')) => {
+                push!(Tkn::Arrow);
+                eat!();
+            }
             _ if x.is_alphabetic() || x == '_' => {
                 let mut k: usize = i;
                 loop {
@@ -76,7 +85,7 @@ fn get_tokens<'a, 'b>(comment: &'b Comment<'a>) -> Vec<Lex<'a>> {
                             || c.is_digit(DECIMAL)
                             || *c == '_'
                         {
-                            let _: Option<(usize, char)> = chars.next();
+                            eat!();
                         } else {
                             break;
                         }
