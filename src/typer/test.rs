@@ -723,9 +723,7 @@ fn declare_scoped_function() {
             (
                 Target { ident: vec!["f"], scope: Vec::new() },
                 Type::Fn(
-                    vec![(vec![obj.clone()], Type::Num),]
-                        .into_iter()
-                        .collect(),
+                    vec![(vec![obj.clone()], Type::Num)].into_iter().collect(),
                 ),
             ),
             (
@@ -746,6 +744,194 @@ fn declare_scoped_function() {
                 Target { ident: vec!["f"], scope: vec!["h", "g"] },
                 Type::Fn(vec![(Vec::new(), Type::Num)].into_iter().collect()),
             ),
+        ]
+        .into_iter()
+        .collect()),
+    )
+}
+
+#[test]
+fn nested_function_returns() {
+    let obj: Type = Type::Obj(vec![("a", Type::Num)].into_iter().collect());
+    assert_types!(
+        "// x {
+         //     a: number,
+         // }
+         // h(x) -> number
+         // h @ g() -> number
+         // h @ g @ f() -> number
+
+         function h(x) {
+             function g() {
+                 function f() {
+                     return x.a;
+                 }
+                 return f();
+             }
+             return g();
+         }",
+        Ok(vec![
+            (
+                Target { ident: vec!["h"], scope: Vec::new() },
+                Type::Fn(
+                    vec![(vec![obj.clone()], Type::Num)].into_iter().collect(),
+                ),
+            ),
+            (
+                Target { ident: vec!["g"], scope: vec!["h"] },
+                Type::Fn(vec![(Vec::new(), Type::Num)].into_iter().collect(),),
+            ),
+            (
+                Target { ident: vec!["f"], scope: vec!["h", "g"] },
+                Type::Fn(vec![(Vec::new(), Type::Num)].into_iter().collect()),
+            ),
+        ]
+        .into_iter()
+        .collect()),
+    )
+}
+
+#[test]
+fn return_closure() {
+    let obj: Type = Type::Obj(vec![("a", Type::Num)].into_iter().collect());
+    assert_types!(
+        "/*  x {
+          *      a: number,
+          *  }
+          *  h(x) -> () -> () -> number
+          *  h @ g() -> () -> number
+          *  h @ g @ f() -> number
+          */
+
+         function h(x) {
+             function g() {
+                 function f() {
+                     return x.a;
+                 }
+                 return f;
+             }
+             return g;
+         }",
+        Ok(vec![
+            (
+                Target { ident: vec!["h"], scope: Vec::new() },
+                Type::Fn(
+                    vec![(
+                        vec![obj],
+                        Type::Fn(
+                            vec![(
+                                Vec::new(),
+                                Type::Fn(
+                                    vec![(Vec::new(), Type::Num)]
+                                        .into_iter()
+                                        .collect(),
+                                ),
+                            )]
+                            .into_iter()
+                            .collect(),
+                        ),
+                    )]
+                    .into_iter()
+                    .collect(),
+                ),
+            ),
+            (
+                Target { ident: vec!["g"], scope: vec!["h"] },
+                Type::Fn(
+                    vec![(
+                        Vec::new(),
+                        Type::Fn(
+                            vec![(Vec::new(), Type::Num)]
+                                .into_iter()
+                                .collect(),
+                        ),
+                    )]
+                    .into_iter()
+                    .collect(),
+                ),
+            ),
+            (
+                Target { ident: vec!["f"], scope: vec!["h", "g"] },
+                Type::Fn(vec![(Vec::new(), Type::Num)].into_iter().collect()),
+            ),
+        ]
+        .into_iter()
+        .collect()),
+    )
+}
+
+#[test]
+fn assign_closures() {
+    let obj: Type = Type::Obj(vec![("a", Type::Num)].into_iter().collect());
+    assert_types!(
+        "// x {
+         //     a: number,
+         // }
+
+         // f(x) -> number
+         function f(x) {
+             return x.a;
+         }
+
+         // g(x) -> () -> number
+         // g @ f() -> number
+         function g(x) {
+             function f() {
+                 return x.a;
+             }
+             return f;
+         }
+
+         var a = { a: 0 };
+         var b = { b: a };
+         var c = f(b.b);
+         var d = g(b.b);
+         var e = 0;
+         e = c;
+         e = d();",
+        Ok(vec![
+            (
+                Target { ident: vec!["f"], scope: Vec::new() },
+                Type::Fn(
+                    vec![(vec![obj.clone()], Type::Num)].into_iter().collect(),
+                ),
+            ),
+            (
+                Target { ident: vec!["g"], scope: Vec::new() },
+                Type::Fn(
+                    vec![(
+                        vec![obj.clone()],
+                        Type::Fn(
+                            vec![(Vec::new(), Type::Num)]
+                                .into_iter()
+                                .collect(),
+                        ),
+                    )]
+                    .into_iter()
+                    .collect(),
+                ),
+            ),
+            (
+                Target { ident: vec!["f"], scope: vec!["g"] },
+                Type::Fn(vec![(Vec::new(), Type::Num)].into_iter().collect()),
+            ),
+            (Target { ident: vec!["a"], scope: Vec::new() }, obj.clone()),
+            (Target { ident: vec!["a", "a"], scope: Vec::new() }, Type::Num),
+            (
+                Target { ident: vec!["b"], scope: Vec::new() },
+                Type::Obj(vec![("b", obj.clone())].into_iter().collect()),
+            ),
+            (Target { ident: vec!["b", "b"], scope: Vec::new() }, obj),
+            (
+                Target { ident: vec!["b", "b", "a"], scope: Vec::new() },
+                Type::Num,
+            ),
+            (Target { ident: vec!["c"], scope: Vec::new() }, Type::Num),
+            (
+                Target { ident: vec!["d"], scope: Vec::new() },
+                Type::Fn(vec![(Vec::new(), Type::Num)].into_iter().collect()),
+            ),
+            (Target { ident: vec!["e"], scope: Vec::new() }, Type::Num),
         ]
         .into_iter()
         .collect()),

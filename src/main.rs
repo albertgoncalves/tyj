@@ -34,6 +34,8 @@ fn get_message(message: &Message) -> &'static str {
         }
         Message::ArrayMultiType => "array contains multiple types",
         Message::AssignNonIdent => "unable to assign value to non-identifier",
+        Message::CallNonFn => "unable to call non-function",
+        Message::FnIncompatArgs => "incompatible function arguments",
         Message::FnMissingReturn => "missing return statement",
         Message::FnMissingSig => "function signature not found",
         Message::FnWrongNumArgs => "incorrect number of arguments",

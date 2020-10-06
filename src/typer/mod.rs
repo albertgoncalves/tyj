@@ -12,6 +12,8 @@ pub(crate) enum Message {
     AccessNonIndex,
     ArrayMultiType,
     AssignNonIdent,
+    CallNonFn,
+    FnIncompatArgs,
     FnMissingReturn,
     FnMissingSig,
     FnWrongNumArgs,
@@ -138,6 +140,21 @@ fn get_expr<'a, 'b>(
                 (Type::Array(type_), Type::Num) => *type_.clone(),
                 (Type::Array(_), _) => return Err(Message::AccessNonIndex),
                 _ => return Err(Message::AccessNonArray),
+            }
+        }
+        Expr::Call { expr, args } => {
+            let fn_: BTreeMap<Vec<Type>, Type> =
+                match get_expr(scope, types, expr)? {
+                    Type::Fn(fn_) => fn_,
+                    _ => return Err(Message::CallNonFn),
+                };
+            let mut arg_types: Vec<Type> = Vec::with_capacity(args.len());
+            for arg in args {
+                arg_types.push(get_expr(scope, types, arg)?);
+            }
+            match fn_.get(&arg_types) {
+                Some(type_) => type_.clone(),
+                None => return Err(Message::FnIncompatArgs),
             }
         }
         _ => panic!("{:#?}", expr),
