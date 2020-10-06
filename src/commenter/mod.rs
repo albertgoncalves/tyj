@@ -26,6 +26,12 @@ enum Tkn<'a> {
     Undef,
 }
 
+#[derive(Debug, PartialEq)]
+pub(crate) struct Comment<'a> {
+    pub(crate) string: &'a str,
+    pub(crate) line: Count,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Lex<'a> {
     token: Tkn<'a>,
@@ -38,10 +44,11 @@ pub(crate) enum Error {
     Line(Count),
 }
 
-fn get_tokens<'a>(comment: &'a str) -> Vec<Lex<'a>> {
-    let mut chars: Peekable<CharIndices> = comment.char_indices().peekable();
-    let mut tokens: Vec<Lex> = Vec::with_capacity(comment.len());
-    let mut line: Count = 0;
+fn get_tokens<'a, 'b>(comment: &'b Comment<'a>) -> Vec<Lex<'a>> {
+    let mut chars: Peekable<CharIndices> =
+        comment.string.char_indices().peekable();
+    let mut tokens: Vec<Lex> = Vec::with_capacity(comment.string.len());
+    let mut line: Count = comment.line;
 
     macro_rules! push {
         ($token:expr $(,)?) => {{
@@ -78,7 +85,7 @@ fn get_tokens<'a>(comment: &'a str) -> Vec<Lex<'a>> {
                         break;
                     }
                 }
-                let token: Tkn = match &comment[i..k] {
+                let token: Tkn = match &comment.string[i..k] {
                     "number" => Tkn::Num,
                     "bool" => Tkn::Bool,
                     "string" => Tkn::Str,
@@ -222,7 +229,7 @@ fn push_type<'a, 'b, 'c>(
 }
 
 pub(crate) fn get_sigs<'a, 'b>(
-    comments: &'b [&'a str],
+    comments: &'b [Comment<'a>],
 ) -> Result<HashMap<Target<'a>, Type<'a>>, Error> {
     let mut types: HashMap<Target, Type> = HashMap::new();
     let mut tokens: Vec<Lex> = Vec::new();

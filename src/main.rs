@@ -4,7 +4,7 @@ mod tokenizer;
 mod typer;
 mod types;
 
-use crate::commenter::{get_sigs, Error as SigError};
+use crate::commenter::{get_sigs, Comment, Error as SigError};
 use crate::parser::{get_ast, Error as ParseError, Syntax};
 use crate::tokenizer::{get_tokens, Count};
 use crate::typer::{get_types, Error as TypeError, Message};
@@ -71,7 +71,7 @@ fn main() {
         Ok(source) => source,
         Err(_) => exit!(),
     };
-    let (ast, comments): (Vec<Syntax>, Vec<&str>) =
+    let (ast, comments): (Vec<Syntax>, Vec<Comment>) =
         match get_ast(&get_tokens(&source)) {
             Ok((ast, comments)) => (ast, comments),
             Err(error) => {

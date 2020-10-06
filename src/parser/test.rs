@@ -1,4 +1,5 @@
 use super::{get_ast, Case, Error, Expr, Prop, Stmt, Syntax};
+use crate::commenter::Comment;
 use crate::tokenizer::{get_tokens, Asn, Lex, Op, Tkn};
 
 macro_rules! assert_ast {
@@ -774,7 +775,7 @@ fn small_function() {
                 },
                 line: 1,
             }],
-            vec!["// ..."],
+            vec![Comment { string: "// ...", line: 0 }],
         )),
     )
 }
@@ -887,7 +888,11 @@ fn operator_precedence() {
                     line: 12,
                 },
             ],
-            vec!["/* ...\n          */", "// ...", "/* ... */"],
+            vec![
+                Comment { string: "/* ...\n          */", line: 0 },
+                Comment { string: "// ...", line: 7 },
+                Comment { string: "/* ... */", line: 10 },
+            ],
         )),
     )
 }
@@ -1878,7 +1883,7 @@ fn scoped_array_access() {
                 ]),
                 line: 1,
             }],
-            vec!["// ..."],
+            vec![Comment { string: "// ...", line: 0 }],
         )),
     )
 }

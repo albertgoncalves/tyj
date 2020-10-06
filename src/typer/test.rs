@@ -1,5 +1,5 @@
 use super::{get_types, Error, Message};
-use crate::commenter::get_sigs;
+use crate::commenter::{get_sigs, Comment};
 use crate::parser::{get_ast, Expr, Prop, Stmt, Syntax};
 use crate::tokenizer::{get_tokens, Asn, Op};
 use crate::types::{Target, Type};
@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, HashMap};
 
 macro_rules! assert_types {
     ($a:expr, $b:expr $(,)?) => {{
-        let (ast, comments): (Vec<Syntax>, Vec<&str>) =
+        let (ast, comments): (Vec<Syntax>, Vec<Comment>) =
             get_ast(&get_tokens($a)).unwrap();
         let mut sigs: HashMap<Target, Type> = get_sigs(&comments).unwrap();
         assert_eq!(get_types(&ast, &mut sigs), $b)

@@ -1,23 +1,23 @@
-use super::{get_sigs, get_tokens, Lex, Tkn};
+use super::{get_sigs, get_tokens, Comment, Error, Lex, Tkn};
 use crate::{Target, Type};
 use std::collections::BTreeMap;
 
 macro_rules! assert_tokens {
     ($a:expr, $b:expr $(,)?) => {
-        assert_eq!(get_tokens($a), $b)
+        assert_eq!(get_tokens(&$a), $b)
     };
 }
 
 #[test]
 fn tokenize_empty() {
-    assert_tokens!("/* \n *\n */", Vec::new());
-    assert_tokens!("//", Vec::new());
+    assert_tokens!(Comment { string: "/* \n *\n */", line: 0 }, Vec::new());
+    assert_tokens!(Comment { string: "//", line: 0 }, Vec::new());
 }
 
 #[test]
 fn tokenize_function() {
     assert_tokens!(
-        "// f(number, number) -> number",
+        Comment { string: "// f(number, number) -> number", line: 0 },
         vec![
             Lex { token: Tkn::Ident("f"), line: 0 },
             Lex { token: Tkn::LParen, line: 0 },
@@ -33,15 +33,16 @@ fn tokenize_function() {
 
 #[test]
 fn tokenize_object() {
+    let string: &str = "/* x {
+                         *     a: number,
+                         *     b: string,
+                         *     c: bool,
+                         *     d: null,
+                         *     e: undefined,
+                         * }
+                         */";
     assert_tokens!(
-        "/* x {
-          *     a: number,
-          *     b: string,
-          *     c: bool,
-          *     d: null,
-          *     e: undefined,
-          * }
-          */",
+        Comment { string, line: 0 },
         vec![
             Lex { token: Tkn::Ident("x"), line: 0 },
             Lex { token: Tkn::LBrace, line: 0 },
@@ -79,7 +80,7 @@ macro_rules! assert_sigs {
 #[test]
 fn parse_fn() {
     assert_sigs!(
-        "// f(null, undefined) -> null",
+        Comment { string: "// f(null, undefined) -> null", line: 0 },
         Ok(vec![(
             Target { ident: vec!["f"], scope: Vec::new() },
             Type::Fn(
@@ -96,7 +97,7 @@ fn parse_fn() {
 #[test]
 fn parse_fn_empty_args() {
     assert_sigs!(
-        "/* f() -> undefined */",
+        Comment { string: "/* f() -> undefined */", line: 0 },
         Ok(vec![(
             Target { ident: vec!["f"], scope: Vec::new() },
             Type::Fn(vec![(Vec::new(), Type::Undef)].into_iter().collect()),
@@ -108,16 +109,17 @@ fn parse_fn_empty_args() {
 
 #[test]
 fn parse_obj() {
+    let string: &str = "/* x {
+                         *     a: number,
+                         *     b: string,
+                         *     c: bool,
+                         *     d: null,
+                         *     e: undefined,
+                         *     f: { g: null },
+                         * }
+                         */";
     assert_sigs!(
-        "/* x {
-          *     a: number,
-          *     b: string,
-          *     c: bool,
-          *     d: null,
-          *     e: undefined,
-          *     f: { g: null },
-          * }
-          */",
+        Comment { string, line: 0 },
         Ok(vec![(
             Target { ident: vec!["x"], scope: Vec::new() },
             Type::Obj(
@@ -146,7 +148,7 @@ fn parse_obj() {
 #[test]
 fn parse_obj_empty() {
     assert_sigs!(
-        "// x {}",
+        Comment { string: "// x {}", line: 0 },
         Ok(vec![(
             Target { ident: vec!["x"], scope: Vec::new() },
             Type::Obj(BTreeMap::new()),
@@ -159,10 +161,11 @@ fn parse_obj_empty() {
 #[test]
 fn parse_combined() {
     let obj: Type = Type::Obj(vec![("a", Type::Num)].into_iter().collect());
+    let string: &str = "/* x { a: number }
+                         * f(x) -> { b: bool }
+                         */";
     assert_sigs!(
-        "/* x { a: number }
-          * f(x) -> { b: bool }
-          */",
+        Comment { string, line: 0 },
         Ok(vec![
             (Target { ident: vec!["x"], scope: Vec::new() }, obj.clone()),
             (
@@ -186,11 +189,12 @@ fn parse_combined() {
 
 #[test]
 fn parse_overload() {
+    let string: &str = "// f(bool, bool) -> bool
+                        // f(null, null) -> null
+                        // x {}
+                        // f(number, number) -> number";
     assert_sigs!(
-        "// f(bool, bool) -> bool
-         // f(null, null) -> null
-         // x {}
-         // f(number, number) -> number",
+        Comment { string, line: 0 },
         Ok(vec![
             (
                 Target { ident: vec!["f"], scope: Vec::new() },
@@ -217,14 +221,15 @@ fn parse_overload() {
 #[test]
 fn parse_scopes() {
     let obj: Type = Type::Obj(vec![("a", Type::Num)].into_iter().collect());
+    let string: &str = "/* x {
+                         *     a: number,
+                         * }
+                         * f(x) -> number
+                         * g(x) -> undefined
+                         * g @ f() -> number
+                         */";
     assert_sigs!(
-        "/* x {
-          *     a: number,
-          * }
-          * f(x) -> number
-          * g(x) -> undefined
-          * g @ f() -> number
-          */",
+        Comment { string, line: 0 },
         Ok(vec![
             (Target { ident: vec!["x"], scope: Vec::new() }, obj.clone()),
             (
@@ -251,4 +256,13 @@ fn parse_scopes() {
         .into_iter()
         .collect()),
     )
+}
+
+#[test]
+fn error_at_line() {
+    let string: &str = "/* f(string) -> string
+                         * f(number) -> number
+                         * f(bool -> bool
+                         */";
+    assert_sigs!(Comment { string, line: 0 }, Err(Error::Line(2)))
 }

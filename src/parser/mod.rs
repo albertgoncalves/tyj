@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod test;
 
+use crate::commenter::Comment;
 use crate::tokenizer::{Asn, Count, Lex, Op, Tkn};
 use std::iter::Peekable;
 use std::slice::Iter;
@@ -584,12 +585,12 @@ fn get_stmt<'a, 'b, 'c>(
 
 pub(crate) fn get_ast<'a, 'b>(
     tokens: &'b [Lex<'a>],
-) -> Result<(Vec<Syntax<'a>>, Vec<&'a str>), Error<'a>> {
+) -> Result<(Vec<Syntax<'a>>, Vec<Comment<'a>>), Error<'a>> {
     let mut ast_tokens: Vec<Lex> = Vec::with_capacity(tokens.len());
-    let mut comments: Vec<&str> = Vec::new();
+    let mut comments: Vec<Comment> = Vec::new();
     for token in tokens {
-        if let Lex { token: Tkn::Comment(x), .. } = token {
-            comments.push(x)
+        if let Lex { token: Tkn::Comment(string), line } = token {
+            comments.push(Comment { string, line: *line })
         } else {
             ast_tokens.push(*token)
         }
