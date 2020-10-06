@@ -2,7 +2,11 @@
 
 Static type-checking for the subset of `javascript` syntax that I tend to use.
 
-The idea is to quickly type-check regular `.js` files without needing to bundle or transpile. Should be **fast** and **not require some auxiliary syntax** to facilitate static typing.
+---
+The idea is to type-check regular `.js` files without needing to bundle or transpile.
+~Should **not require some auxiliary syntax** to facilitate static typing~.
+Auxiliary syntax is _hidden_ in comments; valid `.js` source code can be immediately interpreted after type-checking.
+Type-checking should be **fast**.
 
 Needed things
 ---
