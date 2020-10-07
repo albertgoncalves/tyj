@@ -203,7 +203,7 @@ fn push_type<'a, 'b, 'c>(
     types: &'c mut HashMap<Target<'a>, Type<'a>>,
 ) -> Result<(), Error> {
     match tokens.next() {
-        Some(Lex { token: Tkn::Ident(first_ident), .. }) => {
+        Some(Lex { token: Tkn::Ident(first_ident), line }) => {
             let mut ident: &str = first_ident;
             let mut scope: Vec<&str> = Vec::new();
             while let Some(Lex { token: Tkn::At, .. }) = tokens.peek() {
@@ -217,15 +217,20 @@ fn push_type<'a, 'b, 'c>(
             }
             let target: Target = Target { ident: vec![ident], scope };
             let mut new_type: Type = get_type(tokens, types)?;
-            if let Some(mut type_) = types.remove(&target) {
-                match (&mut type_, &mut new_type) {
+            if let Some(mut existing_type) = types.remove(&target) {
+                match (&mut existing_type, &mut new_type) {
                     (Type::Fn(fn_a), Type::Fn(fn_b)) => {
+                        if (fn_a.len() == fn_b.len())
+                            && fn_a.keys().all(|key| fn_b.contains_key(key))
+                        {
+                            return Err(Error::Line(*line));
+                        }
                         fn_a.append(fn_b);
                         let type_: Type = Type::Fn(fn_a.clone());
                         let _: Option<_> = types.insert(target, type_.clone());
                         return Ok(());
                     }
-                    _ => panic!(),
+                    _ => panic!("{:#?} {:#?}", existing_type, new_type),
                 }
             } else {
                 let _: Option<_> = types.insert(target, new_type.clone());

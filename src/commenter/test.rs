@@ -266,3 +266,19 @@ fn error_at_line() {
                          */";
     assert_sigs!(Comment { string, line: 0 }, Err(Error::Line(2)))
 }
+
+#[test]
+fn overloads_err() {
+    let string: &str = "// f() -> string
+                        // f() -> number";
+    assert_sigs!(Comment { string, line: 0 }, Err(Error::Line(1)))
+}
+
+#[test]
+fn nested_overloads_err() {
+    let string: &str = "// g(string) -> () -> string
+                        // g(number) -> () -> number
+                        // f() -> string
+                        // f() -> number";
+    assert_sigs!(Comment { string, line: 0 }, Err(Error::Line(3)))
+}
