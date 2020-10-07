@@ -1639,7 +1639,7 @@ fn update_assign() {
 }
 
 #[test]
-fn r#while() {
+fn while_() {
     assert_ast!(
         "var i = 0;
          while (i < 10) {
@@ -1682,7 +1682,7 @@ fn r#while() {
 }
 
 #[test]
-fn r#for() {
+fn for_() {
     assert_ast!(
         "for (var i = 0; i < 10; ++i) {
              console.log(i);

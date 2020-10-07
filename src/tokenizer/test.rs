@@ -596,7 +596,7 @@ fn switch_case() {
 }
 
 #[test]
-fn r#for() {
+fn for_() {
     assert_tokens!(
         "var x = 0;
          for (var i = 0; i < 10; ++i) {
@@ -633,7 +633,7 @@ fn r#for() {
 }
 
 #[test]
-fn r#while() {
+fn while_() {
     assert_tokens!(
         "var x = 0;
          while (x < 10) {
