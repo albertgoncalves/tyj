@@ -234,9 +234,9 @@ fn type_check<'a, 'b>(
 
     match &syntax.statement {
         Stmt::Decl { ident, expr } => {
-            let ident: Vec<&str> = vec![ident];
+            let idents: Vec<&str> = vec![ident];
             if types.contains_key(&Target {
-                ident: ident.to_vec(),
+                ident: idents.to_vec(),
                 scope: scope.0.to_vec(),
             }) {
                 error!(syntax, Message::IdentShadow);
@@ -244,8 +244,25 @@ fn type_check<'a, 'b>(
             match get_expr(&scope, &types, expr) {
                 Err(message) => return Err(Error { syntax, message }),
                 Ok(type_) => {
+                    let current_scope: &[&str] = scope.0;
+                    let n: usize = current_scope.len();
+                    if 0 < n {
+                        let mut purges: Vec<Target> = Vec::new();
+                        for target in types.keys() {
+                            /* NOTE: `target.ident` should *never* be empty! */
+                            let target_scope: &[&str] = &target.scope;
+                            if (&target.ident[0] == ident)
+                                && (&current_scope[0..(n - 1)] == target_scope)
+                            {
+                                purges.push(target.clone());
+                            }
+                        }
+                        for purge in purges {
+                            let _: Option<_> = types.remove(&purge);
+                        }
+                    }
                     if let Err(message) =
-                        set_type(&scope, &Ident(&ident), types, &type_)
+                        set_type(&scope, &Ident(&idents), types, &type_)
                     {
                         error!(syntax, message);
                     }

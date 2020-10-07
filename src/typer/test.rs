@@ -905,3 +905,84 @@ fn assign_closures() {
         .collect()),
     )
 }
+
+#[test]
+fn replaced_binding_err() {
+    assert_types!(
+        "var x = {
+             a: 0,
+             b: \"?\",
+         };
+
+         // g() -> () -> string
+         // g @ f() -> string
+         function g() {
+             var x = null;
+             function f() {
+                 return x.b;
+             }
+             return f;
+         }",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Ret(Expr::Infix {
+                    op: Op::Member,
+                    left: Box::new(Expr::Ident("x")),
+                    right: Box::new(Expr::Ident("b")),
+                }),
+                line: 10,
+            },
+            message: Message::IdentUnknown,
+        }),
+    )
+}
+
+#[test]
+fn replaced_binding_ok() {
+    let fn_: Type =
+        Type::Fn(vec![(Vec::new(), Type::Num)].into_iter().collect());
+    assert_types!(
+        "var x = {
+             a: 0,
+             b: \"?\",
+         };
+
+         // g() -> () -> number
+         // g @ f() -> number
+         function g() {
+             var x = {
+                 b: 0,
+             };
+             function f() {
+                 var b = x.b;
+                 return x.b;
+             }
+             return f;
+         }",
+        Ok(vec![
+            (
+                Target { ident: vec!["x"], scope: Vec::new() },
+                Type::Obj(
+                    vec![("a", Type::Num), ("b", Type::Str)]
+                        .into_iter()
+                        .collect(),
+                ),
+            ),
+            (Target { ident: vec!["x", "a"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["x", "b"], scope: Vec::new() }, Type::Str),
+            (
+                Target { ident: vec!["f"], scope: vec!["g"] },
+                Type::Fn(vec![(Vec::new(), Type::Num),].into_iter().collect()),
+            ),
+            (
+                Target { ident: vec!["g"], scope: Vec::new() },
+                Type::Fn(
+                    vec![(Vec::new(), fn_.clone())].into_iter().collect(),
+                ),
+            ),
+            (Target { ident: vec!["f"], scope: vec!["g"] }, fn_),
+        ]
+        .into_iter()
+        .collect()),
+    )
+}
