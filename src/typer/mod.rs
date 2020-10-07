@@ -137,7 +137,7 @@ fn get_expr<'a, 'b>(
             let expr: Type = get_expr(scope, types, expr)?;
             let index: Type = get_expr(scope, types, index)?;
             match (expr, index) {
-                (Type::Array(type_), Type::Num) => *type_.clone(),
+                (Type::Array(type_), Type::Num) => *type_,
                 (Type::Array(_), _) => return Err(Message::AccessNonIndex),
                 _ => return Err(Message::AccessNonArray),
             }
@@ -207,10 +207,8 @@ fn set_assign<'a, 'b>(
     };
     match ident_type {
         Type::Uninit => {
-            let _: Option<_> = types.insert(
-                Target { ident, scope: scope.0.to_vec() },
-                expr_type.clone(),
-            );
+            let _: Option<_> = types
+                .insert(Target { ident, scope: scope.0.to_vec() }, expr_type);
         }
         ident_type => {
             if ident_type != expr_type {
@@ -288,7 +286,7 @@ fn type_check<'a, 'b>(
             if let Some(Type::Fn(overloads)) = types
                 .get(&Target { ident: fn_ident.to_vec(), scope: parent_scope })
             {
-                for (arg_types, return_) in &overloads.clone() {
+                for (arg_types, return_) in overloads {
                     if arg_idents.len() != arg_types.len() {
                         error!(syntax, Message::FnWrongNumArgs);
                     }

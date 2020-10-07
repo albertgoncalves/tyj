@@ -227,13 +227,13 @@ fn push_type<'a, 'b, 'c>(
                         }
                         fn_a.append(fn_b);
                         let type_: Type = Type::Fn(fn_a.clone());
-                        let _: Option<_> = types.insert(target, type_.clone());
+                        let _: Option<_> = types.insert(target, type_);
                         return Ok(());
                     }
                     _ => panic!("{:#?} {:#?}", existing_type, new_type),
                 }
             } else {
-                let _: Option<_> = types.insert(target, new_type.clone());
+                let _: Option<_> = types.insert(target, new_type);
             }
         }
         Some(token) => return Err(Error::Line(token.line)),
