@@ -73,7 +73,7 @@ fn get_expr<'a, 'b>(
     types: &'b HashMap<Target<'a>, Type<'a>>,
     expr: &'a Expr<'a>,
 ) -> Result<Type<'a>, Message> {
-    macro_rules! deref_ident {
+    macro_rules! check_ident {
         ($ident:expr $(,)?) => {
             match deref_ident(scope, $ident, types) {
                 Some(Type::Uninit) => return Err(Message::IdentUninit),
@@ -84,7 +84,7 @@ fn get_expr<'a, 'b>(
     }
 
     Ok(match expr {
-        Expr::Ident(ident) => deref_ident!(&Ident(&[*ident])),
+        Expr::Ident(ident) => check_ident!(&Ident(&[*ident])),
         Expr::Num(_) => Type::Num,
         Expr::Str(_) => Type::Str,
         Expr::Bool(_) => Type::Bool,

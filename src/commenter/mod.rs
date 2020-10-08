@@ -225,9 +225,9 @@ fn push_type<'a, 'b, 'c>(
                 }
             }
             let target: Target = Target { ident: vec![ident], scope };
-            let mut new_type: Type = get_type(tokens, types)?;
-            if let Some(mut existing_type) = types.remove(&target) {
-                match (&mut existing_type, &mut new_type) {
+            let mut return_type: Type = get_type(tokens, types)?;
+            if let Some(mut overload) = types.remove(&target) {
+                match (&mut overload, &mut return_type) {
                     (Type::Fn(fn_a), Type::Fn(fn_b)) => {
                         if (fn_a.len() == fn_b.len())
                             && fn_a.keys().all(|key| fn_b.contains_key(key))
@@ -242,7 +242,7 @@ fn push_type<'a, 'b, 'c>(
                     _ => panic!("{:#?} {:#?}", existing_type, new_type),
                 }
             } else {
-                let _: Option<_> = types.insert(target, new_type);
+                let _: Option<_> = types.insert(target, return_type);
             }
         }
         Some(token) => return Err(Error::Line(token.line)),
