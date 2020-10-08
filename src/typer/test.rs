@@ -188,10 +188,18 @@ fn declare_object_duplicate_keys() {
 fn declare_array() {
     assert_types!(
         "var x = [0, 1, 2, 3];",
-        Ok(vec![(
-            Target { ident: vec!["x"], scope: Vec::new() },
-            Type::Array(Box::new(Type::Num)),
-        )]
+        Ok(vec![
+            (
+                Target { ident: vec!["x"], scope: Vec::new() },
+                Type::Array(Box::new(Type::Num)),
+            ),
+            (
+                Target { ident: vec!["x", "push"], scope: Vec::new() },
+                Type::Fn(
+                    vec![(vec![Type::Num], Type::Undef)].into_iter().collect(),
+                ),
+            ),
+        ]
         .into_iter()
         .collect()),
     )
@@ -212,6 +220,7 @@ fn declare_array_empty() {
 
 #[test]
 fn declare_array_obj() {
+    let obj: Type = Type::Obj(vec![("x", Type::Num)].into_iter().collect());
     assert_types!(
         "var a = {
              x: 0,
@@ -220,26 +229,32 @@ fn declare_array_obj() {
              x: 1,
          };
          var xs = [a, b];",
-        Ok(vec![
-            (Target { ident: vec!["a", "x"], scope: Vec::new() }, Type::Num),
-            (
-                Target { ident: vec!["a"], scope: Vec::new() },
-                Type::Obj(vec![("x", Type::Num)].into_iter().collect()),
-            ),
-            (Target { ident: vec!["b", "x"], scope: Vec::new() }, Type::Num),
-            (
-                Target { ident: vec!["b"], scope: Vec::new() },
-                Type::Obj(vec![("x", Type::Num)].into_iter().collect()),
-            ),
-            (
-                Target { ident: vec!["xs"], scope: Vec::new() },
-                Type::Array(Box::new(Type::Obj(
-                    vec![("x", Type::Num)].into_iter().collect(),
-                ))),
-            ),
-        ]
-        .into_iter()
-        .collect()),
+        Ok(
+            vec![
+                (
+                    Target { ident: vec!["a", "x"], scope: Vec::new() },
+                    Type::Num,
+                ),
+                (Target { ident: vec!["a"], scope: Vec::new() }, obj.clone()),
+                (
+                    Target { ident: vec!["b", "x"], scope: Vec::new() },
+                    Type::Num,
+                ),
+                (Target { ident: vec!["b"], scope: Vec::new() }, obj.clone()),
+                (
+                    Target { ident: vec!["xs"], scope: Vec::new() },
+                    Type::Array(Box::new(obj.clone())),
+                ),
+                (
+                    Target { ident: vec!["xs", "push"], scope: Vec::new() },
+                    Type::Fn(
+                        vec![(vec![obj], Type::Undef)].into_iter().collect(),
+                    ),
+                ),
+            ]
+            .into_iter()
+            .collect()
+        ),
     )
 }
 
@@ -556,6 +571,12 @@ fn access() {
             (
                 Target { ident: vec!["xs"], scope: Vec::new() },
                 Type::Array(Box::new(Type::Num)),
+            ),
+            (
+                Target { ident: vec!["xs", "push"], scope: Vec::new() },
+                Type::Fn(
+                    vec![(vec![Type::Num], Type::Undef)].into_iter().collect(),
+                ),
             ),
             (Target { ident: vec!["x"], scope: Vec::new() }, Type::Num),
         ]
@@ -981,6 +1002,39 @@ fn replaced_binding_ok() {
                 ),
             ),
             (Target { ident: vec!["f"], scope: vec!["g"] }, fn_),
+        ]
+        .into_iter()
+        .collect()),
+    )
+}
+
+#[test]
+fn array_push() {
+    let array: Type = Type::Array(Box::new(Type::Num));
+    let obj_z: Type =
+        Type::Obj(vec![("z", array.clone())].into_iter().collect());
+    let obj_y: Type =
+        Type::Obj(vec![("y", obj_z.clone())].into_iter().collect());
+    assert_types!(
+        "var x = {
+             y: {
+                 z: [0],
+             },
+         };
+         x.y.z.push(0);",
+        Ok(vec![
+            (Target { ident: vec!["x"], scope: Vec::new() }, obj_y),
+            (Target { ident: vec!["x", "y"], scope: Vec::new() }, obj_z),
+            (Target { ident: vec!["x", "y", "z"], scope: Vec::new() }, array),
+            (
+                Target {
+                    ident: vec!["x", "y", "z", "push"],
+                    scope: Vec::new(),
+                },
+                Type::Fn(
+                    vec![(vec![Type::Num], Type::Undef)].into_iter().collect(),
+                ),
+            ),
         ]
         .into_iter()
         .collect()),

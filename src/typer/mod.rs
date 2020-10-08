@@ -177,12 +177,27 @@ fn set_type<'a, 'b>(
     types: &'b mut HashMap<Target<'a>, Type<'a>>,
     type_: &'b Type<'a>,
 ) -> Result<(), Message> {
-    if let Type::Obj(props) = type_ {
-        for (key, value) in props.iter() {
-            let mut ident: Vec<&str> = ident.0.to_vec();
-            ident.push(key);
-            set_type(scope, &Ident(&ident), types, &value)?;
+    match type_ {
+        Type::Obj(props) => {
+            for (key, value) in props.iter() {
+                let mut ident: Vec<&str> = ident.0.to_vec();
+                ident.push(key);
+                set_type(scope, &Ident(&ident), types, &value)?;
+            }
         }
+        Type::Array(type_) => {
+            let mut ident: Vec<&str> = ident.0.to_vec();
+            ident.push("push");
+            let _: Option<_> = types.insert(
+                Target { ident, scope: scope.0.to_vec() },
+                Type::Fn(
+                    vec![(vec![*type_.clone()], Type::Undef)]
+                        .into_iter()
+                        .collect(),
+                ),
+            );
+        }
+        _ => (),
     }
     if types
         .insert(
