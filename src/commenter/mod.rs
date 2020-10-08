@@ -239,7 +239,7 @@ fn push_type<'a, 'b, 'c>(
                         let _: Option<_> = types.insert(target, type_);
                         return Ok(());
                     }
-                    _ => panic!("{:#?} {:#?}", existing_type, new_type),
+                    _ => return Err(Error::Line(*line)),
                 }
             } else {
                 let _: Option<_> = types.insert(target, return_type);
