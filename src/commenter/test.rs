@@ -282,3 +282,33 @@ fn nested_overloads_err() {
                         // f() -> number";
     assert_sigs!(Comment { string, line: 0 }, Err(Error::Line(3)))
 }
+
+#[test]
+fn array() {
+    let string: &str = "// f(string, number) -> [string]
+                        // f([number], number) -> [[number]]";
+    assert_sigs!(
+        Comment { string, line: 0 },
+        Ok(vec![(
+            Target { ident: vec!["f"], scope: Vec::new() },
+            Type::Fn(
+                vec![
+                    (
+                        vec![Type::Str, Type::Num],
+                        Type::Array(Box::new(Type::Str)),
+                    ),
+                    (
+                        vec![Type::Array(Box::new(Type::Num)), Type::Num],
+                        Type::Array(Box::new(Type::Array(Box::new(
+                            Type::Num,
+                        )))),
+                    ),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+        )]
+        .into_iter()
+        .collect()),
+    )
+}

@@ -17,10 +17,12 @@ enum Tkn<'a> {
     Comma,
     Ident(&'a str),
     LBrace,
+    LBracket,
     LParen,
     Null,
     Num,
     RBrace,
+    RBracket,
     RParen,
     Str,
     Undef,
@@ -70,6 +72,8 @@ fn get_tokens<'a, 'b>(comment: &'b Comment<'a>) -> Vec<Lex<'a>> {
             ',' => push!(Tkn::Comma),
             ':' => push!(Tkn::Colon),
             '@' => push!(Tkn::At),
+            '[' => push!(Tkn::LBracket),
+            ']' => push!(Tkn::RBracket),
             '{' => push!(Tkn::LBrace),
             '}' => push!(Tkn::RBrace),
             '-' if chars.peek() == Some(&(i + 1, '>')) => {
@@ -148,6 +152,11 @@ fn get_type<'a, 'b, 'c>(
             } else {
                 return Err(Error::Line(*line));
             }
+        }
+        Some(Lex { token: Tkn::LBracket, .. }) => {
+            let type_: Type = get_type(tokens, types)?;
+            eat_or_error!(tokens, Tkn::RBracket);
+            Type::Array(Box::new(type_))
         }
         Some(Lex { token: Tkn::LBrace, .. }) => {
             let mut props: BTreeMap<&str, Type> = BTreeMap::new();
