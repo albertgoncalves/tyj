@@ -130,9 +130,19 @@ fn get_expr<'a, 'b>(
                 _ => return Err(Message::IncompatibleTypes),
             }
         }
-        Expr::Infix { op: Op::Member, .. } => {
-            deref_ident!(&Ident(&get_idents(expr)?))
-        }
+        Expr::Infix { op, left, right } => match op {
+            Op::Member => check_ident!(&Ident(&get_idents(expr)?)),
+            Op::Add | Op::Sub | Op::Mul | Op::Div => {
+                match (
+                    get_expr(scope, types, left)?,
+                    get_expr(scope, types, right)?,
+                ) {
+                    (Type::Num, Type::Num) => Type::Num,
+                    _ => panic!("{:#?} {:#?}", left, right),
+                }
+            }
+            _ => panic!("{:#?} {:#?}", left, right),
+        },
         Expr::Access { expr, index } => {
             let expr: Type = get_expr(scope, types, expr)?;
             let index: Type = get_expr(scope, types, index)?;
