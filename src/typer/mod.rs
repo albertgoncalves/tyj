@@ -301,6 +301,11 @@ fn type_check<'a, 'b>(
             Ok(type_) => return Ok(Return::Type(type_)),
             Err(message) => error!(syntax, message),
         },
+        Stmt::Effect(expr) => {
+            if let Err(message) = get_expr(&scope, &types, expr) {
+                return Err(Error { syntax, message });
+            }
+        }
         Stmt::Fn { ident, args: arg_idents, body } => {
             let fn_ident: Vec<&str> = vec![ident];
             let parent_scope: Vec<&str> = scope.0.to_vec();
