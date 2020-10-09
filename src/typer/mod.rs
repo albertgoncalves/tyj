@@ -41,13 +41,19 @@ enum Return<'a> {
     Type(Type<'a>),
 }
 
+macro_rules! get_infix_idents {
+    ($left:expr, $right:expr $(,)?) => {{
+        let mut idents: Vec<&str> = get_idents($left)?;
+        idents.extend_from_slice(&get_idents($right)?);
+        idents
+    }};
+}
+
 fn get_idents<'a>(expr: &'a Expr<'a>) -> Result<Vec<&'a str>, Message> {
     Ok(match expr {
         Expr::Ident(ident) => vec![ident],
         Expr::Infix { op: Op::Member, left, right } => {
-            let mut idents: Vec<&str> = get_idents(left)?;
-            idents.extend_from_slice(&get_idents(right)?);
-            idents
+            get_infix_idents!(left, right)
         }
         _ => return Err(Message::NonIdentMember),
     })
@@ -131,7 +137,9 @@ fn get_expr<'a, 'b>(
             }
         }
         Expr::Infix { op, left, right } => match op {
-            Op::Member => check_ident!(&Ident(&get_idents(expr)?)),
+            Op::Member => {
+                check_ident!(&Ident(&get_infix_idents!(left, right)))
+            }
             Op::Add | Op::Sub | Op::Mul | Op::Div => {
                 match (
                     get_expr(scope, types, left)?,
@@ -220,7 +228,9 @@ fn set_assign<'a, 'b>(
 ) -> Result<(), Message> {
     let ident: Vec<&str> = match ident_expr {
         Expr::Ident(ident) => vec![ident],
-        Expr::Infix { op: Op::Member, .. } => get_idents(ident_expr)?,
+        Expr::Infix { op: Op::Member, left, right } => {
+            get_infix_idents!(left, right)
+        }
         _ => return Err(Message::AssignNonIdent),
     };
     let expr_type: Type = get_expr(scope, &types, value_expr)?;
