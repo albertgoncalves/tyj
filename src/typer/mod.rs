@@ -179,39 +179,45 @@ fn get_expr<'a, 'b>(
     })
 }
 
+fn set_array_methods<'a, 'b>(
+    scope: &'b Scope<'a, 'b>,
+    mut ident: Vec<&'a str>,
+    types: &'b mut HashMap<Target<'a>, Type<'a>>,
+    type_: &'b Type<'a>,
+) -> Result<(), Message> {
+    ident.push("push");
+    set_type(
+        scope,
+        &Ident(&ident),
+        types,
+        &Type::Fn(
+            vec![(vec![type_.clone()], Type::Undef)].into_iter().collect(),
+        ),
+    )
+}
+
 fn set_type<'a, 'b>(
     scope: &'b Scope<'a, 'b>,
     ident: &'b Ident<'a, 'b>,
     types: &'b mut HashMap<Target<'a>, Type<'a>>,
     type_: &'b Type<'a>,
 ) -> Result<(), Message> {
+    let ident: Vec<&str> = ident.0.to_vec();
     match type_ {
         Type::Obj(props) => {
             for (key, value) in props.iter() {
-                let mut ident: Vec<&str> = ident.0.to_vec();
+                let mut ident: Vec<&str> = ident.clone();
                 ident.push(key);
                 set_type(scope, &Ident(&ident), types, &value)?;
             }
         }
         Type::Array(type_) => {
-            let mut ident: Vec<&str> = ident.0.to_vec();
-            ident.push("push");
-            let _: Option<_> = types.insert(
-                Target { ident, scope: scope.0.to_vec() },
-                Type::Fn(
-                    vec![(vec![*type_.clone()], Type::Undef)]
-                        .into_iter()
-                        .collect(),
-                ),
-            );
+            set_array_methods(scope, ident.clone(), types, type_)?
         }
         _ => (),
     }
     if types
-        .insert(
-            Target { ident: ident.0.to_vec(), scope: scope.0.to_vec() },
-            type_.clone(),
-        )
+        .insert(Target { ident, scope: scope.0.to_vec() }, type_.clone())
         .is_some()
     {
         Err(Message::ObjDuplicateKeys)
