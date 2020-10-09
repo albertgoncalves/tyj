@@ -67,7 +67,7 @@ fn deref_ident<'a, 'b>(
     let mut scope: Vec<&str> = scope.0.to_vec();
     loop {
         let type_: Option<&Type> = types
-            .get(&Target { ident: ident.0.to_vec(), scope: scope.to_vec() });
+            .get(&Target { ident: ident.0.to_vec(), scope: scope.clone() });
         if type_.is_some() || scope.pop().is_none() {
             return type_;
         }
@@ -240,16 +240,16 @@ fn set_assign<'a, 'b>(
         _ => return Err(Message::AssignNonIdent),
     };
     let expr_type: Type = get_expr(scope, &types, value_expr)?;
-    let ident_type: Type = match types
-        .get(&Target { ident: ident.to_vec(), scope: scope.0.to_vec() })
-    {
+    let target: Target =
+        Target { ident: ident.clone(), scope: scope.0.to_vec() };
+    let ident_type: Type = match types.get(&target) {
         Some(type_) => type_.clone(),
         None => return Err(Message::IdentUnknown),
     };
     match ident_type {
         Type::Uninit => {
-            let _: Option<_> = types
-                .insert(Target { ident, scope: scope.0.to_vec() }, expr_type);
+            let _: Option<_> = types.remove(&target);
+            set_type(scope, &Ident(&ident), types, &expr_type)?;
         }
         ident_type => {
             if ident_type != expr_type {
@@ -275,7 +275,7 @@ fn type_check<'a, 'b>(
         Stmt::Decl { ident, expr } => {
             let idents: Vec<&str> = vec![ident];
             if types.contains_key(&Target {
-                ident: idents.to_vec(),
+                ident: idents.clone(),
                 scope: scope.0.to_vec(),
             }) {
                 error!(syntax, Message::IdentShadow);
@@ -288,8 +288,8 @@ fn type_check<'a, 'b>(
                     if 0 < n {
                         let mut purges: Vec<Target> = Vec::new();
                         for target in types.keys() {
-                            /* NOTE: `target.ident` should *never* be empty! */
                             let target_scope: &[&str] = &target.scope;
+                            /* NOTE: `target.ident` should *never* be empty! */
                             if (&target.ident[0] == ident)
                                 && (&current_scope[0..(n - 1)] == target_scope)
                             {
@@ -323,14 +323,13 @@ fn type_check<'a, 'b>(
             }
         }
         Stmt::Fn { ident, args: arg_idents, body } => {
-            let fn_ident: Vec<&str> = vec![ident];
             let parent_scope: Vec<&str> = scope.0.to_vec();
             let mut fn_scope: Vec<&str> =
                 Vec::with_capacity(parent_scope.len() + 1);
             fn_scope.append(&mut scope.0.to_vec());
             fn_scope.push(ident);
-            if let Some(Type::Fn(overloads)) = types
-                .get(&Target { ident: fn_ident.to_vec(), scope: parent_scope })
+            if let Some(Type::Fn(overloads)) =
+                types.get(&Target { ident: vec![ident], scope: parent_scope })
             {
                 for (arg_types, return_) in overloads {
                     if arg_idents.len() != arg_types.len() {
