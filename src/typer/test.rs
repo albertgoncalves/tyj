@@ -1,4 +1,5 @@
 use super::{get_types, Error, Message};
+use crate::btree_map;
 use crate::commenter::{get_sigs, Comment};
 use crate::parser::{get_ast, Expr, Prop, Stmt, Syntax};
 use crate::tokenizer::{get_tokens, Asn, Op};
@@ -22,15 +23,13 @@ fn declares() {
          var c = true;
          var d = null;
          var e = undefined;",
-        Ok(vec![
+        Ok(btree_map![
             (Target { ident: vec!["a"], scope: Vec::new() }, Type::Str),
             (Target { ident: vec!["b"], scope: Vec::new() }, Type::Num),
             (Target { ident: vec!["c"], scope: Vec::new() }, Type::Bool),
             (Target { ident: vec!["d"], scope: Vec::new() }, Type::Null),
             (Target { ident: vec!["e"], scope: Vec::new() }, Type::Undef),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
@@ -71,12 +70,10 @@ fn declare_ident() {
     assert_types!(
         "var x = 0;
          var y = x;",
-        Ok(vec![
+        Ok(btree_map![
             (Target { ident: vec!["x"], scope: Vec::new() }, Type::Num),
             (Target { ident: vec!["y"], scope: Vec::new() }, Type::Num),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
@@ -85,16 +82,14 @@ fn declare_object() {
     assert_types!(
         "var x = 0;
          var y = { a: x };",
-        Ok(vec![
+        Ok(btree_map![
             (Target { ident: vec!["x"], scope: Vec::new() }, Type::Num),
             (Target { ident: vec!["y", "a"], scope: Vec::new() }, Type::Num),
             (
                 Target { ident: vec!["y"], scope: Vec::new() },
-                Type::Obj(vec![("a", Type::Num)].into_iter().collect()),
+                Type::Obj(btree_map![("a", Type::Num)]),
             ),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
@@ -102,19 +97,16 @@ fn declare_object() {
 fn declare_empty_object() {
     assert_types!(
         "var x = {};",
-        Ok(vec![(
+        Ok(btree_map![(
             Target { ident: vec!["x"], scope: Vec::new() },
             Type::Obj(BTreeMap::new()),
-        )]
-        .into_iter()
-        .collect()),
+        )]),
     )
 }
 
 #[test]
 fn declare_nested_object() {
-    let props: BTreeMap<&str, Type> =
-        vec![("a", Type::Num)].into_iter().collect();
+    let props: BTreeMap<&str, Type> = btree_map![("a", Type::Num)];
     assert_types!(
         "var x = {
              a: 0,
@@ -126,7 +118,7 @@ fn declare_nested_object() {
                  a: 0,
              },
          };",
-        Ok(vec![
+        Ok(btree_map![
             (Target { ident: vec!["x", "a"], scope: Vec::new() }, Type::Num),
             (Target { ident: vec!["x", "b"], scope: Vec::new() }, Type::Str),
             (Target { ident: vec!["x", "c"], scope: Vec::new() }, Type::Bool),
@@ -142,22 +134,16 @@ fn declare_nested_object() {
             ),
             (
                 Target { ident: vec!["x"], scope: Vec::new() },
-                Type::Obj(
-                    vec![
-                        ("a", Type::Num),
-                        ("b", Type::Str),
-                        ("c", Type::Bool),
-                        ("d", Type::Null),
-                        ("e", Type::Undef),
-                        ("f", Type::Obj(props)),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
+                Type::Obj(btree_map![
+                    ("a", Type::Num),
+                    ("b", Type::Str),
+                    ("c", Type::Bool),
+                    ("d", Type::Null),
+                    ("e", Type::Undef),
+                    ("f", Type::Obj(props)),
+                ]),
             ),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
@@ -188,20 +174,16 @@ fn declare_object_duplicate_keys() {
 fn declare_array() {
     assert_types!(
         "var x = [0, 1, 2, 3];",
-        Ok(vec![
+        Ok(btree_map![
             (
                 Target { ident: vec!["x"], scope: Vec::new() },
                 Type::Array(Box::new(Type::Num)),
             ),
             (
                 Target { ident: vec!["x", "push"], scope: Vec::new() },
-                Type::Fn(
-                    vec![(vec![Type::Num], Type::Undef)].into_iter().collect(),
-                ),
+                Type::Fn(btree_map![(vec![Type::Num], Type::Undef)]),
             ),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
@@ -209,18 +191,16 @@ fn declare_array() {
 fn declare_array_empty() {
     assert_types!(
         "var x = [];",
-        Ok(vec![(
+        Ok(btree_map![(
             Target { ident: vec!["x"], scope: Vec::new() },
             Type::EmptyArray,
-        )]
-        .into_iter()
-        .collect()),
+        )]),
     )
 }
 
 #[test]
 fn declare_array_obj() {
-    let obj: Type = Type::Obj(vec![("x", Type::Num)].into_iter().collect());
+    let obj: Type = Type::Obj(btree_map![("x", Type::Num)]);
     assert_types!(
         "var a = {
              x: 0,
@@ -229,32 +209,20 @@ fn declare_array_obj() {
              x: 1,
          };
          var xs = [a, b];",
-        Ok(
-            vec![
-                (
-                    Target { ident: vec!["a", "x"], scope: Vec::new() },
-                    Type::Num,
-                ),
-                (Target { ident: vec!["a"], scope: Vec::new() }, obj.clone()),
-                (
-                    Target { ident: vec!["b", "x"], scope: Vec::new() },
-                    Type::Num,
-                ),
-                (Target { ident: vec!["b"], scope: Vec::new() }, obj.clone()),
-                (
-                    Target { ident: vec!["xs"], scope: Vec::new() },
-                    Type::Array(Box::new(obj.clone())),
-                ),
-                (
-                    Target { ident: vec!["xs", "push"], scope: Vec::new() },
-                    Type::Fn(
-                        vec![(vec![obj], Type::Undef)].into_iter().collect(),
-                    ),
-                ),
-            ]
-            .into_iter()
-            .collect()
-        ),
+        Ok(btree_map![
+            (Target { ident: vec!["a", "x"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["a"], scope: Vec::new() }, obj.clone()),
+            (Target { ident: vec!["b", "x"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["b"], scope: Vec::new() }, obj.clone()),
+            (
+                Target { ident: vec!["xs"], scope: Vec::new() },
+                Type::Array(Box::new(obj.clone())),
+            ),
+            (
+                Target { ident: vec!["xs", "push"], scope: Vec::new() },
+                Type::Fn(btree_map![(vec![obj], Type::Undef)]),
+            ),
+        ]),
     )
 }
 
@@ -298,15 +266,13 @@ fn declare_prefix() {
          var c = ~0;
          var d = ++b;
          var e = --c;",
-        Ok(vec![
+        Ok(btree_map![
             (Target { ident: vec!["a"], scope: Vec::new() }, Type::Bool),
             (Target { ident: vec!["b"], scope: Vec::new() }, Type::Num),
             (Target { ident: vec!["c"], scope: Vec::new() }, Type::Num),
             (Target { ident: vec!["d"], scope: Vec::new() }, Type::Num),
             (Target { ident: vec!["e"], scope: Vec::new() }, Type::Num),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
@@ -333,8 +299,7 @@ fn declare_prefix_err() {
 
 #[test]
 fn declare_infix_member() {
-    let props: BTreeMap<&str, Type> =
-        vec![("y", Type::Num)].into_iter().collect();
+    let props: BTreeMap<&str, Type> = btree_map![("y", Type::Num)];
     assert_types!(
         "var a = {
              x: {
@@ -344,7 +309,7 @@ fn declare_infix_member() {
          var x = null;
          var y = \"\";
          var b = a.x.y;",
-        Ok(vec![
+        Ok(btree_map![
             (
                 Target { ident: vec!["a", "x", "y"], scope: Vec::new() },
                 Type::Num,
@@ -355,14 +320,12 @@ fn declare_infix_member() {
             ),
             (
                 Target { ident: vec!["a"], scope: Vec::new() },
-                Type::Obj(vec![("x", Type::Obj(props))].into_iter().collect()),
+                Type::Obj(btree_map![("x", Type::Obj(props))]),
             ),
             (Target { ident: vec!["x"], scope: Vec::new() }, Type::Null),
             (Target { ident: vec!["y"], scope: Vec::new() }, Type::Str),
             (Target { ident: vec!["b"], scope: Vec::new() }, Type::Num),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
@@ -401,9 +364,10 @@ fn declare_update() {
     assert_types!(
         "var x = 0;
          x = 1;",
-        Ok(vec![(Target { ident: vec!["x"], scope: Vec::new() }, Type::Num)]
-            .into_iter()
-            .collect()),
+        Ok(btree_map![(
+            Target { ident: vec!["x"], scope: Vec::new() },
+            Type::Num
+        )]),
     )
 }
 
@@ -432,9 +396,10 @@ fn declare_uninit() {
         "var x;
          x = 1;
          x = 2;",
-        Ok(vec![(Target { ident: vec!["x"], scope: Vec::new() }, Type::Num)]
-            .into_iter()
-            .collect()),
+        Ok(btree_map![(
+            Target { ident: vec!["x"], scope: Vec::new() },
+            Type::Num
+        )]),
     )
 }
 
@@ -483,16 +448,14 @@ fn assign_obj() {
         "var x = { a: 0 };
          var y = 1;
          x.a = y;",
-        Ok(vec![
+        Ok(btree_map![
             (Target { ident: vec!["x", "a"], scope: Vec::new() }, Type::Num),
             (
                 Target { ident: vec!["x"], scope: Vec::new() },
-                Type::Obj(vec![("a", Type::Num)].into_iter().collect()),
+                Type::Obj(btree_map![("a", Type::Num)]),
             ),
             (Target { ident: vec!["y"], scope: Vec::new() }, Type::Num),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
@@ -567,21 +530,17 @@ fn access() {
     assert_types!(
         "var xs = [1];
          var x = xs[0];",
-        Ok(vec![
+        Ok(btree_map![
             (
                 Target { ident: vec!["xs"], scope: Vec::new() },
                 Type::Array(Box::new(Type::Num)),
             ),
             (
                 Target { ident: vec!["xs", "push"], scope: Vec::new() },
-                Type::Fn(
-                    vec![(vec![Type::Num], Type::Undef)].into_iter().collect(),
-                ),
+                Type::Fn(btree_map![(vec![Type::Num], Type::Undef)]),
             ),
             (Target { ident: vec!["x"], scope: Vec::new() }, Type::Num),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
@@ -629,7 +588,7 @@ fn access_non_index_err() {
 
 #[test]
 fn declare_functions() {
-    let obj: Type = Type::Obj(vec![("a", Type::Bool)].into_iter().collect());
+    let obj: Type = Type::Obj(btree_map![("a", Type::Bool)]);
     assert_types!(
         "/* x { a: bool }
           * f(number, string) -> number
@@ -664,61 +623,47 @@ fn declare_functions() {
          // i(bool) -> undefined
          // i(undefined) -> undefined
          function i(_) {}",
-        Ok(vec![
+        Ok(btree_map![
             (Target { ident: vec!["x"], scope: Vec::new() }, Type::Str),
             (Target { ident: vec!["y"], scope: Vec::new() }, Type::Null),
             (
                 Target { ident: vec!["f"], scope: Vec::new() },
-                Type::Fn(
-                    vec![
-                        (vec![Type::Num, Type::Str], Type::Num),
-                        (vec![Type::Str, Type::Bool], Type::Str),
-                        (vec![Type::Str, Type::Null], Type::Str),
-                        (vec![obj.clone(), Type::Undef], obj.clone()),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
+                Type::Fn(btree_map![
+                    (vec![Type::Num, Type::Str], Type::Num),
+                    (vec![Type::Str, Type::Bool], Type::Str),
+                    (vec![Type::Str, Type::Null], Type::Str),
+                    (vec![obj.clone(), Type::Undef], obj.clone()),
+                ]),
             ),
             (
                 Target { ident: vec!["g"], scope: Vec::new() },
-                Type::Fn(
-                    vec![
-                        (vec![Type::Num], Type::Num),
-                        (vec![Type::Str], Type::Num),
-                        (vec![obj.clone()], Type::Num),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
+                Type::Fn(btree_map![
+                    (vec![Type::Num], Type::Num),
+                    (vec![Type::Str], Type::Num),
+                    (vec![obj.clone()], Type::Num),
+                ]),
             ),
             (
                 Target { ident: vec!["h"], scope: Vec::new() },
-                Type::Fn(vec![(vec![obj], Type::Bool)].into_iter().collect()),
+                Type::Fn(btree_map![(vec![obj], Type::Bool)]),
             ),
             (
                 Target { ident: vec!["i"], scope: Vec::new() },
-                Type::Fn(
-                    vec![
-                        (vec![Type::Num], Type::Undef),
-                        (vec![Type::Str], Type::Undef),
-                        (vec![Type::Null], Type::Undef),
-                        (vec![Type::Bool], Type::Undef),
-                        (vec![Type::Undef], Type::Undef),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
+                Type::Fn(btree_map![
+                    (vec![Type::Num], Type::Undef),
+                    (vec![Type::Str], Type::Undef),
+                    (vec![Type::Null], Type::Undef),
+                    (vec![Type::Bool], Type::Undef),
+                    (vec![Type::Undef], Type::Undef),
+                ]),
             ),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
 #[test]
 fn declare_scoped_function() {
-    let obj: Type = Type::Obj(vec![("a", Type::Num)].into_iter().collect());
+    let obj: Type = Type::Obj(btree_map![("a", Type::Num)]);
     assert_types!(
         "/* x {
           *     a: number,
@@ -740,42 +685,31 @@ fn declare_scoped_function() {
                  }
              }
          }",
-        Ok(vec![
+        Ok(btree_map![
             (
                 Target { ident: vec!["f"], scope: Vec::new() },
-                Type::Fn(
-                    vec![(vec![obj.clone()], Type::Num)].into_iter().collect(),
-                ),
+                Type::Fn(btree_map![(vec![obj.clone()], Type::Num)]),
             ),
             (
                 Target { ident: vec!["h"], scope: Vec::new() },
-                Type::Fn(
-                    vec![(vec![obj.clone()], Type::Undef)]
-                        .into_iter()
-                        .collect(),
-                ),
+                Type::Fn(btree_map![(vec![obj.clone()], Type::Undef)]),
             ),
             (
                 Target { ident: vec!["g"], scope: vec!["h"] },
-                Type::Fn(
-                    vec![(Vec::new(), Type::Undef)].into_iter().collect(),
-                ),
+                Type::Fn(btree_map![(Vec::new(), Type::Undef)]),
             ),
             (
                 Target { ident: vec!["f"], scope: vec!["h", "g"] },
-                Type::Fn(vec![(Vec::new(), Type::Num)].into_iter().collect()),
+                Type::Fn(btree_map![(Vec::new(), Type::Num)]),
             ),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
 #[test]
 fn nested_function_returns() {
-    let obj: Type = Type::Obj(vec![("a", Type::Num)].into_iter().collect());
-    let fn_: Type =
-        Type::Fn(vec![(Vec::new(), Type::Num)].into_iter().collect());
+    let obj: Type = Type::Obj(btree_map![("a", Type::Num)]);
+    let fn_: Type = Type::Fn(btree_map![(Vec::new(), Type::Num)]);
     assert_types!(
         "// x {
          //     a: number,
@@ -793,26 +727,21 @@ fn nested_function_returns() {
              }
              return g();
          }",
-        Ok(vec![
+        Ok(btree_map![
             (
                 Target { ident: vec!["h"], scope: Vec::new() },
-                Type::Fn(
-                    vec![(vec![obj.clone()], Type::Num)].into_iter().collect(),
-                ),
+                Type::Fn(btree_map![(vec![obj.clone()], Type::Num)]),
             ),
             (Target { ident: vec!["g"], scope: vec!["h"] }, fn_.clone()),
             (Target { ident: vec!["f"], scope: vec!["h", "g"] }, fn_),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
 #[test]
 fn return_closure() {
-    let obj: Type = Type::Obj(vec![("a", Type::Num)].into_iter().collect());
-    let fn_: Type =
-        Type::Fn(vec![(Vec::new(), Type::Num)].into_iter().collect());
+    let obj: Type = Type::Obj(btree_map![("a", Type::Num)]);
+    let fn_: Type = Type::Fn(btree_map![(Vec::new(), Type::Num)]);
     assert_types!(
         "/*  x {
           *      a: number,
@@ -831,40 +760,27 @@ fn return_closure() {
              }
              return g;
          }",
-        Ok(vec![
+        Ok(btree_map![
             (
                 Target { ident: vec!["h"], scope: Vec::new() },
-                Type::Fn(
-                    vec![(
-                        vec![obj],
-                        Type::Fn(
-                            vec![(Vec::new(), fn_.clone())]
-                                .into_iter()
-                                .collect(),
-                        ),
-                    )]
-                    .into_iter()
-                    .collect(),
-                ),
+                Type::Fn(btree_map![(
+                    vec![obj],
+                    Type::Fn(btree_map![(Vec::new(), fn_.clone())]),
+                )]),
             ),
             (
                 Target { ident: vec!["g"], scope: vec!["h"] },
-                Type::Fn(
-                    vec![(Vec::new(), fn_.clone())].into_iter().collect(),
-                ),
+                Type::Fn(btree_map![(Vec::new(), fn_.clone())]),
             ),
             (Target { ident: vec!["f"], scope: vec!["h", "g"] }, fn_),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
 #[test]
 fn assign_closures() {
-    let obj: Type = Type::Obj(vec![("a", Type::Num)].into_iter().collect());
-    let fn_: Type =
-        Type::Fn(vec![(Vec::new(), Type::Num)].into_iter().collect());
+    let obj: Type = Type::Obj(btree_map![("a", Type::Num)]);
+    let fn_: Type = Type::Fn(btree_map![(Vec::new(), Type::Num)]);
     assert_types!(
         "// x {
          //     a: number,
@@ -891,27 +807,21 @@ fn assign_closures() {
          var e = 0;
          e = c;
          e = d();",
-        Ok(vec![
+        Ok(btree_map![
             (
                 Target { ident: vec!["f"], scope: Vec::new() },
-                Type::Fn(
-                    vec![(vec![obj.clone()], Type::Num)].into_iter().collect(),
-                ),
+                Type::Fn(btree_map![(vec![obj.clone()], Type::Num)]),
             ),
             (
                 Target { ident: vec!["g"], scope: Vec::new() },
-                Type::Fn(
-                    vec![(vec![obj.clone()], fn_.clone())]
-                        .into_iter()
-                        .collect(),
-                ),
+                Type::Fn(btree_map![(vec![obj.clone()], fn_.clone())]),
             ),
             (Target { ident: vec!["f"], scope: vec!["g"] }, fn_.clone()),
             (Target { ident: vec!["a"], scope: Vec::new() }, obj.clone()),
             (Target { ident: vec!["a", "a"], scope: Vec::new() }, Type::Num),
             (
                 Target { ident: vec!["b"], scope: Vec::new() },
-                Type::Obj(vec![("b", obj.clone())].into_iter().collect()),
+                Type::Obj(btree_map![("b", obj.clone())]),
             ),
             (Target { ident: vec!["b", "b"], scope: Vec::new() }, obj),
             (
@@ -921,9 +831,7 @@ fn assign_closures() {
             (Target { ident: vec!["c"], scope: Vec::new() }, Type::Num),
             (Target { ident: vec!["d"], scope: Vec::new() }, fn_),
             (Target { ident: vec!["e"], scope: Vec::new() }, Type::Num),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
@@ -960,8 +868,7 @@ fn replaced_binding_err() {
 
 #[test]
 fn replaced_binding_ok() {
-    let fn_: Type =
-        Type::Fn(vec![(Vec::new(), Type::Num)].into_iter().collect());
+    let fn_: Type = Type::Fn(btree_map![(Vec::new(), Type::Num)]);
     assert_types!(
         "var x = {
              a: 0,
@@ -980,41 +887,31 @@ fn replaced_binding_ok() {
              }
              return f;
          }",
-        Ok(vec![
+        Ok(btree_map![
             (
                 Target { ident: vec!["x"], scope: Vec::new() },
-                Type::Obj(
-                    vec![("a", Type::Num), ("b", Type::Str)]
-                        .into_iter()
-                        .collect(),
-                ),
+                Type::Obj(btree_map![("a", Type::Num), ("b", Type::Str)]),
             ),
             (Target { ident: vec!["x", "a"], scope: Vec::new() }, Type::Num),
             (Target { ident: vec!["x", "b"], scope: Vec::new() }, Type::Str),
             (
                 Target { ident: vec!["f"], scope: vec!["g"] },
-                Type::Fn(vec![(Vec::new(), Type::Num),].into_iter().collect()),
+                Type::Fn(btree_map![(Vec::new(), Type::Num)]),
             ),
             (
                 Target { ident: vec!["g"], scope: Vec::new() },
-                Type::Fn(
-                    vec![(Vec::new(), fn_.clone())].into_iter().collect(),
-                ),
+                Type::Fn(btree_map![(Vec::new(), fn_.clone())]),
             ),
             (Target { ident: vec!["f"], scope: vec!["g"] }, fn_),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
 #[test]
 fn array_push() {
     let array: Type = Type::Array(Box::new(Type::Num));
-    let obj_z: Type =
-        Type::Obj(vec![("z", array.clone())].into_iter().collect());
-    let obj_y: Type =
-        Type::Obj(vec![("y", obj_z.clone())].into_iter().collect());
+    let obj_z: Type = Type::Obj(btree_map![("z", array.clone())]);
+    let obj_y: Type = Type::Obj(btree_map![("y", obj_z.clone())]);
     assert_types!(
         "var x = {
              y: {
@@ -1022,7 +919,7 @@ fn array_push() {
              },
          };
          x.y.z.push(0);",
-        Ok(vec![
+        Ok(btree_map![
             (Target { ident: vec!["x"], scope: Vec::new() }, obj_y),
             (Target { ident: vec!["x", "y"], scope: Vec::new() }, obj_z),
             (Target { ident: vec!["x", "y", "z"], scope: Vec::new() }, array),
@@ -1031,21 +928,16 @@ fn array_push() {
                     ident: vec!["x", "y", "z", "push"],
                     scope: Vec::new(),
                 },
-                Type::Fn(
-                    vec![(vec![Type::Num], Type::Undef)].into_iter().collect(),
-                ),
+                Type::Fn(btree_map![(vec![Type::Num], Type::Undef)]),
             ),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
 #[test]
 fn fn_in_obj() {
     let array: Type = Type::Array(Box::new(Type::Num));
-    let fn_: Type =
-        Type::Fn(vec![(Vec::new(), array.clone())].into_iter().collect());
+    let fn_: Type = Type::Fn(btree_map![(Vec::new(), array.clone())]);
     assert_types!(
         "/*
           *  f() -> [number]
@@ -1063,22 +955,18 @@ fn fn_in_obj() {
          };
          var xs = x.f();
          xs.push(0);",
-        Ok(vec![
+        Ok(btree_map![
             (
                 Target { ident: vec!["x"], scope: Vec::new() },
-                Type::Obj(vec![("f", fn_.clone())].into_iter().collect()),
+                Type::Obj(btree_map![("f", fn_.clone())]),
             ),
             (Target { ident: vec!["f"], scope: Vec::new() }, fn_.clone()),
             (Target { ident: vec!["x", "f"], scope: Vec::new() }, fn_),
             (Target { ident: vec!["xs"], scope: Vec::new() }, array),
             (
                 Target { ident: vec!["xs", "push"], scope: Vec::new() },
-                Type::Fn(
-                    vec![(vec![Type::Num], Type::Undef)].into_iter().collect(),
-                ),
+                Type::Fn(btree_map![(vec![Type::Num], Type::Undef)]),
             ),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }

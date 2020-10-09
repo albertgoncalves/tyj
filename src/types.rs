@@ -19,3 +19,10 @@ pub(crate) enum Type<'a> {
     Undef,
     Uninit,
 }
+
+#[macro_export]
+macro_rules! btree_map {
+    ($($tuple:expr),+ $(,)?) => (
+        vec![$($tuple),+].into_iter().collect()
+    );
+}

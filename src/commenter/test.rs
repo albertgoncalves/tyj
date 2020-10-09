@@ -1,5 +1,6 @@
 use super::{get_sigs, get_tokens, Comment, Error, Lex, Tkn};
-use crate::{Target, Type};
+use crate::btree_map;
+use crate::types::{Target, Type};
 use std::collections::BTreeMap;
 
 macro_rules! assert_tokens {
@@ -81,16 +82,10 @@ macro_rules! assert_sigs {
 fn parse_fn() {
     assert_sigs!(
         Comment { string: "// f(null, undefined) -> null", line: 0 },
-        Ok(vec![(
+        Ok(btree_map![(
             Target { ident: vec!["f"], scope: Vec::new() },
-            Type::Fn(
-                vec![(vec![Type::Null, Type::Undef], Type::Null)]
-                    .into_iter()
-                    .collect(),
-            ),
-        )]
-        .into_iter()
-        .collect()),
+            Type::Fn(btree_map![(vec![Type::Null, Type::Undef], Type::Null)]),
+        )]),
     )
 }
 
@@ -98,12 +93,10 @@ fn parse_fn() {
 fn parse_fn_empty_args() {
     assert_sigs!(
         Comment { string: "/* f() -> undefined */", line: 0 },
-        Ok(vec![(
+        Ok(btree_map![(
             Target { ident: vec!["f"], scope: Vec::new() },
-            Type::Fn(vec![(Vec::new(), Type::Undef)].into_iter().collect()),
-        )]
-        .into_iter()
-        .collect()),
+            Type::Fn(btree_map![(Vec::new(), Type::Undef)]),
+        )]),
     )
 }
 
@@ -120,28 +113,17 @@ fn parse_obj() {
                          */";
     assert_sigs!(
         Comment { string, line: 0 },
-        Ok(vec![(
+        Ok(btree_map![(
             Target { ident: vec!["x"], scope: Vec::new() },
-            Type::Obj(
-                vec![
-                    ("a", Type::Num),
-                    ("b", Type::Str),
-                    ("c", Type::Bool),
-                    ("d", Type::Null),
-                    ("e", Type::Undef),
-                    (
-                        "f",
-                        Type::Obj(
-                            vec![("g", Type::Null)].into_iter().collect(),
-                        ),
-                    ),
-                ]
-                .into_iter()
-                .collect(),
-            )
-        )]
-        .into_iter()
-        .collect()),
+            Type::Obj(btree_map![
+                ("a", Type::Num),
+                ("b", Type::Str),
+                ("c", Type::Bool),
+                ("d", Type::Null),
+                ("e", Type::Undef),
+                ("f", Type::Obj(btree_map![("g", Type::Null)])),
+            ]),
+        )]),
     )
 }
 
@@ -149,41 +131,31 @@ fn parse_obj() {
 fn parse_obj_empty() {
     assert_sigs!(
         Comment { string: "// x {}", line: 0 },
-        Ok(vec![(
+        Ok(btree_map![(
             Target { ident: vec!["x"], scope: Vec::new() },
             Type::Obj(BTreeMap::new()),
-        )]
-        .into_iter()
-        .collect()),
+        )]),
     )
 }
 
 #[test]
 fn parse_combined() {
-    let obj: Type = Type::Obj(vec![("a", Type::Num)].into_iter().collect());
+    let obj: Type = Type::Obj(btree_map![("a", Type::Num)]);
     let string: &str = "/* x { a: number }
                          * f(x) -> { b: bool }
                          */";
     assert_sigs!(
         Comment { string, line: 0 },
-        Ok(vec![
+        Ok(btree_map![
             (Target { ident: vec!["x"], scope: Vec::new() }, obj.clone()),
             (
                 Target { ident: vec!["f"], scope: Vec::new() },
-                Type::Fn(
-                    vec![(
-                        vec![obj],
-                        Type::Obj(
-                            vec![("b", Type::Bool)].into_iter().collect(),
-                        ),
-                    )]
-                    .into_iter()
-                    .collect(),
-                ),
+                Type::Fn(btree_map![(
+                    vec![obj],
+                    Type::Obj(btree_map![("b", Type::Bool)]),
+                )]),
             ),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
@@ -195,32 +167,26 @@ fn parse_overload() {
                         // f(number, number) -> number";
     assert_sigs!(
         Comment { string, line: 0 },
-        Ok(vec![
+        Ok(btree_map![
             (
                 Target { ident: vec!["f"], scope: Vec::new() },
-                Type::Fn(
-                    vec![
-                        (vec![Type::Bool, Type::Bool], Type::Bool),
-                        (vec![Type::Null, Type::Null], Type::Null),
-                        (vec![Type::Num, Type::Num], Type::Num),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
+                Type::Fn(btree_map![
+                    (vec![Type::Bool, Type::Bool], Type::Bool),
+                    (vec![Type::Null, Type::Null], Type::Null),
+                    (vec![Type::Num, Type::Num], Type::Num),
+                ]),
             ),
             (
                 Target { ident: vec!["x"], scope: Vec::new() },
                 Type::Obj(BTreeMap::new()),
             ),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
 #[test]
 fn parse_scopes() {
-    let obj: Type = Type::Obj(vec![("a", Type::Num)].into_iter().collect());
+    let obj: Type = Type::Obj(btree_map![("a", Type::Num)]);
     let string: &str = "/* x {
                          *     a: number,
                          * }
@@ -230,31 +196,21 @@ fn parse_scopes() {
                          */";
     assert_sigs!(
         Comment { string, line: 0 },
-        Ok(vec![
+        Ok(btree_map![
             (Target { ident: vec!["x"], scope: Vec::new() }, obj.clone()),
             (
                 Target { ident: vec!["f"], scope: Vec::new() },
-                Type::Fn(
-                    vec![(vec![obj.clone()], Type::Num),]
-                        .into_iter()
-                        .collect(),
-                ),
+                Type::Fn(btree_map![(vec![obj.clone()], Type::Num)]),
             ),
             (
                 Target { ident: vec!["g"], scope: Vec::new() },
-                Type::Fn(
-                    vec![(vec![obj.clone()], Type::Undef)]
-                        .into_iter()
-                        .collect(),
-                ),
+                Type::Fn(btree_map![(vec![obj.clone()], Type::Undef)]),
             ),
             (
                 Target { ident: vec!["f"], scope: vec!["g"] },
-                Type::Fn(vec![(Vec::new(), Type::Num)].into_iter().collect()),
+                Type::Fn(btree_map![(Vec::new(), Type::Num)]),
             ),
-        ]
-        .into_iter()
-        .collect()),
+        ]),
     )
 }
 
@@ -289,26 +245,15 @@ fn array() {
                         // f([number], number) -> [[number]]";
     assert_sigs!(
         Comment { string, line: 0 },
-        Ok(vec![(
+        Ok(btree_map![(
             Target { ident: vec!["f"], scope: Vec::new() },
-            Type::Fn(
-                vec![
-                    (
-                        vec![Type::Str, Type::Num],
-                        Type::Array(Box::new(Type::Str)),
-                    ),
-                    (
-                        vec![Type::Array(Box::new(Type::Num)), Type::Num],
-                        Type::Array(Box::new(Type::Array(Box::new(
-                            Type::Num,
-                        )))),
-                    ),
-                ]
-                .into_iter()
-                .collect(),
-            ),
-        )]
-        .into_iter()
-        .collect()),
+            Type::Fn(btree_map![
+                (vec![Type::Str, Type::Num], Type::Array(Box::new(Type::Str))),
+                (
+                    vec![Type::Array(Box::new(Type::Num)), Type::Num],
+                    Type::Array(Box::new(Type::Array(Box::new(Type::Num)))),
+                ),
+            ]),
+        )]),
     )
 }
