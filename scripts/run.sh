@@ -4,10 +4,7 @@ set -eux
 
 export RUST_BACKTRACE=1
 
-if [ "$1" = "test" ]; then
-    "$WD/scripts/build.sh" test
-    "$WD/bin/test"
-else
+if [ -f "$1" ]; then
     "$WD/scripts/build.sh" debug
     "$WD/bin/debug" "$1"
 fi
