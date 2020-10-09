@@ -1040,3 +1040,45 @@ fn array_push() {
         .collect()),
     )
 }
+
+#[test]
+fn fn_in_obj() {
+    let array: Type = Type::Array(Box::new(Type::Num));
+    let fn_: Type =
+        Type::Fn(vec![(Vec::new(), array.clone())].into_iter().collect());
+    assert_types!(
+        "/*
+          *  f() -> [number]
+          *  x {
+          *      f: () -> [number]
+          *  }
+          */
+
+         function f() {
+             return [0];
+         }
+
+         var x = {
+             f: f,
+         };
+         var xs = x.f();
+         xs.push(0);",
+        Ok(vec![
+            (
+                Target { ident: vec!["x"], scope: Vec::new() },
+                Type::Obj(vec![("f", fn_.clone())].into_iter().collect()),
+            ),
+            (Target { ident: vec!["f"], scope: Vec::new() }, fn_.clone()),
+            (Target { ident: vec!["x", "f"], scope: Vec::new() }, fn_),
+            (Target { ident: vec!["xs"], scope: Vec::new() }, array),
+            (
+                Target { ident: vec!["xs", "push"], scope: Vec::new() },
+                Type::Fn(
+                    vec![(vec![Type::Num], Type::Undef)].into_iter().collect(),
+                ),
+            ),
+        ]
+        .into_iter()
+        .collect()),
+    )
+}
