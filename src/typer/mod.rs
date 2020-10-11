@@ -182,10 +182,11 @@ fn get_expr<'a, 'b>(
 
 fn set_array_methods<'a, 'b>(
     scope: &'b Scope<'a, 'b>,
-    mut ident: Vec<&'a str>,
+    ident: &'b Ident<'a, 'b>,
     types: &'b mut HashMap<Target<'a>, Type<'a>>,
     type_: &'b Type<'a>,
 ) -> Result<(), Message> {
+    let mut ident: Vec<&str> = ident.0.to_vec();
     ident.push("push");
     set_type(
         scope,
@@ -201,24 +202,20 @@ fn set_type<'a, 'b>(
     types: &'b mut HashMap<Target<'a>, Type<'a>>,
     type_: &'b Type<'a>,
 ) -> Result<(), Message> {
-    let ident: Vec<&str> = ident.0.to_vec();
     match type_ {
         Type::Obj(props) => {
             for (key, value) in props.iter() {
-                let mut ident: Vec<&str> = ident.clone();
+                let mut ident: Vec<&str> = ident.0.to_vec();
                 ident.push(key);
                 set_type(scope, &Ident(&ident), types, &value)?;
             }
         }
-        Type::Array(type_) => {
-            set_array_methods(scope, ident.clone(), types, type_)?
-        }
+        Type::Array(type_) => set_array_methods(scope, ident, types, type_)?,
         _ => (),
     }
-    if types
-        .insert(Target { ident, scope: scope.0.to_vec() }, type_.clone())
-        .is_some()
-    {
+    let target: Target =
+        Target { ident: ident.0.to_vec(), scope: scope.0.to_vec() };
+    if types.insert(target, type_.clone()).is_some() {
         Err(Message::ObjDuplicateKeys)
     } else {
         Ok(())
