@@ -48,6 +48,7 @@ fn get_message(message: &Message) -> &'static str {
             "unable to access object with non-identifier"
         }
         Message::ObjDuplicateKeys => "object contains duplicate keys",
+        Message::SwitchMissingCaseBreak => "case statement will fall through",
     }
 }
 

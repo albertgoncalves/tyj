@@ -63,8 +63,8 @@ pub(crate) enum Expr<'a> {
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct Case<'a> {
-    expr: Expr<'a>,
-    body: Vec<Syntax<'a>>,
+    pub(crate) expr: Expr<'a>,
+    pub(crate) body: Vec<Syntax<'a>>,
 }
 
 #[derive(Debug, PartialEq)]

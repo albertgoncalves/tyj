@@ -2,7 +2,7 @@
 mod test;
 
 use crate::btree_map;
-use crate::parser::{Expr, Stmt, Syntax};
+use crate::parser::{Case, Expr, Stmt, Syntax};
 use crate::tokenizer::{Asn, Op};
 use crate::types::{Target, Type};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -25,6 +25,7 @@ pub(crate) enum Message {
     IncompatibleTypes,
     NonIdentMember,
     ObjDuplicateKeys,
+    SwitchMissingCaseBreak,
 }
 
 #[derive(Debug, PartialEq)]
@@ -268,6 +269,28 @@ fn type_check<'a, 'b>(
         };
     }
 
+    macro_rules! check_for_return {
+        ($scope:expr, $types:expr, $body:expr, $return_type:expr $(,)?) => {
+            for syntax in $body {
+                match type_check($scope, $types, syntax) {
+                    Ok(Return::Type(type_a)) => match &$return_type {
+                        None => $return_type = Some(type_a),
+                        Some(type_b) => {
+                            if type_a != *type_b {
+                                return Err(Error {
+                                    syntax,
+                                    message: Message::FnWrongReturn,
+                                });
+                            }
+                        }
+                    },
+                    Err(error) => return Err(error),
+                    Ok(_) => (),
+                }
+            }
+        };
+    }
+
     match &syntax.statement {
         Stmt::Decl { ident, expr } => {
             let idents: Vec<&str> = vec![ident];
@@ -383,6 +406,42 @@ fn type_check<'a, 'b>(
                 }
             } else {
                 error!(syntax, Message::FnMissingSig);
+            }
+        }
+        Stmt::Switch { expr: switch_expr, cases, default } => {
+            let switch_type: Type = match get_expr(scope, types, switch_expr) {
+                Ok(type_) => type_,
+                Err(message) => return Err(Error { syntax, message }),
+            };
+            let mut return_type: Option<Type> = None;
+            for Case { expr: case_expr, body } in cases {
+                match get_expr(scope, types, case_expr) {
+                    Ok(type_) => {
+                        if switch_type != type_ {
+                            return Err(Error {
+                                syntax,
+                                message: Message::IncompatibleTypes,
+                            });
+                        }
+                    }
+                    Err(message) => return Err(Error { syntax, message }),
+                }
+                if let Some((
+                    Syntax { statement: Stmt::Break, .. },
+                    statements,
+                )) = body.split_last()
+                {
+                    check_for_return!(scope, types, statements, return_type);
+                } else {
+                    return Err(Error {
+                        syntax,
+                        message: Message::SwitchMissingCaseBreak,
+                    });
+                }
+            }
+            check_for_return!(scope, types, default, return_type);
+            if let Some(type_) = return_type {
+                return Ok(Return::Type(type_));
             }
         }
         _ => panic!("{:#?}", syntax),
