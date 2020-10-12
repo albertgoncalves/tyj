@@ -236,15 +236,16 @@ fn set_assign<'a, 'b>(
         _ => return Err(Message::AssignNonIdent),
     };
     let expr_type: Type = get_expr(scope, &types, value_expr)?;
-    let target: Target =
-        Target { ident: ident.clone(), scope: scope.0.to_vec() };
-    let ident_type: Type = match types.get(&target) {
+    let ident_type: Type = match deref_ident(scope, &Ident(&ident), types) {
         Some(type_) => type_.clone(),
         None => return Err(Message::IdentUnknown),
     };
     match ident_type {
         Type::Uninit => {
-            let _: Option<_> = types.remove(&target);
+            let _: Option<_> = types.remove(&Target {
+                ident: ident.clone(),
+                scope: scope.0.to_vec(),
+            });
             set_type(scope, &Ident(&ident), types, &expr_type)?;
         }
         ident_type => {
@@ -325,7 +326,7 @@ fn type_check<'a, 'b>(
             fn_scope.append(&mut scope.0.to_vec());
             fn_scope.push(ident);
             if let Some(Type::Fn(overloads)) =
-                types.get(&Target { ident: vec![ident], scope: parent_scope })
+                deref_ident(&Scope(&parent_scope), &Ident(&[ident]), types)
             {
                 for (arg_types, return_) in overloads {
                     if arg_idents.len() != arg_types.len() {
