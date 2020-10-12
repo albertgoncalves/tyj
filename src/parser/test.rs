@@ -775,7 +775,7 @@ fn small_function() {
                 },
                 line: 1,
             }],
-            vec![Comment { string: "// ...", line: 0 }],
+            vec![],
         )),
     )
 }
@@ -783,17 +783,17 @@ fn small_function() {
 #[test]
 fn operator_precedence() {
     assert_ast!(
-        "/* ...
+        "/*! ...
           */
          var x = {
              a: {
                  b: 10,
              },
          };
-         // ...
+         //! ...
          x.a.b++ + .01;
          ++x.a.b + .01;
-         /* ... */
+         /*! ... */
          .01 + x.a.b++;
          .01 + ++x.a.b;",
         Ok((
@@ -889,9 +889,9 @@ fn operator_precedence() {
                 },
             ],
             vec![
-                Comment { string: "/* ...\n          */", line: 0 },
-                Comment { string: "// ...", line: 7 },
-                Comment { string: "/* ... */", line: 10 },
+                Comment { string: "/*! ...\n          */", line: 0 },
+                Comment { string: "//! ...", line: 7 },
+                Comment { string: "/*! ... */", line: 10 },
             ],
         )),
     )
@@ -1850,7 +1850,7 @@ fn array_literal() {
 #[test]
 fn scoped_array_access() {
     assert_ast!(
-        "// ...
+        "//! ...
          {
              x[2] = 1;
              x[3] = 2;
@@ -1883,7 +1883,7 @@ fn scoped_array_access() {
                 ]),
                 line: 1,
             }],
-            vec![Comment { string: "// ...", line: 0 }],
+            vec![Comment { string: "//! ...", line: 0 }],
         )),
     )
 }

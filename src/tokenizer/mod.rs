@@ -196,9 +196,12 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
             }
             '/' if chars.peek() == Some(&(i + 1, '/')) => {
                 eat!();
+                let signature: bool = Some(&(i + 2, '!')) == chars.peek();
                 while let Some((j, x)) = chars.next() {
                     if x == '\n' {
-                        push!(Tkn::Comment(&source[i..j]));
+                        if signature {
+                            push!(Tkn::Comment(&source[i..j]));
+                        }
                         line += 1;
                         break;
                     }
@@ -207,11 +210,14 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
             '/' if chars.peek() == Some(&(i + 1, '*')) => {
                 eat!();
                 let mut n: Count = 0;
+                let signature: bool = Some(&(i + 2, '!')) == chars.peek();
                 while let Some((j, x)) = chars.next() {
                     match x {
                         '*' if chars.peek() == Some(&(j + 1, '/')) => {
                             eat!();
-                            push!(Tkn::Comment(&source[i..(j + 2)]));
+                            if signature {
+                                push!(Tkn::Comment(&source[i..(j + 2)]));
+                            }
                             line += n;
                             break;
                         }

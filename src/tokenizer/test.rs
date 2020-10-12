@@ -450,19 +450,21 @@ fn decrement() {
 #[test]
 fn comment() {
     assert_tokens!(
-        "// Comment 1
+        "//! Comment 1
          var a;
-         /// Comment 2
-         var b;",
+         /*! Comment 2 */
+         // Ignored Comment 3
+         var b;
+         /* Ignored Comment 4 */",
         vec![
-            Lex { token: Tkn::Comment("// Comment 1"), line: 0 },
+            Lex { token: Tkn::Comment("//! Comment 1"), line: 0 },
             Lex { token: Tkn::Var, line: 1 },
             Lex { token: Tkn::Ident("a"), line: 1 },
             Lex { token: Tkn::Semicolon, line: 1 },
-            Lex { token: Tkn::Comment("/// Comment 2"), line: 2 },
-            Lex { token: Tkn::Var, line: 3 },
-            Lex { token: Tkn::Ident("b"), line: 3 },
-            Lex { token: Tkn::Semicolon, line: 3 },
+            Lex { token: Tkn::Comment("/*! Comment 2 */"), line: 2 },
+            Lex { token: Tkn::Var, line: 4 },
+            Lex { token: Tkn::Ident("b"), line: 4 },
+            Lex { token: Tkn::Semicolon, line: 4 },
         ],
     )
 }
@@ -470,18 +472,18 @@ fn comment() {
 #[test]
 fn multiline_comment() {
     assert_tokens!(
-        "/* Comment 1 */
+        "/*! Comment 1 */
          var a;
-         /* Comment 2\n\
+         /*! Comment 2\n\
           * ...\n\
           */\n\
          var b;",
         vec![
-            Lex { token: Tkn::Comment("/* Comment 1 */"), line: 0 },
+            Lex { token: Tkn::Comment("/*! Comment 1 */"), line: 0 },
             Lex { token: Tkn::Var, line: 1 },
             Lex { token: Tkn::Ident("a"), line: 1 },
             Lex { token: Tkn::Semicolon, line: 1 },
-            Lex { token: Tkn::Comment("/* Comment 2\n* ...\n*/"), line: 2 },
+            Lex { token: Tkn::Comment("/*! Comment 2\n* ...\n*/"), line: 2 },
             Lex { token: Tkn::Var, line: 5 },
             Lex { token: Tkn::Ident("b"), line: 5 },
             Lex { token: Tkn::Semicolon, line: 5 },

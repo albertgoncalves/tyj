@@ -590,14 +590,14 @@ fn access_non_index_err() {
 fn declare_functions() {
     let obj: Type = Type::Obj(btree_map![("a", Type::Bool)]);
     assert_types!(
-        "/* x { a: bool }
-          * f(number, string) -> number
-          * f(string, bool) -> string
-          * f(string, null) -> string
-          * f(x, undefined) -> x
-          * g(number) -> number
-          * g(string) -> number
-          * g(x) -> number
+        "/*! x { a: bool }
+          *  f(number, string) -> number
+          *  f(string, bool) -> string
+          *  f(string, null) -> string
+          *  f(x, undefined) -> x
+          *  g(number) -> number
+          *  g(string) -> number
+          *  g(x) -> number
           */
 
          var x = \"???\";
@@ -612,16 +612,16 @@ fn declare_functions() {
              return y;
          }
 
-         /* h(x) -> bool */
+         /*! h(x) -> bool */
          function h(x) {
              return x.a;
          }
 
-         // i(number) -> undefined
-         // i(string) -> undefined
-         // i(null) -> undefined
-         // i(bool) -> undefined
-         // i(undefined) -> undefined
+         //! i(number) -> undefined
+         //! i(string) -> undefined
+         //! i(null) -> undefined
+         //! i(bool) -> undefined
+         //! i(undefined) -> undefined
          function i(_) {}",
         Ok(btree_map![
             (Target { ident: vec!["x"], scope: Vec::new() }, Type::Str),
@@ -665,13 +665,13 @@ fn declare_functions() {
 fn declare_scoped_function() {
     let obj: Type = Type::Obj(btree_map![("a", Type::Num)]);
     assert_types!(
-        "/* x {
-          *     a: number,
-          * }
-          * f(x) -> number
-          * h(x) -> undefined
-          * h @ g() -> undefined
-          * h @ g @ f() -> number
+        "/*! x {
+          *      a: number,
+          *  }
+          *  f(x) -> number
+          *  h(x) -> undefined
+          *  h @ g() -> undefined
+          *  h @ g @ f() -> number
           */
 
          function f(x) {
@@ -711,12 +711,12 @@ fn nested_function_returns() {
     let obj: Type = Type::Obj(btree_map![("a", Type::Num)]);
     let fn_: Type = Type::Fn(btree_map![(Vec::new(), Type::Num)]);
     assert_types!(
-        "// x {
-         //     a: number,
-         // }
-         // h(x) -> number
-         // h @ g() -> number
-         // h @ g @ f() -> number
+        "//! x {
+         //!     a: number,
+         //! }
+         //! h(x) -> number
+         //! h @ g() -> number
+         //! h @ g @ f() -> number
 
          function h(x) {
              function g() {
@@ -743,7 +743,7 @@ fn return_closure() {
     let obj: Type = Type::Obj(btree_map![("a", Type::Num)]);
     let fn_: Type = Type::Fn(btree_map![(Vec::new(), Type::Num)]);
     assert_types!(
-        "/*  x {
+        "/*! x {
           *      a: number,
           *  }
           *  h(x) -> () -> () -> number
@@ -782,17 +782,17 @@ fn assign_closures() {
     let obj: Type = Type::Obj(btree_map![("a", Type::Num)]);
     let fn_: Type = Type::Fn(btree_map![(Vec::new(), Type::Num)]);
     assert_types!(
-        "// x {
-         //     a: number,
-         // }
+        "//! x {
+         //!     a: number,
+         //! }
 
-         // f(x) -> number
+         //! f(x) -> number
          function f(x) {
              return x.a;
          }
 
-         // g(x) -> () -> number
-         // g @ f() -> number
+         //! g(x) -> () -> number
+         //! g @ f() -> number
          function g(x) {
              function f() {
                  return x.a;
@@ -843,8 +843,8 @@ fn replaced_binding_err() {
              b: \"?\",
          };
 
-         // g() -> () -> string
-         // g @ f() -> string
+         //! g() -> () -> string
+         //! g @ f() -> string
          function g() {
              var x = null;
              function f() {
@@ -875,8 +875,8 @@ fn replaced_binding_ok() {
              b: \"?\",
          };
 
-         // g() -> () -> number
-         // g @ f() -> number
+         //! g() -> () -> number
+         //! g @ f() -> number
          function g() {
              var x = {
                  b: 0,
@@ -939,8 +939,7 @@ fn fn_in_obj() {
     let array: Type = Type::Array(Box::new(Type::Num));
     let fn_: Type = Type::Fn(btree_map![(Vec::new(), array.clone())]);
     assert_types!(
-        "/*
-          *  f() -> [number]
+        "/*! f() -> [number]
           *  x {
           *      f: () -> [number]
           *  }
