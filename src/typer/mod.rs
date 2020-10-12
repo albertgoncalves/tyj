@@ -277,7 +277,7 @@ fn type_check<'a, 'b>(
             }) {
                 error!(syntax, Message::IdentShadow);
             }
-            match get_expr(&scope, &types, expr) {
+            match get_expr(scope, types, expr) {
                 Err(message) => return Err(Error { syntax, message }),
                 Ok(type_) => {
                     let current_scope: &[&str] = scope.0;
@@ -310,12 +310,12 @@ fn type_check<'a, 'b>(
                 error!(syntax, message);
             }
         }
-        Stmt::Ret(expr) => match get_expr(&scope, &types, expr) {
+        Stmt::Ret(expr) => match get_expr(scope, types, expr) {
             Ok(type_) => return Ok(Return::Type(type_)),
             Err(message) => error!(syntax, message),
         },
         Stmt::Effect(expr) => {
-            if let Err(message) = get_expr(&scope, &types, expr) {
+            if let Err(message) = get_expr(scope, types, expr) {
                 return Err(Error { syntax, message });
             }
         }
@@ -338,7 +338,7 @@ fn type_check<'a, 'b>(
                     {
                         if let Err(message) = set_type(
                             &Scope(&fn_scope),
-                            &Ident(vec![*arg_ident].as_slice()),
+                            &Ident(&[*arg_ident]),
                             &mut types,
                             arg_type,
                         ) {
