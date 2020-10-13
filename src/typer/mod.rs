@@ -267,7 +267,7 @@ macro_rules! error {
     };
 }
 
-fn get_return_type<'a, 'b>(
+fn get_returns<'a, 'b>(
     scope: &'b Scope<'a, 'b>,
     types: &'b mut HashMap<Target<'a>, Type<'a>>,
     body: &'a [Syntax<'a>],
@@ -281,7 +281,7 @@ fn get_return_type<'a, 'b>(
                 }
                 _ => (),
             }
-            match type_check(scope, types, syntax) {
+            match get_return(scope, types, syntax) {
                 Ok(Return::Always(_)) => error!(syntax, Message::Unreachable),
                 Ok(Return::Sometimes(next_type)) => match &return_type {
                     Some(prev_type) => {
@@ -301,7 +301,7 @@ fn get_return_type<'a, 'b>(
                 Err(error) => return Err(error),
             }
         }
-        match (return_type, type_check(scope, types, last)) {
+        match (return_type, get_return(scope, types, last)) {
             (None, last) => last,
             (Some(prev_type), Ok(Return::Always(next_type))) => {
                 if prev_type != next_type {
@@ -328,7 +328,7 @@ fn get_return_type<'a, 'b>(
     }
 }
 
-fn type_check<'a, 'b>(
+fn get_return<'a, 'b>(
     scope: &'b Scope<'a, 'b>,
     types: &'b mut HashMap<Target<'a>, Type<'a>>,
     syntax: &'a Syntax<'a>,
@@ -412,7 +412,7 @@ fn type_check<'a, 'b>(
                     }
                     if let Some((last, body)) = body.split_last() {
                         for syntax in body {
-                            match type_check(
+                            match get_return(
                                 &Scope(&fn_scope),
                                 &mut types,
                                 syntax,
@@ -429,18 +429,15 @@ fn type_check<'a, 'b>(
                                 Ok(_) => (),
                             }
                         }
-                        let syntax: &Syntax = last;
-                        let return_or_error: Result<Return, Error> =
-                            type_check(&Scope(&fn_scope), &mut types, syntax);
-                        match return_or_error {
+                        match get_return(&Scope(&fn_scope), &mut types, last) {
                             Ok(Return::Always(type_)) => {
                                 if *return_ != type_ {
-                                    error!(syntax, Message::FnWrongReturn);
+                                    error!(last, Message::FnWrongReturn);
                                 }
                             }
                             Ok(_) => {
                                 if *return_ != Type::Undef {
-                                    error!(syntax, Message::FnMissingReturn);
+                                    error!(last, Message::FnMissingReturn);
                                 }
                             }
                             Err(error) => return Err(error),
@@ -471,13 +468,10 @@ fn type_check<'a, 'b>(
                     }
                     Err(message) => error!(syntax, message),
                 }
-                match (
-                    return_type.clone(),
-                    get_return_type(scope, types, body),
-                ) {
+                match (return_type.clone(), get_returns(scope, types, body)) {
                     (None, Ok(Return::Always(type_)))
                     | (None, Ok(Return::Sometimes(type_))) => {
-                        return_type = Some(type_.clone());
+                        return_type = Some(type_);
                     }
                     (Some(prev_type), Ok(Return::Always(next_type)))
                     | (Some(prev_type), Ok(Return::Sometimes(next_type))) => {
@@ -502,10 +496,7 @@ fn type_check<'a, 'b>(
                     return Ok(Return::Sometimes(type_));
                 }
             } else {
-                match (
-                    return_type.clone(),
-                    get_return_type(scope, types, default),
-                ) {
+                match (return_type, get_returns(scope, types, default)) {
                     (None, Ok(Return::Always(next_type))) => {
                         if cases.is_empty() {
                             return Ok(Return::Always(next_type));
@@ -557,7 +548,7 @@ pub(crate) fn get_types<'a>(
     let scope: Vec<&str> = Vec::new();
     let scope: Scope = Scope(&scope);
     for syntax in ast {
-        let _: Return = type_check(&scope, &mut types, syntax)?;
+        let _: Return = get_return(&scope, &mut types, syntax)?;
     }
     Ok(types)
 }
