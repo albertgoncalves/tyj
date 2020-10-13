@@ -1,7 +1,7 @@
 use super::{get_types, Error, Message};
 use crate::commenter::{get_sigs, Comment};
-use crate::parser::{get_ast, Expr, Prop, Stmt, Syntax};
 use crate::map;
+use crate::parser::{get_ast, Case, Expr, Prop, Stmt, Syntax};
 use crate::tokenizer::{get_tokens, Asn, Op};
 use crate::types::{Target, Type};
 use std::collections::{BTreeMap, HashMap};
@@ -948,18 +948,465 @@ fn fn_in_obj() {
          };
          var xs = x.f();
          xs.push(0);",
-        Ok(btree_map![
+        Ok(map![
             (
                 Target { ident: vec!["x"], scope: Vec::new() },
-                Type::Obj(btree_map![("f", fn_.clone())]),
+                Type::Obj(map![("f", fn_.clone())]),
             ),
             (Target { ident: vec!["f"], scope: Vec::new() }, fn_.clone()),
             (Target { ident: vec!["x", "f"], scope: Vec::new() }, fn_),
             (Target { ident: vec!["xs"], scope: Vec::new() }, array),
             (
                 Target { ident: vec!["xs", "push"], scope: Vec::new() },
-                Type::Fn(btree_map![(vec![Type::Num], Type::Undef)]),
+                Type::Fn(map![(vec![Type::Num], Type::Undef)]),
             ),
         ]),
+    )
+}
+
+#[test]
+fn fn_unreachable() {
+    assert_types!(
+        "//! f() -> undefined
+         var x = 0;
+         function f() {
+             return;
+             x = 1;
+         }",
+        Err(Error {
+            syntax: &Syntax { statement: Stmt::Ret(Expr::Undef), line: 3 },
+            message: Message::Unreachable,
+        }),
+    )
+}
+
+#[test]
+fn switch() {
+    let obj_x: Type = Type::Obj(map![("a", Type::Bool), ("b", Type::Bool)]);
+    let obj_y: Type = Type::Obj(map![("x", Type::Num)]);
+    let fn_: Type = Type::Fn(map![(vec![obj_y.clone()], Type::Undef)]);
+    let types: Result<HashMap<Target, Type>, Error> = Ok(map![
+        (
+            Target { ident: vec!["f"], scope: Vec::new() },
+            Type::Fn(map![(vec![obj_x], fn_.clone())]),
+        ),
+        (Target { ident: vec!["g"], scope: vec!["f"] }, fn_),
+    ]);
+    assert_types!(
+        "/*! x {
+          *      a: bool,
+          *      b: bool,
+          *  }
+          *  y {
+          *      x: number,
+          *  }
+          *  f @ g(y) -> undefined
+          *  f(x) -> (y) -> undefined
+          */
+
+         function f(x) {
+             function g(y) {
+                 switch (y.x) {
+                 case 0: {
+                     x.a = true;
+                     break;
+                 }
+                 case 1: {
+                     x.b = true;
+                     break;
+                 }
+                 }
+             }
+             return g;
+         }",
+        types,
+    );
+    assert_types!(
+        "/*! x {
+          *      a: bool,
+          *      b: bool,
+          *  }
+          *  y {
+          *      x: number,
+          *  }
+          *  f @ g(y) -> undefined
+          *  f(x) -> (y) -> undefined
+          */
+
+         function f(x) {
+             function g(y) {
+                 switch (y.x) {
+                 case 0: {
+                     x.a = true;
+                     return;
+                 }
+                 case 1: {
+                     x.b = true;
+                     return;
+                 }
+                 }
+                 x.a = false;
+                 x.b = false;
+             }
+             return g;
+         }",
+        types,
+    );
+    assert_types!(
+        "/*! x {
+          *      a: bool,
+          *      b: bool,
+          *  }
+          *  y {
+          *      x: number,
+          *  }
+          *  f @ g(y) -> undefined
+          *  f(x) -> (y) -> undefined
+          */
+
+         function f(x) {
+             function g(y) {
+                 switch (y.x) {
+                 case 0: {
+                     x.a = true;
+                     return;
+                 }
+                 case 1: {
+                     x.b = true;
+                     break;
+                 }
+                 default: {
+                     return;
+                 }
+                 }
+             }
+             return g;
+         }",
+        types,
+    );
+    assert_types!(
+        "/*! x {
+          *      a: bool,
+          *      b: bool,
+          *  }
+          *  y {
+          *      x: number,
+          *  }
+          *  f @ g(y) -> undefined
+          *  f(x) -> (y) -> undefined
+          */
+
+         function f(x) {
+             function g(y) {
+                 switch (y.x) {
+                 case 0: {
+                     x.a = true;
+                     break;
+                 }
+                 case 1: {
+                     x.b = true;
+                     return;
+                 }
+                 default: {
+                 }
+                 }
+                 x.a = false;
+                 return;
+             }
+             return g;
+         }",
+        types,
+    )
+}
+
+#[test]
+fn big_switch() {
+    let obj_x: Type = Type::Obj(map![("a", Type::Bool), ("b", Type::Bool)]);
+    let obj_y: Type = Type::Obj(map![("x", Type::Num)]);
+    let fn_: Type = Type::Fn(map![(vec![obj_y.clone()], Type::Undef)]);
+    assert_types!(
+        "/*! x {
+          *      a: bool,
+          *      b: bool,
+          *  }
+          *  y {
+          *      x: number,
+          *  }
+          *  f @ g(y) -> undefined
+          *  f(x) -> (y) -> undefined
+          */
+
+         var X = {
+             a: false,
+             b: false,
+         };
+         var Y = {
+             x: 0,
+         };
+         var Z = {
+             a: 0,
+             b: 1,
+         };
+
+         function f(x) {
+             function g(y) {
+                 switch (y.x) {
+                 case Z.a: {
+                     x.a = true;
+                     break;
+                 }
+                 case Z.b: {
+                     x.b = true;
+                     break;
+                 }
+                 }
+             }
+             return g;
+         }
+
+         f(X)(Y);",
+        Ok(map![
+            (Target { ident: vec!["X"], scope: Vec::new() }, obj_x.clone()),
+            (Target { ident: vec!["X", "a"], scope: Vec::new() }, Type::Bool),
+            (Target { ident: vec!["X", "b"], scope: Vec::new() }, Type::Bool),
+            (Target { ident: vec!["Y"], scope: Vec::new() }, obj_y),
+            (Target { ident: vec!["Y", "x"], scope: Vec::new() }, Type::Num),
+            (
+                Target { ident: vec!["Z"], scope: Vec::new() },
+                Type::Obj(map![("a", Type::Num), ("b", Type::Num)]),
+            ),
+            (Target { ident: vec!["Z", "a"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["Z", "b"], scope: Vec::new() }, Type::Num),
+            (
+                Target { ident: vec!["f"], scope: Vec::new() },
+                Type::Fn(map![(vec![obj_x], fn_.clone())]),
+            ),
+            (Target { ident: vec!["g"], scope: vec!["f"] }, fn_),
+        ]),
+    )
+}
+
+#[test]
+fn another_big_switch() {
+    let obj_x: Type = Type::Obj(map![("a", Type::Bool), ("b", Type::Bool)]);
+    let obj_y: Type = Type::Obj(map![("x", Type::Num)]);
+    let fn_: Type = Type::Fn(map![(vec![obj_y.clone()], Type::Num)]);
+    assert_types!(
+        "/*! x {
+          *      a: bool,
+          *      b: bool,
+          *  }
+          *  y {
+          *      x: number,
+          *  }
+          *  f @ g(y) -> number
+          *  f(x) -> (y) -> number
+          */
+
+         var Z = {
+             a: 0,
+             b: 1,
+         };
+
+         function f(x) {
+             function g(y) {
+                 switch (y.x) {
+                 case Z.a: {
+                     x.a = true;
+                     return 1;
+                 }
+                 case Z.b: {
+                     x.b = true;
+                     break;
+                 }
+                 }
+                 return 0;
+             }
+             return g;
+         }",
+        Ok(map![
+            (
+                Target { ident: vec!["Z"], scope: Vec::new() },
+                Type::Obj(map![("a", Type::Num), ("b", Type::Num)]),
+            ),
+            (Target { ident: vec!["Z", "a"], scope: Vec::new() }, Type::Num),
+            (Target { ident: vec!["Z", "b"], scope: Vec::new() }, Type::Num),
+            (
+                Target { ident: vec!["f"], scope: Vec::new() },
+                Type::Fn(map![(vec![obj_x], fn_.clone())]),
+            ),
+            (Target { ident: vec!["g"], scope: vec!["f"] }, fn_),
+        ]),
+    )
+}
+
+#[test]
+fn switch_no_break_err() {
+    assert_types!(
+        "var x = 2;
+
+         switch (x) {
+         case 0: {
+         }
+         case 1: {
+             break;
+         }
+         default: {
+         }
+         }",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Switch {
+                    expr: Expr::Ident("x"),
+                    cases: vec![
+                        Case { expr: Expr::Num("0"), body: Vec::new() },
+                        Case {
+                            expr: Expr::Num("1"),
+                            body: vec![Syntax {
+                                statement: Stmt::Break,
+                                line: 6,
+                            }],
+                        },
+                    ],
+                    default: Vec::new(),
+                },
+                line: 2,
+            },
+            message: Message::SwitchMissingCaseBreak,
+        }),
+    )
+}
+
+#[test]
+fn switch_unreachable() {
+    assert_types!(
+        "/*! x {
+          *      a: bool,
+          *      b: bool,
+          *  }
+          *  y {
+          *      x: number,
+          *  }
+          *  f @ g(y) -> undefined
+          *  f(x) -> (y) -> undefined
+          */
+
+         function f(x) {
+             function g(y) {
+                 switch (y.x) {
+                 case 0: {
+                     return;
+                 }
+                 case 1: {
+                     break;
+                     return;
+                 }
+                 }
+             }
+             return g;
+         }",
+        Err(Error {
+            syntax: &Syntax { statement: Stmt::Break, line: 18 },
+            message: Message::Unreachable,
+        }),
+    );
+    assert_types!(
+        "/*! x {
+          *      a: bool,
+          *      b: bool,
+          *  }
+          *  y {
+          *      x: number,
+          *  }
+          *  f @ g(y) -> undefined
+          *  f(x) -> (y) -> undefined
+          */
+
+         function f(x) {
+             function g(y) {
+                 switch (y.x) {
+                 case 0: {
+                     return;
+                     y.x = 1;
+                 }
+                 case 1: {
+                     return;
+                 }
+                 }
+             }
+             return g;
+         }",
+        Err(Error {
+            syntax: &Syntax { statement: Stmt::Ret(Expr::Undef), line: 15 },
+            message: Message::Unreachable,
+        }),
+    )
+}
+
+#[test]
+fn switch_empty_err() {
+    macro_rules! types {
+        () => {
+            Err(Error {
+                syntax: &Syntax {
+                    statement: Stmt::Switch {
+                        expr: Expr::Num("0"),
+                        cases: Vec::new(),
+                        default: Vec::new(),
+                    },
+                    line: 13,
+                },
+                message: Message::SwitchEmpty,
+            })
+        };
+    }
+
+    assert_types!(
+        "/*! x {
+          *      a: bool,
+          *      b: bool,
+          *  }
+          *  y {
+          *      x: number,
+          *  }
+          *  f @ g(y) -> undefined
+          *  f(x) -> (y) -> undefined
+          */
+
+         function f(x) {
+             function g(y) {
+                 switch (0) {
+                 }
+                 x.a = false;
+                 return;
+             }
+             return g;
+         }",
+        types!(),
+    );
+    assert_types!(
+        "/*! x {
+          *      a: bool,
+          *      b: bool,
+          *  }
+          *  y {
+          *      x: number,
+          *  }
+          *  f @ g(y) -> undefined
+          *  f(x) -> (y) -> undefined
+          */
+
+         function f(x) {
+             function g(y) {
+                 switch (0) {
+                 default: {
+                 }
+                 }
+                 x.a = false;
+                 return;
+             }
+             return g;
+         }",
+        types!(),
     )
 }

@@ -25,7 +25,9 @@ pub(crate) enum Message {
     IncompatibleTypes,
     NonIdentMember,
     ObjDuplicateKeys,
+    SwitchEmpty,
     SwitchMissingCaseBreak,
+    Unreachable,
 }
 
 #[derive(Debug, PartialEq)]
@@ -39,8 +41,9 @@ struct Ident<'a, 'b>(&'b [&'a str]);
 struct Scope<'a, 'b>(&'b [&'a str]);
 
 enum Return<'a> {
-    Undef,
-    Type(Type<'a>),
+    Always(Type<'a>),
+    Sometimes(Type<'a>),
+    Empty,
 }
 
 macro_rules! get_infix_idents {
@@ -258,39 +261,78 @@ fn set_assign<'a, 'b>(
     Ok(())
 }
 
+macro_rules! error {
+    ($syntax:expr, $message:expr $(,)?) => {
+        return Err(Error { syntax: $syntax, message: $message });
+    };
+}
+
+fn get_return_type<'a, 'b>(
+    scope: &'b Scope<'a, 'b>,
+    types: &'b mut HashMap<Target<'a>, Type<'a>>,
+    body: &'a [Syntax<'a>],
+) -> Result<Return<'a>, Error<'a>> {
+    if let Some((last, body)) = body.split_last() {
+        let mut return_type: Option<Type> = None;
+        for syntax in body {
+            match syntax.statement {
+                Stmt::Ret(_) | Stmt::Break => {
+                    error!(syntax, Message::Unreachable)
+                }
+                _ => (),
+            }
+            match type_check(scope, types, syntax) {
+                Ok(Return::Always(_)) => error!(syntax, Message::Unreachable),
+                Ok(Return::Sometimes(next_type)) => match &return_type {
+                    Some(prev_type) => {
+                        if *prev_type != next_type {
+                            error!(syntax, Message::FnWrongReturn)
+                        }
+                    }
+                    None => return_type = Some(next_type),
+                },
+                Ok(Return::Empty) => {
+                    if let Some(prev_type) = &return_type {
+                        if *prev_type != Type::Undef {
+                            error!(syntax, Message::FnWrongReturn)
+                        }
+                    }
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        match (return_type, type_check(scope, types, last)) {
+            (None, last) => last,
+            (Some(prev_type), Ok(Return::Always(next_type))) => {
+                if prev_type != next_type {
+                    error!(last, Message::FnWrongReturn)
+                }
+                Ok(Return::Always(next_type))
+            }
+            (Some(prev_type), Ok(Return::Sometimes(next_type))) => {
+                if prev_type != next_type {
+                    error!(last, Message::FnWrongReturn)
+                }
+                Ok(Return::Sometimes(next_type))
+            }
+            (Some(next_type), Ok(Return::Empty)) => {
+                if Type::Undef != next_type {
+                    error!(last, Message::FnMissingReturn)
+                }
+                Ok(Return::Empty)
+            }
+            (_, Err(error)) => Err(error),
+        }
+    } else {
+        Ok(Return::Empty)
+    }
+}
+
 fn type_check<'a, 'b>(
     scope: &'b Scope<'a, 'b>,
     types: &'b mut HashMap<Target<'a>, Type<'a>>,
     syntax: &'a Syntax<'a>,
 ) -> Result<Return<'a>, Error<'a>> {
-    macro_rules! error {
-        ($syntax:expr, $message:expr $(,)?) => {
-            return Err(Error { syntax: $syntax, message: $message });
-        };
-    }
-
-    macro_rules! check_for_return {
-        ($scope:expr, $types:expr, $body:expr, $return_type:expr $(,)?) => {
-            for syntax in $body {
-                match type_check($scope, $types, syntax) {
-                    Ok(Return::Type(type_a)) => match &$return_type {
-                        None => $return_type = Some(type_a),
-                        Some(type_b) => {
-                            if type_a != *type_b {
-                                return Err(Error {
-                                    syntax,
-                                    message: Message::FnWrongReturn,
-                                });
-                            }
-                        }
-                    },
-                    Err(error) => return Err(error),
-                    Ok(_) => (),
-                }
-            }
-        };
-    }
-
     match &syntax.statement {
         Stmt::Decl { ident, expr } => {
             let idents: Vec<&str> = vec![ident];
@@ -334,7 +376,7 @@ fn type_check<'a, 'b>(
             }
         }
         Stmt::Ret(expr) => match get_expr(scope, types, expr) {
-            Ok(type_) => return Ok(Return::Type(type_)),
+            Ok(type_) => return Ok(Return::Always(type_)),
             Err(message) => error!(syntax, message),
         },
         Stmt::Effect(expr) => {
@@ -375,10 +417,13 @@ fn type_check<'a, 'b>(
                                 &mut types,
                                 syntax,
                             ) {
-                                Ok(Return::Type(type_)) => {
+                                Ok(Return::Sometimes(type_)) => {
                                     if *return_ != type_ {
                                         error!(syntax, Message::FnWrongReturn);
                                     }
+                                }
+                                Ok(Return::Always(_)) => {
+                                    error!(syntax, Message::Unreachable);
                                 }
                                 Err(error) => return Err(error),
                                 Ok(_) => (),
@@ -388,7 +433,7 @@ fn type_check<'a, 'b>(
                         let return_or_error: Result<Return, Error> =
                             type_check(&Scope(&fn_scope), &mut types, syntax);
                         match return_or_error {
-                            Ok(Return::Type(type_)) => {
+                            Ok(Return::Always(type_)) => {
                                 if *return_ != type_ {
                                     error!(syntax, Message::FnWrongReturn);
                                 }
@@ -409,44 +454,94 @@ fn type_check<'a, 'b>(
             }
         }
         Stmt::Switch { expr: switch_expr, cases, default } => {
+            if cases.is_empty() && default.is_empty() {
+                error!(syntax, Message::SwitchEmpty)
+            }
             let switch_type: Type = match get_expr(scope, types, switch_expr) {
                 Ok(type_) => type_,
-                Err(message) => return Err(Error { syntax, message }),
+                Err(message) => error!(syntax, message),
             };
             let mut return_type: Option<Type> = None;
             for Case { expr: case_expr, body } in cases {
                 match get_expr(scope, types, case_expr) {
                     Ok(type_) => {
                         if switch_type != type_ {
-                            return Err(Error {
-                                syntax,
-                                message: Message::IncompatibleTypes,
-                            });
+                            error!(syntax, Message::IncompatibleTypes);
                         }
                     }
-                    Err(message) => return Err(Error { syntax, message }),
+                    Err(message) => error!(syntax, message),
                 }
-                if let Some((
-                    Syntax { statement: Stmt::Break, .. },
-                    statements,
-                )) = body.split_last()
-                {
-                    check_for_return!(scope, types, statements, return_type);
+                match (
+                    return_type.clone(),
+                    get_return_type(scope, types, body),
+                ) {
+                    (None, Ok(Return::Always(type_)))
+                    | (None, Ok(Return::Sometimes(type_))) => {
+                        return_type = Some(type_.clone());
+                    }
+                    (Some(prev_type), Ok(Return::Always(next_type)))
+                    | (Some(prev_type), Ok(Return::Sometimes(next_type))) => {
+                        if prev_type != next_type {
+                            error!(syntax, Message::IncompatibleTypes)
+                        }
+                    }
+                    (_, Ok(Return::Empty)) => (),
+                    (_, error) => return error,
+                }
+                if let Some(last) = body.last() {
+                    match last.statement {
+                        Stmt::Break | Stmt::Ret(_) => (),
+                        _ => error!(syntax, Message::SwitchMissingCaseBreak),
+                    }
                 } else {
-                    return Err(Error {
-                        syntax,
-                        message: Message::SwitchMissingCaseBreak,
-                    });
+                    error!(syntax, Message::SwitchMissingCaseBreak);
                 }
             }
-            check_for_return!(scope, types, default, return_type);
-            if let Some(type_) = return_type {
-                return Ok(Return::Type(type_));
+            if default.is_empty() {
+                if let Some(type_) = return_type {
+                    return Ok(Return::Sometimes(type_));
+                }
+            } else {
+                match (
+                    return_type.clone(),
+                    get_return_type(scope, types, default),
+                ) {
+                    (None, Ok(Return::Always(next_type))) => {
+                        if cases.is_empty() {
+                            return Ok(Return::Always(next_type));
+                        }
+                        return Ok(Return::Sometimes(next_type));
+                    }
+                    (None, Ok(Return::Sometimes(next_type))) => {
+                        return Ok(Return::Sometimes(next_type));
+                    }
+                    (None, Ok(Return::Empty)) => (),
+                    (Some(prev_type), Ok(Return::Always(next_type))) => {
+                        if prev_type != next_type {
+                            error!(syntax, Message::IncompatibleTypes)
+                        }
+                        return Ok(Return::Always(next_type));
+                    }
+                    (Some(prev_type), Ok(Return::Sometimes(next_type))) => {
+                        if prev_type != next_type {
+                            error!(syntax, Message::IncompatibleTypes)
+                        }
+                        return Ok(Return::Sometimes(next_type));
+                    }
+                    (Some(prev_type), Ok(Return::Empty)) => {
+                        if prev_type != Type::Undef {
+                            error!(syntax, Message::IncompatibleTypes)
+                        }
+                        return Ok(Return::Always(Type::Undef));
+                    }
+                    (_, error) => return error,
+                }
             }
         }
+        Stmt::Break => (),
         _ => panic!("{:#?}", syntax),
     }
-    Ok(Return::Undef)
+    Ok(Return::Empty)
 }
 
 pub(crate) fn get_types<'a>(
