@@ -276,7 +276,7 @@ fn get_return_type<'a, 'b>(
         let mut return_type: Option<Type> = None;
         for syntax in body {
             match syntax.statement {
-                Stmt::Ret(_) | Stmt::Break => {
+                Stmt::Ret(_) | Stmt::Break | Stmt::Continue => {
                     error!(syntax, Message::Unreachable)
                 }
                 _ => (),

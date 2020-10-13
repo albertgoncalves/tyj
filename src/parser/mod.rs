@@ -80,6 +80,7 @@ pub(crate) enum Stmt<'a> {
         if_: Vec<Syntax<'a>>,
         else_: Vec<Syntax<'a>>,
     },
+    Continue,
     Decl {
         ident: &'a str,
         expr: Expr<'a>,
@@ -553,6 +554,11 @@ fn get_stmt<'a, 'b, 'c>(
             eat!(tokens);
             eat_or_error!(tokens, Tkn::Semicolon);
             Syntax { statement: Stmt::Break, line: *line }
+        }
+        Some(Lex { token: Tkn::Continue, line }) => {
+            eat!(tokens);
+            eat_or_error!(tokens, Tkn::Semicolon);
+            Syntax { statement: Stmt::Continue, line: *line }
         }
         Some(Lex { token: Tkn::LBrace, line }) => {
             Syntax { statement: Stmt::Scope(get_body(tokens)?), line: *line }
