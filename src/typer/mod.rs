@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use crate::btree_map;
+use crate::map;
 use crate::parser::{Case, Expr, Stmt, Syntax};
 use crate::tokenizer::{Asn, Op};
 use crate::types::{Target, Type};
@@ -193,7 +193,7 @@ fn set_array_methods<'a, 'b>(
         scope,
         &Ident(&ident),
         types,
-        &Type::Fn(btree_map![(vec![type_.clone()], Type::Undef)]),
+        &Type::Fn(map![(vec![type_.clone()], Type::Undef)]),
     )
 }
 

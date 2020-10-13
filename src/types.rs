@@ -21,7 +21,7 @@ pub(crate) enum Type<'a> {
 }
 
 #[macro_export]
-macro_rules! btree_map {
+macro_rules! map {
     [$($tuple:expr),+ $(,)?] => {
         vec![$($tuple),+].into_iter().collect()
     };

@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod test;
 
-use crate::btree_map;
+use crate::map;
 use crate::tokenizer::{Count, DECIMAL};
 use crate::types::{Target, Type};
 use std::collections::{BTreeMap, HashMap};
@@ -199,7 +199,7 @@ fn get_type<'a, 'b, 'c>(
                 }
             }
             eat_or_error!(tokens, Tkn::Arrow);
-            Type::Fn(btree_map![(args, get_type(tokens, types)?)])
+            Type::Fn(map![(args, get_type(tokens, types)?)])
         }
         Some(token) => return Err(Error::Line(token.line)),
         None => return Err(Error::EOF),
