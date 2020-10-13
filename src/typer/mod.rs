@@ -343,7 +343,7 @@ fn get_return<'a, 'b>(
                 error!(syntax, Message::IdentShadow);
             }
             match get_expr(scope, types, expr) {
-                Err(message) => return Err(Error { syntax, message }),
+                Err(message) => error!(syntax, message),
                 Ok(type_) => {
                     let current_scope: &[&str] = scope.0;
                     let n: usize = current_scope.len();
@@ -381,7 +381,7 @@ fn get_return<'a, 'b>(
         },
         Stmt::Effect(expr) => {
             if let Err(message) = get_expr(scope, types, expr) {
-                return Err(Error { syntax, message });
+                error!(syntax, message)
             }
         }
         Stmt::Fn { ident, args: arg_idents, body } => {
