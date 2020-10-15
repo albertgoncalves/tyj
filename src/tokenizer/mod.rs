@@ -196,38 +196,55 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
                     }
                 }
             }
-            '/' if chars.peek() == Some(&(i + 1, '/')) => {
-                eat!();
-                let signature: bool = Some(&(i + 2, '!')) == chars.peek();
-                while let Some((j, x)) = chars.next() {
-                    if x == '\n' {
-                        if signature {
-                            push!(Tkn::Comment(&source[i..j]));
-                        }
-                        line += 1;
-                        break;
-                    }
-                }
-            }
-            '/' if chars.peek() == Some(&(i + 1, '*')) => {
-                eat!();
-                let mut n: Count = 0;
-                let signature: bool = Some(&(i + 2, '!')) == chars.peek();
-                while let Some((j, x)) = chars.next() {
-                    match x {
-                        '*' if chars.peek() == Some(&(j + 1, '/')) => {
-                            eat!();
-                            if signature {
-                                push!(Tkn::Comment(&source[i..(j + 2)]));
+            '/' => match chars.peek() {
+                Some((_, '/')) => {
+                    eat!();
+                    let bang: bool = if let Some((_, '!')) = chars.peek() {
+                        true
+                    } else {
+                        false
+                    };
+                    eat!();
+                    while let Some((j, x)) = chars.next() {
+                        if x == '\n' {
+                            if bang {
+                                push!(Tkn::Comment(&source[i..j]));
                             }
-                            line += n;
+                            line += 1;
                             break;
                         }
-                        '\n' => n += 1,
-                        _ => (),
                     }
                 }
-            }
+                Some((_, '*')) => {
+                    eat!();
+                    let mut n: Count = 0;
+                    let bang: bool = if let Some((_, '!')) = chars.peek() {
+                        true
+                    } else {
+                        false
+                    };
+                    eat!();
+                    while let Some((j, x)) = chars.next() {
+                        match x {
+                            '*' if chars.peek() == Some(&(j + 1, '/')) => {
+                                eat!();
+                                if bang {
+                                    push!(Tkn::Comment(&source[i..(j + 2)]));
+                                }
+                                line += n;
+                                break;
+                            }
+                            '\n' => n += 1,
+                            _ => (),
+                        }
+                    }
+                }
+                Some((_, '=')) => {
+                    eat!();
+                    push!(Tkn::Assign(Asn::Div));
+                }
+                _ => push!(Tkn::Op(Op::Div)),
+            },
             ':' => push!(Tkn::Colon),
             ';' => push!(Tkn::Semicolon),
             ',' => push!(Tkn::Comma),
@@ -244,7 +261,6 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
                     "+=" => Tkn::Assign(Asn::Add),
                     "-=" => Tkn::Assign(Asn::Sub),
                     "*=" => Tkn::Assign(Asn::Mul),
-                    "/=" => Tkn::Assign(Asn::Div),
                     "." => Tkn::Op(Op::Member),
                     "!" => Tkn::Op(Op::Not),
                     "~" => Tkn::Op(Op::BitwiseNot),
@@ -253,7 +269,6 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
                     "+" => Tkn::Op(Op::Add),
                     "-" => Tkn::Op(Op::Sub),
                     "*" => Tkn::Op(Op::Mul),
-                    "/" => Tkn::Op(Op::Div),
                     "%" => Tkn::Op(Op::Mod),
                     "<<" => Tkn::Op(Op::ShiftLeft),
                     ">>" => Tkn::Op(Op::ShiftRight),
@@ -292,9 +307,7 @@ pub(crate) fn get_tokens(source: &str) -> Vec<Lex> {
                 line += n;
                 eat!();
             }
-            _ => {
-                push!(Tkn::Illegal(&source[i..=i]));
-            }
+            _ => push!(Tkn::Illegal(&source[i..=i])),
         }
     }
     tokens

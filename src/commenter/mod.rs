@@ -77,10 +77,6 @@ fn get_tokens<'a, 'b>(comment: &'b Comment<'a>) -> Vec<Lex<'a>> {
             ']' => push!(Tkn::RBracket),
             '{' => push!(Tkn::LBrace),
             '}' => push!(Tkn::RBrace),
-            '-' if chars.peek() == Some(&(i + 1, '>')) => {
-                push!(Tkn::Arrow);
-                eat!();
-            }
             _ if x.is_alphabetic() || x == '_' => {
                 let mut k: usize = i;
                 loop {
@@ -108,6 +104,12 @@ fn get_tokens<'a, 'b>(comment: &'b Comment<'a>) -> Vec<Lex<'a>> {
                     x => Tkn::Ident(x),
                 };
                 push!(token);
+            }
+            '-' => {
+                if let Some((_, '>')) = chars.peek() {
+                    push!(Tkn::Arrow);
+                    eat!();
+                }
             }
             _ => (),
         }
