@@ -215,7 +215,7 @@ fn parse_scopes() {
 }
 
 #[test]
-fn error_at_line() {
+fn syntax_err() {
     let string: &str = "/* f(string) -> string
                          * f(number) -> number
                          * f(bool -> bool

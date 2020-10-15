@@ -34,7 +34,7 @@ fn declares() {
 }
 
 #[test]
-fn declare_shadow_ident() {
+fn declare_shadow_ident_err() {
     assert_types!(
         "var x = true;
          var x = false;",
@@ -52,7 +52,7 @@ fn declare_shadow_ident() {
 }
 
 #[test]
-fn declare_unknown_ident() {
+fn declare_unknown_ident_err() {
     assert_types!(
         "var y = x;",
         Err(Error {
@@ -148,7 +148,7 @@ fn declare_nested_object() {
 }
 
 #[test]
-fn declare_object_duplicate_keys() {
+fn declare_object_duplicate_keys_err() {
     assert_types!(
         "var x = {
              a: true,
@@ -861,7 +861,7 @@ fn replaced_binding_err() {
 }
 
 #[test]
-fn replaced_binding_ok() {
+fn replaced_binding() {
     let fn_: Type = Type::Fn(map![(Vec::new(), Type::Num)]);
     assert_types!(
         "var x = {
@@ -965,7 +965,7 @@ fn fn_in_obj() {
 }
 
 #[test]
-fn fn_unreachable() {
+fn fn_unreachable_err() {
     assert_types!(
         "//! f() -> undefined
          var x = 0;
@@ -1278,7 +1278,7 @@ fn switch_no_break_err() {
 }
 
 #[test]
-fn switch_unreachable() {
+fn switch_unreachable_err() {
     assert_types!(
         "/*! x {
           *      a: bool,

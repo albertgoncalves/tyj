@@ -142,7 +142,7 @@ fn declare_object_trailing_comma() {
 }
 
 #[test]
-fn declare_object_missing_comma() {
+fn declare_object_missing_comma_err() {
     assert_ast!(
         "var x = { a: null bc: undefined };",
         Err(Error::Token(Lex { token: Tkn::Ident("bc"), line: 0 })),
