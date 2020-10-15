@@ -40,7 +40,8 @@ struct Ident<'a, 'b>(&'b [&'a str]);
 
 struct Scope<'a, 'b>(&'b [&'a str]);
 
-enum Return<'a> {
+#[derive(Clone)]
+enum Ret<'a> {
     Always(Type<'a>),
     Sometimes(Type<'a>),
     Empty,
@@ -271,7 +272,7 @@ fn get_returns<'a, 'b>(
     scope: &'b Scope<'a, 'b>,
     types: &'b mut HashMap<Target<'a>, Type<'a>>,
     body: &'a [Syntax<'a>],
-) -> Result<Return<'a>, Error<'a>> {
+) -> Result<Ret<'a>, Error<'a>> {
     if let Some((last, body)) = body.split_last() {
         let mut return_type: Option<Type> = None;
         for syntax in body {
@@ -282,8 +283,8 @@ fn get_returns<'a, 'b>(
                 _ => (),
             }
             match get_return(scope, types, syntax) {
-                Ok(Return::Always(_)) => error!(syntax, Message::Unreachable),
-                Ok(Return::Sometimes(next_type)) => match &return_type {
+                Ok(Ret::Always(_)) => error!(syntax, Message::Unreachable),
+                Ok(Ret::Sometimes(next_type)) => match &return_type {
                     Some(prev_type) => {
                         if *prev_type != next_type {
                             error!(syntax, Message::FnWrongReturn)
@@ -291,7 +292,7 @@ fn get_returns<'a, 'b>(
                     }
                     None => return_type = Some(next_type),
                 },
-                Ok(Return::Empty) => {
+                Ok(Ret::Empty) => {
                     if let Some(prev_type) = &return_type {
                         if *prev_type != Type::Undef {
                             error!(syntax, Message::FnWrongReturn)
@@ -303,28 +304,28 @@ fn get_returns<'a, 'b>(
         }
         match (return_type, get_return(scope, types, last)) {
             (None, last) => last,
-            (Some(prev_type), Ok(Return::Always(next_type))) => {
+            (Some(prev_type), Ok(Ret::Always(next_type))) => {
                 if prev_type != next_type {
                     error!(last, Message::FnWrongReturn)
                 }
-                Ok(Return::Always(next_type))
+                Ok(Ret::Always(next_type))
             }
-            (Some(prev_type), Ok(Return::Sometimes(next_type))) => {
+            (Some(prev_type), Ok(Ret::Sometimes(next_type))) => {
                 if prev_type != next_type {
                     error!(last, Message::FnWrongReturn)
                 }
-                Ok(Return::Sometimes(next_type))
+                Ok(Ret::Sometimes(next_type))
             }
-            (Some(next_type), Ok(Return::Empty)) => {
+            (Some(next_type), Ok(Ret::Empty)) => {
                 if Type::Undef != next_type {
                     error!(last, Message::FnMissingReturn)
                 }
-                Ok(Return::Empty)
+                Ok(Ret::Empty)
             }
             (_, Err(error)) => Err(error),
         }
     } else {
-        Ok(Return::Empty)
+        Ok(Ret::Empty)
     }
 }
 
@@ -332,7 +333,7 @@ fn get_return<'a, 'b>(
     scope: &'b Scope<'a, 'b>,
     types: &'b mut HashMap<Target<'a>, Type<'a>>,
     syntax: &'a Syntax<'a>,
-) -> Result<Return<'a>, Error<'a>> {
+) -> Result<Ret<'a>, Error<'a>> {
     match &syntax.statement {
         Stmt::Decl { ident, expr } => {
             let idents: Vec<&str> = vec![ident];
@@ -376,7 +377,7 @@ fn get_return<'a, 'b>(
             }
         }
         Stmt::Ret(expr) => match get_expr(scope, types, expr) {
-            Ok(type_) => return Ok(Return::Always(type_)),
+            Ok(type_) => return Ok(Ret::Always(type_)),
             Err(message) => error!(syntax, message),
         },
         Stmt::Effect(expr) => {
@@ -417,12 +418,12 @@ fn get_return<'a, 'b>(
                                 &mut types,
                                 syntax,
                             ) {
-                                Ok(Return::Sometimes(type_)) => {
+                                Ok(Ret::Sometimes(type_)) => {
                                     if *return_ != type_ {
                                         error!(syntax, Message::FnWrongReturn);
                                     }
                                 }
-                                Ok(Return::Always(_)) => {
+                                Ok(Ret::Always(_)) => {
                                     error!(syntax, Message::Unreachable);
                                 }
                                 Err(error) => return Err(error),
@@ -430,7 +431,7 @@ fn get_return<'a, 'b>(
                             }
                         }
                         match get_return(&Scope(&fn_scope), &mut types, last) {
-                            Ok(Return::Always(type_)) => {
+                            Ok(Ret::Always(type_)) => {
                                 if *return_ != type_ {
                                     error!(last, Message::FnWrongReturn);
                                 }
@@ -458,7 +459,7 @@ fn get_return<'a, 'b>(
                 Ok(type_) => type_,
                 Err(message) => error!(syntax, message),
             };
-            let mut return_type: Option<Type> = None;
+            let mut return_type: Ret = Ret::Empty;
             for Case { expr: case_expr, body } in cases {
                 match get_expr(scope, types, case_expr) {
                     Ok(type_) => {
@@ -469,18 +470,34 @@ fn get_return<'a, 'b>(
                     Err(message) => error!(syntax, message),
                 }
                 match (return_type.clone(), get_returns(scope, types, body)) {
-                    (None, Ok(Return::Always(type_)))
-                    | (None, Ok(Return::Sometimes(type_))) => {
-                        return_type = Some(type_);
-                    }
-                    (Some(prev_type), Ok(Return::Always(next_type)))
-                    | (Some(prev_type), Ok(Return::Sometimes(next_type))) => {
+                    (Ret::Always(prev_type), Ok(Ret::Always(next_type))) => {
                         if prev_type != next_type {
                             error!(syntax, Message::IncompatibleTypes)
                         }
                     }
-                    (_, Ok(Return::Empty)) => (),
-                    (_, error) => return error,
+                    (
+                        Ret::Always(prev_type),
+                        Ok(Ret::Sometimes(next_type)),
+                    )
+                    | (
+                        Ret::Sometimes(prev_type),
+                        Ok(Ret::Always(next_type)),
+                    )
+                    | (
+                        Ret::Sometimes(prev_type),
+                        Ok(Ret::Sometimes(next_type)),
+                    ) => {
+                        if prev_type != next_type {
+                            error!(syntax, Message::IncompatibleTypes)
+                        }
+                        return_type = Ret::Sometimes(next_type);
+                    }
+                    (Ret::Empty, Ok(Ret::Always(type_)))
+                    | (Ret::Empty, Ok(Ret::Sometimes(type_))) => {
+                        return_type = Ret::Sometimes(type_);
+                    }
+                    (_, Ok(Ret::Empty)) => (),
+                    (_, Err(error)) => return Err(error),
                 }
                 if let Some(last) = body.last() {
                     match last.statement {
@@ -492,47 +509,66 @@ fn get_return<'a, 'b>(
                 }
             }
             if default.is_empty() {
-                if let Some(type_) = return_type {
-                    return Ok(Return::Sometimes(type_));
+                match return_type {
+                    Ret::Always(type_) => return Ok(Ret::Sometimes(type_)),
+                    Ret::Sometimes(_) => return Ok(return_type),
+                    Ret::Empty => (),
                 }
             } else {
                 match (return_type, get_returns(scope, types, default)) {
-                    (None, Ok(Return::Always(next_type))) => {
+                    (Ret::Empty, Ok(Ret::Always(next_type))) => {
                         if cases.is_empty() {
-                            return Ok(Return::Always(next_type));
+                            return Ok(Ret::Always(next_type));
                         }
-                        return Ok(Return::Sometimes(next_type));
+                        return Ok(Ret::Sometimes(next_type));
                     }
-                    (None, Ok(Return::Sometimes(next_type))) => {
-                        return Ok(Return::Sometimes(next_type));
+                    (Ret::Empty, Ok(Ret::Sometimes(next_type))) => {
+                        return Ok(Ret::Sometimes(next_type));
                     }
-                    (None, Ok(Return::Empty)) => (),
-                    (Some(prev_type), Ok(Return::Always(next_type))) => {
+                    (Ret::Empty, Ok(Ret::Empty)) => (),
+                    (
+                        Ret::Always(prev_type),
+                        Ok(Ret::Sometimes(next_type)),
+                    )
+                    | (
+                        Ret::Sometimes(prev_type),
+                        Ok(Ret::Sometimes(next_type)),
+                    ) => {
+                        if prev_type == next_type {
+                            return Ok(Ret::Sometimes(next_type));
+                        }
+                        error!(syntax, Message::IncompatibleTypes)
+                    }
+                    (Ret::Always(prev_type), Ok(Ret::Always(next_type))) => {
                         if prev_type != next_type {
                             error!(syntax, Message::IncompatibleTypes)
                         }
-                        return Ok(Return::Always(next_type));
+                        return Ok(Ret::Always(next_type));
                     }
-                    (Some(prev_type), Ok(Return::Sometimes(next_type))) => {
+                    (
+                        Ret::Sometimes(prev_type),
+                        Ok(Ret::Always(next_type)),
+                    ) => {
                         if prev_type != next_type {
                             error!(syntax, Message::IncompatibleTypes)
                         }
-                        return Ok(Return::Sometimes(next_type));
+                        return Ok(Ret::Sometimes(next_type));
                     }
-                    (Some(prev_type), Ok(Return::Empty)) => {
+                    (Ret::Always(prev_type), Ok(Ret::Empty))
+                    | (Ret::Sometimes(prev_type), Ok(Ret::Empty)) => {
                         if prev_type != Type::Undef {
                             error!(syntax, Message::IncompatibleTypes)
                         }
-                        return Ok(Return::Always(Type::Undef));
+                        return Ok(Ret::Sometimes(Type::Undef));
                     }
-                    (_, error) => return error,
+                    (_, Err(error)) => return Err(error),
                 }
             }
         }
         Stmt::Break => (),
         _ => panic!("{:#?}", syntax),
     }
-    Ok(Return::Empty)
+    Ok(Ret::Empty)
 }
 
 pub(crate) fn get_types<'a>(
@@ -548,7 +584,7 @@ pub(crate) fn get_types<'a>(
     let scope: Vec<&str> = Vec::new();
     let scope: Scope = Scope(&scope);
     for syntax in ast {
-        let _: Return = get_return(&scope, &mut types, syntax)?;
+        let _: Ret = get_return(&scope, &mut types, syntax)?;
     }
     Ok(types)
 }

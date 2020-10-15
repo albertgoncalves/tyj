@@ -1410,3 +1410,52 @@ fn switch_empty_err() {
         types!(),
     )
 }
+
+#[test]
+fn switch_missing_return_err() {
+    assert_types!(
+        "//! f(number) -> number
+         function f(x) {
+             switch (x) {
+             case 0: {
+                 return 0;
+             }
+             case 1: {
+                 break;
+             }
+             default: {
+                 return 1;
+             }
+             }
+         }",
+        Err(Error {
+            syntax: &Syntax {
+                statement: Stmt::Switch {
+                    expr: Expr::Ident("x"),
+                    cases: vec![
+                        Case {
+                            expr: Expr::Num("0"),
+                            body: vec![Syntax {
+                                statement: Stmt::Ret(Expr::Num("0")),
+                                line: 4,
+                            }],
+                        },
+                        Case {
+                            expr: Expr::Num("1"),
+                            body: vec![Syntax {
+                                statement: Stmt::Break,
+                                line: 7,
+                            }],
+                        },
+                    ],
+                    default: vec![Syntax {
+                        statement: Stmt::Ret(Expr::Num("1")),
+                        line: 10,
+                    }],
+                },
+                line: 2,
+            },
+            message: Message::FnMissingReturn,
+        })
+    );
+}
