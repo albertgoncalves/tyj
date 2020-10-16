@@ -36,6 +36,12 @@ pub(crate) struct Error<'a> {
     pub(crate) message: Message,
 }
 
+macro_rules! error {
+    ($syntax:expr, $message:expr $(,)?) => {
+        return Err(Error { syntax: $syntax, message: $message });
+    };
+}
+
 struct Ident<'a, 'b>(&'b [&'a str]);
 
 struct Scope<'a, 'b>(&'b [&'a str]);
@@ -227,10 +233,44 @@ fn set_type<'a, 'b>(
     }
 }
 
+fn set_decl<'a, 'b>(
+    scope: &'b Scope<'a, 'b>,
+    types: &'b mut HashMap<Target<'a>, Type<'a>>,
+    ident: &'a str,
+    expr: &'a Expr<'a>,
+) -> Result<(), Message> {
+    let idents: Vec<&str> = vec![ident];
+    if types.contains_key(&Target {
+        ident: idents.clone(),
+        scope: scope.0.to_vec(),
+    }) {
+        return Err(Message::IdentShadow);
+    }
+    let type_: Type = get_expr(scope, types, expr)?;
+    let current_scope: &[&str] = scope.0;
+    let n: usize = current_scope.len();
+    if 0 < n {
+        let mut purges: Vec<Target> = Vec::new();
+        for target in types.keys() {
+            let target_scope: &[&str] = &target.scope;
+            /* NOTE: `target.ident` should *never* be empty! */
+            if (target.ident[0] == ident)
+                && (&current_scope[0..(n - 1)] == target_scope)
+            {
+                purges.push(target.clone());
+            }
+        }
+        for purge in purges {
+            let _: Option<_> = types.remove(&purge);
+        }
+    }
+    set_type(&scope, &Ident(&idents), types, &type_)
+}
+
 fn set_assign<'a, 'b>(
     scope: &'b Scope<'a, 'b>,
-    ident_expr: &'a Expr<'a>,
     types: &'b mut HashMap<Target<'a>, Type<'a>>,
+    ident_expr: &'a Expr<'a>,
     value_expr: &'a Expr<'a>,
 ) -> Result<(), Message> {
     let ident: Vec<&str> = match ident_expr {
@@ -262,10 +302,72 @@ fn set_assign<'a, 'b>(
     Ok(())
 }
 
-macro_rules! error {
-    ($syntax:expr, $message:expr $(,)?) => {
-        return Err(Error { syntax: $syntax, message: $message });
-    };
+fn set_fn<'a, 'b>(
+    syntax: &'a Syntax<'a>,
+    scope: &'b Scope<'a, 'b>,
+    types: &'b mut HashMap<Target<'a>, Type<'a>>,
+    ident: &'a str,
+    arg_idents: &'a [&'a str],
+    body: &'a [Syntax<'a>],
+) -> Result<(), Error<'a>> {
+    let parent_scope: Vec<&str> = scope.0.to_vec();
+    let mut fn_scope: Vec<&str> = Vec::with_capacity(parent_scope.len() + 1);
+    fn_scope.append(&mut scope.0.to_vec());
+    fn_scope.push(ident);
+    if let Some(Type::Fn(overloads)) =
+        deref_ident(&Scope(&parent_scope), &Ident(&[ident]), types)
+    {
+        for (arg_types, return_) in overloads {
+            if arg_idents.len() != arg_types.len() {
+                error!(syntax, Message::FnWrongNumArgs);
+            }
+            let mut types: HashMap<Target, Type> = types.clone();
+            for (arg_ident, arg_type) in arg_idents.iter().zip(arg_types) {
+                if let Err(message) = set_type(
+                    &Scope(&fn_scope),
+                    &Ident(&[*arg_ident]),
+                    &mut types,
+                    arg_type,
+                ) {
+                    error!(syntax, message);
+                }
+            }
+            if let Some((last, body)) = body.split_last() {
+                for syntax in body {
+                    match get_return(&Scope(&fn_scope), &mut types, syntax) {
+                        Ok(Ret::Sometimes(type_)) => {
+                            if *return_ != type_ {
+                                error!(syntax, Message::FnWrongReturn);
+                            }
+                        }
+                        Ok(Ret::Always(_)) => {
+                            error!(syntax, Message::Unreachable);
+                        }
+                        Err(error) => return Err(error),
+                        Ok(_) => (),
+                    }
+                }
+                match get_return(&Scope(&fn_scope), &mut types, last) {
+                    Ok(Ret::Always(type_)) => {
+                        if *return_ != type_ {
+                            error!(last, Message::FnWrongReturn);
+                        }
+                    }
+                    Ok(_) => {
+                        if *return_ != Type::Undef {
+                            error!(last, Message::FnMissingReturn);
+                        }
+                    }
+                    Err(error) => return Err(error),
+                }
+            } else if *return_ != Type::Undef {
+                error!(syntax, Message::FnMissingReturn);
+            }
+        }
+    } else {
+        error!(syntax, Message::FnMissingSig);
+    }
+    Ok(())
 }
 
 fn get_returns<'a, 'b>(
@@ -329,6 +431,106 @@ fn get_returns<'a, 'b>(
     }
 }
 
+fn set_switch<'a, 'b>(
+    syntax: &'a Syntax<'a>,
+    scope: &'b Scope<'a, 'b>,
+    types: &'b mut HashMap<Target<'a>, Type<'a>>,
+    switch_expr: &'a Expr<'a>,
+    cases: &'a [Case<'a>],
+    default: &'a [Syntax<'a>],
+) -> Result<Ret<'a>, Error<'a>> {
+    if cases.is_empty() && default.is_empty() {
+        error!(syntax, Message::SwitchEmpty)
+    }
+    let switch_type: Type = match get_expr(scope, types, switch_expr) {
+        Ok(type_) => type_,
+        Err(message) => error!(syntax, message),
+    };
+    let mut return_type: Option<Type> = None;
+    let mut always: bool = true;
+    for Case { expr: case_expr, body } in cases {
+        match get_expr(scope, types, case_expr) {
+            Ok(type_) => {
+                if switch_type != type_ {
+                    error!(syntax, Message::IncompatibleTypes);
+                }
+            }
+            Err(message) => error!(syntax, message),
+        }
+        match (return_type.clone(), get_returns(scope, types, body)) {
+            (Some(prev_type), Ok(Ret::Always(next_type))) => {
+                if prev_type != next_type {
+                    error!(syntax, Message::IncompatibleTypes)
+                }
+            }
+            (Some(prev_type), Ok(Ret::Sometimes(next_type))) => {
+                if prev_type != next_type {
+                    error!(syntax, Message::IncompatibleTypes)
+                }
+                always = false;
+            }
+            (None, Ok(Ret::Always(type_))) => {
+                return_type = Some(type_);
+            }
+            (None, Ok(Ret::Sometimes(type_))) => {
+                return_type = Some(type_);
+                always = false;
+            }
+            (_, Ok(Ret::Empty)) => always = false,
+            (_, Err(error)) => return Err(error),
+        }
+        if let Some(last) = body.last() {
+            match last.statement {
+                Stmt::Break | Stmt::Ret(_) => (),
+                _ => error!(syntax, Message::SwitchMissingCaseBreak),
+            }
+        } else {
+            error!(syntax, Message::SwitchMissingCaseBreak);
+        }
+    }
+    if default.is_empty() {
+        if let Some(type_) = return_type {
+            return Ok(Ret::Sometimes(type_));
+        }
+    } else {
+        match (return_type, get_returns(scope, types, default)) {
+            (None, Ok(Ret::Always(next_type))) => {
+                if cases.is_empty() {
+                    return Ok(Ret::Always(next_type));
+                }
+                return Ok(Ret::Sometimes(next_type));
+            }
+            (None, Ok(Ret::Sometimes(next_type))) => {
+                return Ok(Ret::Sometimes(next_type));
+            }
+            (None, Ok(Ret::Empty)) => (),
+            (Some(prev_type), Ok(Ret::Sometimes(next_type))) => {
+                if prev_type != next_type {
+                    error!(syntax, Message::IncompatibleTypes)
+                }
+                return Ok(Ret::Sometimes(next_type));
+            }
+            (Some(prev_type), Ok(Ret::Always(next_type))) => {
+                if prev_type != next_type {
+                    error!(syntax, Message::IncompatibleTypes)
+                }
+                if always {
+                    return Ok(Ret::Always(next_type));
+                }
+                return Ok(Ret::Sometimes(next_type));
+            }
+            (Some(prev_type), Ok(Ret::Empty)) => {
+                if prev_type != Type::Undef {
+                    error!(syntax, Message::IncompatibleTypes)
+                }
+                return Ok(Ret::Sometimes(Type::Undef));
+            }
+            (_, Err(error)) => return Err(error),
+        }
+    }
+    Ok(Ret::Empty)
+}
+
 fn get_return<'a, 'b>(
     scope: &'b Scope<'a, 'b>,
     types: &'b mut HashMap<Target<'a>, Type<'a>>,
@@ -336,43 +538,12 @@ fn get_return<'a, 'b>(
 ) -> Result<Ret<'a>, Error<'a>> {
     match &syntax.statement {
         Stmt::Decl { ident, expr } => {
-            let idents: Vec<&str> = vec![ident];
-            if types.contains_key(&Target {
-                ident: idents.clone(),
-                scope: scope.0.to_vec(),
-            }) {
-                error!(syntax, Message::IdentShadow);
-            }
-            match get_expr(scope, types, expr) {
-                Err(message) => error!(syntax, message),
-                Ok(type_) => {
-                    let current_scope: &[&str] = scope.0;
-                    let n: usize = current_scope.len();
-                    if 0 < n {
-                        let mut purges: Vec<Target> = Vec::new();
-                        for target in types.keys() {
-                            let target_scope: &[&str] = &target.scope;
-                            /* NOTE: `target.ident` should *never* be empty! */
-                            if (&target.ident[0] == ident)
-                                && (&current_scope[0..(n - 1)] == target_scope)
-                            {
-                                purges.push(target.clone());
-                            }
-                        }
-                        for purge in purges {
-                            let _: Option<_> = types.remove(&purge);
-                        }
-                    }
-                    if let Err(message) =
-                        set_type(&scope, &Ident(&idents), types, &type_)
-                    {
-                        error!(syntax, message);
-                    }
-                }
+            if let Err(message) = set_decl(&scope, types, ident, expr) {
+                error!(syntax, message);
             }
         }
         Stmt::Assign { op: Asn::Reg, ident, expr } => {
-            if let Err(message) = set_assign(&scope, ident, types, expr) {
+            if let Err(message) = set_assign(&scope, types, ident, expr) {
                 error!(syntax, message);
             }
         }
@@ -385,162 +556,11 @@ fn get_return<'a, 'b>(
                 error!(syntax, message)
             }
         }
-        Stmt::Fn { ident, args: arg_idents, body } => {
-            let parent_scope: Vec<&str> = scope.0.to_vec();
-            let mut fn_scope: Vec<&str> =
-                Vec::with_capacity(parent_scope.len() + 1);
-            fn_scope.append(&mut scope.0.to_vec());
-            fn_scope.push(ident);
-            if let Some(Type::Fn(overloads)) =
-                deref_ident(&Scope(&parent_scope), &Ident(&[ident]), types)
-            {
-                for (arg_types, return_) in overloads {
-                    if arg_idents.len() != arg_types.len() {
-                        error!(syntax, Message::FnWrongNumArgs);
-                    }
-                    let mut types: HashMap<Target, Type> = types.clone();
-                    for (arg_ident, arg_type) in
-                        arg_idents.iter().zip(arg_types)
-                    {
-                        if let Err(message) = set_type(
-                            &Scope(&fn_scope),
-                            &Ident(&[*arg_ident]),
-                            &mut types,
-                            arg_type,
-                        ) {
-                            error!(syntax, message);
-                        }
-                    }
-                    if let Some((last, body)) = body.split_last() {
-                        for syntax in body {
-                            match get_return(
-                                &Scope(&fn_scope),
-                                &mut types,
-                                syntax,
-                            ) {
-                                Ok(Ret::Sometimes(type_)) => {
-                                    if *return_ != type_ {
-                                        error!(syntax, Message::FnWrongReturn);
-                                    }
-                                }
-                                Ok(Ret::Always(_)) => {
-                                    error!(syntax, Message::Unreachable);
-                                }
-                                Err(error) => return Err(error),
-                                Ok(_) => (),
-                            }
-                        }
-                        match get_return(&Scope(&fn_scope), &mut types, last) {
-                            Ok(Ret::Always(type_)) => {
-                                if *return_ != type_ {
-                                    error!(last, Message::FnWrongReturn);
-                                }
-                            }
-                            Ok(_) => {
-                                if *return_ != Type::Undef {
-                                    error!(last, Message::FnMissingReturn);
-                                }
-                            }
-                            Err(error) => return Err(error),
-                        }
-                    } else if *return_ != Type::Undef {
-                        error!(syntax, Message::FnMissingReturn);
-                    }
-                }
-            } else {
-                error!(syntax, Message::FnMissingSig);
-            }
+        Stmt::Fn { ident, args, body } => {
+            set_fn(syntax, &scope, types, ident, args, body)?
         }
-        Stmt::Switch { expr: switch_expr, cases, default } => {
-            if cases.is_empty() && default.is_empty() {
-                error!(syntax, Message::SwitchEmpty)
-            }
-            let switch_type: Type = match get_expr(scope, types, switch_expr) {
-                Ok(type_) => type_,
-                Err(message) => error!(syntax, message),
-            };
-            let mut return_type: Option<Type> = None;
-            let mut always: bool = true;
-            for Case { expr: case_expr, body } in cases {
-                match get_expr(scope, types, case_expr) {
-                    Ok(type_) => {
-                        if switch_type != type_ {
-                            error!(syntax, Message::IncompatibleTypes);
-                        }
-                    }
-                    Err(message) => error!(syntax, message),
-                }
-                match (return_type.clone(), get_returns(scope, types, body)) {
-                    (Some(prev_type), Ok(Ret::Always(next_type))) => {
-                        if prev_type != next_type {
-                            error!(syntax, Message::IncompatibleTypes)
-                        }
-                    }
-                    (Some(prev_type), Ok(Ret::Sometimes(next_type))) => {
-                        if prev_type != next_type {
-                            error!(syntax, Message::IncompatibleTypes)
-                        }
-                        always = false;
-                    }
-                    (None, Ok(Ret::Always(type_))) => {
-                        return_type = Some(type_);
-                    }
-                    (None, Ok(Ret::Sometimes(type_))) => {
-                        return_type = Some(type_);
-                        always = false;
-                    }
-                    (_, Ok(Ret::Empty)) => always = false,
-                    (_, Err(error)) => return Err(error),
-                }
-                if let Some(last) = body.last() {
-                    match last.statement {
-                        Stmt::Break | Stmt::Ret(_) => (),
-                        _ => error!(syntax, Message::SwitchMissingCaseBreak),
-                    }
-                } else {
-                    error!(syntax, Message::SwitchMissingCaseBreak);
-                }
-            }
-            if default.is_empty() {
-                if let Some(type_) = return_type {
-                    return Ok(Ret::Sometimes(type_));
-                }
-            } else {
-                match (return_type, get_returns(scope, types, default)) {
-                    (None, Ok(Ret::Always(next_type))) => {
-                        if cases.is_empty() {
-                            return Ok(Ret::Always(next_type));
-                        }
-                        return Ok(Ret::Sometimes(next_type));
-                    }
-                    (None, Ok(Ret::Sometimes(next_type))) => {
-                        return Ok(Ret::Sometimes(next_type));
-                    }
-                    (None, Ok(Ret::Empty)) => (),
-                    (Some(prev_type), Ok(Ret::Sometimes(next_type))) => {
-                        if prev_type != next_type {
-                            error!(syntax, Message::IncompatibleTypes)
-                        }
-                        return Ok(Ret::Sometimes(next_type));
-                    }
-                    (Some(prev_type), Ok(Ret::Always(next_type))) => {
-                        if prev_type != next_type {
-                            error!(syntax, Message::IncompatibleTypes)
-                        }
-                        if always {
-                            return Ok(Ret::Always(next_type));
-                        }
-                        return Ok(Ret::Sometimes(next_type));
-                    }
-                    (Some(prev_type), Ok(Ret::Empty)) => {
-                        if prev_type != Type::Undef {
-                            error!(syntax, Message::IncompatibleTypes)
-                        }
-                        return Ok(Ret::Sometimes(Type::Undef));
-                    }
-                    (_, Err(error)) => return Err(error),
-                }
-            }
+        Stmt::Switch { expr, cases, default } => {
+            return set_switch(syntax, scope, types, expr, cases, default);
         }
         Stmt::Break => (),
         _ => panic!("{:#?}", syntax),
