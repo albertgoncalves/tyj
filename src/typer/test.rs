@@ -1120,6 +1120,27 @@ fn switch() {
 }
 
 #[test]
+fn switch_return() {
+    assert_types!(
+        "//! f(number) -> number
+         function f(x) {
+             switch (x) {
+             case 0: {
+                 return 0;
+             }
+             default: {
+                 return 1;
+             }
+             }
+         }",
+        Ok(map![(
+            Target { ident: vec!["f"], scope: Vec::new() },
+            Type::Fn(map![(vec![Type::Num], Type::Num)]),
+        )])
+    )
+}
+
+#[test]
 fn big_switch() {
     let obj_x: Type = Type::Obj(map![("a", Type::Bool), ("b", Type::Bool)]);
     let obj_y: Type = Type::Obj(map![("x", Type::Num)]);

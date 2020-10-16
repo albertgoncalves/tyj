@@ -459,7 +459,8 @@ fn get_return<'a, 'b>(
                 Ok(type_) => type_,
                 Err(message) => error!(syntax, message),
             };
-            let mut return_type: Ret = Ret::Empty;
+            let mut return_type: Option<Type> = None;
+            let mut always: bool = true;
             for Case { expr: case_expr, body } in cases {
                 match get_expr(scope, types, case_expr) {
                     Ok(type_) => {
@@ -470,33 +471,25 @@ fn get_return<'a, 'b>(
                     Err(message) => error!(syntax, message),
                 }
                 match (return_type.clone(), get_returns(scope, types, body)) {
-                    (Ret::Always(prev_type), Ok(Ret::Always(next_type))) => {
+                    (Some(prev_type), Ok(Ret::Always(next_type))) => {
                         if prev_type != next_type {
                             error!(syntax, Message::IncompatibleTypes)
                         }
                     }
-                    (
-                        Ret::Always(prev_type),
-                        Ok(Ret::Sometimes(next_type)),
-                    )
-                    | (
-                        Ret::Sometimes(prev_type),
-                        Ok(Ret::Always(next_type)),
-                    )
-                    | (
-                        Ret::Sometimes(prev_type),
-                        Ok(Ret::Sometimes(next_type)),
-                    ) => {
+                    (Some(prev_type), Ok(Ret::Sometimes(next_type))) => {
                         if prev_type != next_type {
                             error!(syntax, Message::IncompatibleTypes)
                         }
-                        return_type = Ret::Sometimes(next_type);
+                        always = false;
                     }
-                    (Ret::Empty, Ok(Ret::Always(type_)))
-                    | (Ret::Empty, Ok(Ret::Sometimes(type_))) => {
-                        return_type = Ret::Sometimes(type_);
+                    (None, Ok(Ret::Always(type_))) => {
+                        return_type = Some(type_);
                     }
-                    (_, Ok(Ret::Empty)) => (),
+                    (None, Ok(Ret::Sometimes(type_))) => {
+                        return_type = Some(type_);
+                        always = false;
+                    }
+                    (_, Ok(Ret::Empty)) => always = false,
                     (_, Err(error)) => return Err(error),
                 }
                 if let Some(last) = body.last() {
@@ -509,53 +502,37 @@ fn get_return<'a, 'b>(
                 }
             }
             if default.is_empty() {
-                match return_type {
-                    Ret::Always(type_) => return Ok(Ret::Sometimes(type_)),
-                    Ret::Sometimes(_) => return Ok(return_type),
-                    Ret::Empty => (),
+                if let Some(type_) = return_type {
+                    return Ok(Ret::Sometimes(type_));
                 }
             } else {
                 match (return_type, get_returns(scope, types, default)) {
-                    (Ret::Empty, Ok(Ret::Always(next_type))) => {
+                    (None, Ok(Ret::Always(next_type))) => {
                         if cases.is_empty() {
                             return Ok(Ret::Always(next_type));
                         }
                         return Ok(Ret::Sometimes(next_type));
                     }
-                    (Ret::Empty, Ok(Ret::Sometimes(next_type))) => {
+                    (None, Ok(Ret::Sometimes(next_type))) => {
                         return Ok(Ret::Sometimes(next_type));
                     }
-                    (Ret::Empty, Ok(Ret::Empty)) => (),
-                    (
-                        Ret::Always(prev_type),
-                        Ok(Ret::Sometimes(next_type)),
-                    )
-                    | (
-                        Ret::Sometimes(prev_type),
-                        Ok(Ret::Sometimes(next_type)),
-                    ) => {
-                        if prev_type == next_type {
-                            return Ok(Ret::Sometimes(next_type));
-                        }
-                        error!(syntax, Message::IncompatibleTypes)
-                    }
-                    (Ret::Always(prev_type), Ok(Ret::Always(next_type))) => {
-                        if prev_type != next_type {
-                            error!(syntax, Message::IncompatibleTypes)
-                        }
-                        return Ok(Ret::Always(next_type));
-                    }
-                    (
-                        Ret::Sometimes(prev_type),
-                        Ok(Ret::Always(next_type)),
-                    ) => {
+                    (None, Ok(Ret::Empty)) => (),
+                    (Some(prev_type), Ok(Ret::Sometimes(next_type))) => {
                         if prev_type != next_type {
                             error!(syntax, Message::IncompatibleTypes)
                         }
                         return Ok(Ret::Sometimes(next_type));
                     }
-                    (Ret::Always(prev_type), Ok(Ret::Empty))
-                    | (Ret::Sometimes(prev_type), Ok(Ret::Empty)) => {
+                    (Some(prev_type), Ok(Ret::Always(next_type))) => {
+                        if prev_type != next_type {
+                            error!(syntax, Message::IncompatibleTypes)
+                        }
+                        if always {
+                            return Ok(Ret::Always(next_type));
+                        }
+                        return Ok(Ret::Sometimes(next_type));
+                    }
+                    (Some(prev_type), Ok(Ret::Empty)) => {
                         if prev_type != Type::Undef {
                             error!(syntax, Message::IncompatibleTypes)
                         }
