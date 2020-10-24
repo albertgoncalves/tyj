@@ -2,12 +2,12 @@
 
 set -eux
 
-. "$WD/scripts/flags.sh"
+read -r -a flags <<< "$FLAGS"
 
 rustc \
     --emit "dep-info,metadata" \
     -C "embed-bitcode=no" \
-    "${FLAGS[@]}" \
+    "${flags[@]}" \
     "$WD/src/main.rs"
 rm libmain.rmeta
 rm main.d
